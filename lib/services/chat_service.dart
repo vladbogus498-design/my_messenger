@@ -5,40 +5,47 @@ class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Получить ID текущего пользователя
   String getCurrentUserId() {
-    return _auth.currentUser?.uid ?? '';
+    return _auth.currentUser?.uid ?? 'unknown_user';
   }
 
-  // Создать новый чат
   Future<void> createChat(String otherUserId) async {
     final currentUserId = getCurrentUserId();
-    if (currentUserId.isEmpty) return;
+    if (currentUserId.isEmpty || currentUserId == 'unknown_user') {
+      print('❌ Неизвестный пользователь');
+      return;
+    }
 
     final chatId = _generateChatId(currentUserId, otherUserId);
-
+    
     try {
-      await _firestore.collection('chats').doc(chatId).set({
-        'id': chatId,
-        'participants': [currentUserId, otherUserId],
-        'lastMessage': 'Чат создан',
-        'lastMessageTime': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'unreadCount': 0,
-      });
-      print('✅ Чат создан: $chatId');
+      // Проверяем, существует ли уже чат
+      final chatDoc = await _firestore.collection('chats').doc(chatId).get();
+      
+      if (!chatDoc.exists) {
+        await _firestore.collection('chats').doc(chatId).set({
+          'id': chatId,
+          'participants': [currentUserId, otherUserId],
+          'lastMessage': 'Чат создан 🚀',
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'unreadCount': 0,
+        });
+        print('✅ Чат создан: $chatId');
+      } else {
+        print('ℹ️ Чат уже существует: $chatId');
+      }
     } catch (e) {
       print('❌ Ошибка создания чата: $e');
     }
   }
 
-  // Отправить сообщение
   Future<void> sendMessage(String chatId, String text) async {
     final currentUserId = getCurrentUserId();
-    if (currentUserId.isEmpty) return;
+    if (currentUserId.isEmpty || currentUserId == 'unknown_user') return;
 
     try {
-      // Добавляем сообщение в подколлекцию
+      // Добавляем сообщение
       await _firestore
           .collection('chats')
           .doc(chatId)
@@ -50,22 +57,22 @@ class ChatService {
         'status': 0, // sent
       });
 
-      // Обновляем последнее сообщение в чате
+      // Обновляем последнее сообщение
       await _firestore.collection('chats').doc(chatId).update({
         'lastMessage': text,
         'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount': FieldValue.increment(1),
       });
-
-      print('✅ Сообщение отправлено в чат: $chatId');
+      
+      print('✅ Сообщение отправлено: "$text"');
     } catch (e) {
       print('❌ Ошибка отправки сообщения: $e');
     }
   }
 
-  // Получить поток чатов пользователя
   Stream<QuerySnapshot> getChatsStream() {
     final currentUserId = getCurrentUserId();
-    if (currentUserId.isEmpty) {
+    if (currentUserId.isEmpty || currentUserId == 'unknown_user') {
       return const Stream.empty();
     }
 
@@ -76,7 +83,6 @@ class ChatService {
         .snapshots();
   }
 
-  // Получить поток сообщений чата
   Stream<QuerySnapshot> getMessagesStream(String chatId) {
     return _firestore
         .collection('chats')
@@ -86,13 +92,11 @@ class ChatService {
         .snapshots();
   }
 
-  // Генерация ID чата
   String _generateChatId(String userId1, String userId2) {
     final sortedIds = [userId1, userId2]..sort();
     return 'chat_${sortedIds[0]}_${sortedIds[1]}';
   }
 
-  // Получить ID чата для двух пользователей
   String getChatId(String otherUserId) {
     final currentUserId = getCurrentUserId();
     return _generateChatId(currentUserId, otherUserId);

@@ -8,7 +8,7 @@ class ChatScreen extends StatefulWidget {
   final UserModel otherUser;
   final String chatId;
 
-  ChatScreen({
+  const ChatScreen({
     required this.language,
     required this.otherUser,
     required this.chatId,
@@ -27,6 +27,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _currentLanguage = widget.language;
+    print('💬 Чат открыт: ${widget.chatId}');
   }
 
   void _switchLanguage() {
@@ -39,6 +40,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
+    print('📤 Отправка сообщения: "$text" в чат ${widget.chatId}');
     _chatService.sendMessage(widget.chatId, text);
     _messageController.clear();
   }
@@ -97,11 +99,15 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: Container(
               color: Colors.grey[900],
-              child: StreamBuilder(
+              child: StreamBuilder<QuerySnapshot>(
                 stream: _chatService.getMessagesStream(widget.chatId),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
-                    return Center(child: Text('Ошибка загрузки сообщений'));
+                    print('❌ Ошибка сообщений: ${snapshot.error}');
+                    return Center(
+                      child: Text('Ошибка загрузки сообщений',
+                          style: TextStyle(color: Colors.white)),
+                    );
                   }
 
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -109,10 +115,21 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: CircularProgressIndicator(color: Colors.red));
                   }
 
-                  final messages = snapshot.data?.docs ?? [];
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'Нет сообщений\nНачните общение!',
+                        style: TextStyle(color: Colors.grey, fontSize: 16),
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  }
 
+                  final messages = snapshot.data!.docs;
+                  print('📨 Загружено сообщений: ${messages.length}');
                   return ListView.builder(
                     reverse: true,
+                    padding: EdgeInsets.all(16),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       final message = messages.reversed.toList()[index];
@@ -184,7 +201,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildMessageBubble(String text, bool isMe, DateTime time) {
     return Container(
-      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      margin: EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment:
             isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
