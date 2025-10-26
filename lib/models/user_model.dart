@@ -1,39 +1,36 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-class UserProfile {
-  final String userId;
+class UserModel {
+  final String uid;
   final String email;
-  final String username;
-  final String avatarUrl;
-  final Timestamp createdAt;
-  final bool isOnline;
-  final Timestamp lastSeen;
-  final String? typingStatus;
-  final String bio;
+  final String name;
+  final String? photoURL;
+  final DateTime? createdAt;
 
-  UserProfile({
-    required this.userId,
+  UserModel({
+    required this.uid,
     required this.email,
-    required this.username,
-    required this.avatarUrl,
-    required this.createdAt,
-    required this.isOnline,
-    required this.lastSeen,
-    this.typingStatus,
-    this.bio = '',
+    required this.name,
+    this.photoURL,
+    this.createdAt,
   });
 
-  factory UserProfile.fromMap(Map<String, dynamic> data) {
-    return UserProfile(
-      userId: data['userId'] ?? '',
+  factory UserModel.fromMap(Map<String, dynamic> data) {
+    return UserModel(
+      uid: data['uid'] ?? '',
       email: data['email'] ?? '',
-      username: data['username'] ?? '',
-      avatarUrl: data['avatarUrl'] ?? '',
-      createdAt: data['createdAt'] ?? Timestamp.now(),
-      isOnline: data['isOnline'] ?? false,
-      lastSeen: data['lastSeen'] ?? Timestamp.now(),
-      typingStatus: data['typingStatus'],
-      bio: data['bio'] ?? '',
+      name: data['name'] ?? '',
+      photoURL: data['photoURL'],
+      createdAt:
+          data['createdAt'] != null ? DateTime.parse(data['createdAt']) : null,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'uid': uid,
+      'email': email,
+      'name': name,
+      'photoURL': photoURL,
+      'createdAt': createdAt?.toIso8601String(),
+    };
   }
 }

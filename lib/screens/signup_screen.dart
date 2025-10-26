@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'main_chat_screen.dart';
-import 'signup_screen.dart';
+import 'login_screen.dart';
 
-class LoginScreen extends StatefulWidget {
+class SignupScreen extends StatefulWidget {
   final String language;
-
-  LoginScreen({required this.language});
+  
+  SignupScreen({required this.language});
 
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  _SignupScreenState createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
   late String _currentLanguage;
 
@@ -25,41 +26,40 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   bool _isValidEmail(String email) {
-    final emailRegex =
-        RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
     return emailRegex.hasMatch(email);
   }
 
   Map<String, Map<String, String>> _localizations = {
     'ru': {
-      'title': 'Вход в аккаунт',
-      'subtitle': 'Введите ваш email и пароль',
+      'title': 'Создать аккаунт',
+      'subtitle': 'Заполните данные для регистрации',
       'email': 'Email',
       'password': 'Пароль',
-      'login_button': 'ВОЙТИ',
-      'no_account': 'Нет аккаунта? Зарегистрируйтесь',
+      'confirm_password': 'Подтвердите пароль',
+      'signup_button': 'ЗАРЕГИСТРИРОВАТЬСЯ',
+      'has_account': 'Уже есть аккаунт? Войдите',
       'fill_fields': 'Заполните все поля',
+      'passwords_not_match': 'Пароли не совпадают',
       'invalid_email': 'Введите корректный email (например: user@mail.ru)',
-      'user_not_found': 'Аккаунт с таким email не найден',
-      'wrong_password': 'Неверный пароль',
-      'invalid_email_code': 'Некорректный email',
-      'too_many_requests': 'Слишком много попыток. Попробуйте позже',
-      'error': 'Ошибка входа',
+      'email_already_used': 'Этот email уже используется',
+      'weak_password': 'Пароль слишком слабый (минимум 6 символов)',
+      'error': 'Ошибка регистрации',
     },
     'en': {
-      'title': 'Login to account',
-      'subtitle': 'Enter your email and password',
+      'title': 'Create account',
+      'subtitle': 'Fill data for registration',
       'email': 'Email',
       'password': 'Password',
-      'login_button': 'LOGIN',
-      'no_account': 'No account? Sign up',
+      'confirm_password': 'Confirm password',
+      'signup_button': 'SIGN UP',
+      'has_account': 'Already have account? Login',
       'fill_fields': 'Fill all fields',
+      'passwords_not_match': 'Passwords do not match',
       'invalid_email': 'Enter valid email (example: user@mail.com)',
-      'user_not_found': 'Account with this email not found',
-      'wrong_password': 'Wrong password',
-      'invalid_email_code': 'Invalid email',
-      'too_many_requests': 'Too many attempts. Try again later',
-      'error': 'Login error',
+      'email_already_used': 'This email is already in use',
+      'weak_password': 'Password is too weak (minimum 6 characters)',
+      'error': 'Registration error',
     },
   };
 
@@ -69,14 +69,22 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  Future<void> _login() async {
+  Future<void> _signup() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
     final texts = _localizations[_currentLanguage]!;
 
-    if (email.isEmpty || password.isEmpty) {
+    if (email.isEmpty  password.isEmpty  confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(texts['fill_fields']!)),
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(texts['passwords_not_match']!)),
       );
       return;
     }
@@ -88,33 +96,37 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(texts['weak_password']!)),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-
+      
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => MainChatScreen()),
       );
     } on FirebaseAuthException catch (e) {
       String errorMessage = texts['error']!;
-
-      if (e.code == 'user-not-found') {
-        errorMessage = texts['user_not_found']!;
-      } else if (e.code == 'wrong-password') {
-        errorMessage = texts['wrong_password']!;
+      
+      if (e.code == 'email-already-in-use') {
+        errorMessage = texts['email_already_used']!;} else if (e.code == 'weak-password') {
+        errorMessage = texts['weak_password']!;
       } else if (e.code == 'invalid-email') {
-        errorMessage = texts['invalid_email_code']!;
-      } else if (e.code == 'too-many-requests') {
-        errorMessage = texts['too_many_requests']!;
+        errorMessage = texts['invalid_email']!;
       } else {
         errorMessage = '${texts['error']!}: ${e.message}';
       }
-
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorMessage)),
       );
@@ -130,11 +142,12 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final texts = _localizations[_currentLanguage]!;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(_currentLanguage == 'ru' ? 'Вход' : 'Login'),
-        backgroundColor: Colors.blue,
+        title: Text(_currentLanguage == 'ru' ? 'Регистрация' : 'Sign Up'),
+        backgroundColor: Colors.green,
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -177,6 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               SizedBox(height: 40),
+              
               TextField(
                 controller: _emailController,
                 decoration: InputDecoration(
@@ -187,6 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.emailAddress,
               ),
               SizedBox(height: 20),
+              
               TextField(
                 controller: _passwordController,
                 decoration: InputDecoration(
@@ -196,22 +211,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 obscureText: true,
               ),
+              SizedBox(height: 20),
+              
+              TextField(
+                controller: _confirmPasswordController,
+                decoration: InputDecoration(
+                  labelText: texts['confirm_password'],
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lock_outline),
+                ),
+                obscureText: true,
+              ),
               SizedBox(height: 30),
+              
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: _isLoading
                     ? Center(child: CircularProgressIndicator())
                     : ElevatedButton(
-                        onPressed: _login,
+                        onPressed: _signup,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
+                          backgroundColor: Colors.green,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                            borderRadius: BorderRadius.circular(12),),
                         ),
                         child: Text(
-                          texts['login_button']!,
+                          texts['signup_button']!,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -221,19 +247,18 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
               ),
               SizedBox(height: 20),
+              
               Center(
                 child: TextButton(
                   onPressed: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(
-                          builder: (context) =>
-                              SignupScreen(language: _currentLanguage)),
+                      MaterialPageRoute(builder: (context) => LoginScreen(language: _currentLanguage)),
                     );
                   },
                   child: Text(
-                    texts['no_account']!,
-                    style: TextStyle(color: Colors.blue),
+                    texts['has_account']!,
+                    style: TextStyle(color: Colors.green),
                   ),
                 ),
               ),
