@@ -3,6 +3,7 @@ class UserModel {
   final String email;
   final String name;
   final String? photoURL;
+  final String? bio; // описание профиля
   final DateTime? createdAt;
 
   UserModel({
@@ -10,6 +11,7 @@ class UserModel {
     required this.email,
     required this.name,
     this.photoURL,
+    this.bio,
     this.createdAt,
   });
 
@@ -19,6 +21,7 @@ class UserModel {
       email: data['email'] ?? '',
       name: data['name'] ?? '',
       photoURL: data['photoURL'],
+      bio: data['bio'],
       createdAt:
           data['createdAt'] != null ? DateTime.parse(data['createdAt']) : null,
     );
@@ -30,6 +33,7 @@ class UserModel {
       'email': email,
       'name': name,
       'photoURL': photoURL,
+      'bio': bio,
       'createdAt': createdAt?.toIso8601String(),
     };
   }

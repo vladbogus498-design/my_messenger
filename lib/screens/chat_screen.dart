@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import '../models/message_model.dart';
+import 'profile_screen.dart';
+import '../models/user_model.dart';
 
 class ChatScreen extends StatefulWidget {
   final String language;
+  final UserModel otherUser; // добавляем получателя
 
-  ChatScreen({required this.language});
+  ChatScreen({required this.language, required this.otherUser});
 
   @override
   _ChatScreenState createState() => _ChatScreenState();
@@ -14,33 +18,33 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<Message> _messages = [];
   late String _currentLanguage;
 
-  Map<String, Map<String, String>> _localizations = {
-    'ru': {
-      'type_message': 'Введите сообщение...',
-    },
-    'en': {
-      'type_message': 'Type a message...',
-    },
-  };
-
   @override
   void initState() {
     super.initState();
     _currentLanguage = widget.language;
 
+    // Тестовые сообщения со статусами
     _messages.addAll([
       Message(
           text: 'Привет! Как дела?',
           isMe: false,
-          time: DateTime.now().subtract(Duration(minutes: 5))),
+          time: DateTime.now().subtract(Duration(minutes: 5)),
+          status: MessageStatus.read),
       Message(
           text: 'Привет! Всё отлично, а у тебя?',
           isMe: true,
-          time: DateTime.now().subtract(Duration(minutes: 4))),
+          time: DateTime.now().subtract(Duration(minutes: 4)),
+          status: MessageStatus.read),
       Message(
           text: 'Тоже всё хорошо! Что нового?',
           isMe: false,
-          time: DateTime.now().subtract(Duration(minutes: 3))),
+          time: DateTime.now().subtract(Duration(minutes: 3)),
+          status: MessageStatus.delivered),
+      Message(
+          text: 'Сегодня кодил новый мессенджер!',
+          isMe: true,
+          time: DateTime.now().subtract(Duration(minutes: 2)),
+          status: MessageStatus.sent),
     ]);
   }
 
@@ -58,39 +62,67 @@ class _ChatScreenState extends State<ChatScreen> {
         text: _messageController.text,
         isMe: true,
         time: DateTime.now(),
+        status: MessageStatus.sent,
       ));
     });
 
     _messageController.clear();
   }
 
+  void _showProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(
+          user: widget.otherUser,
+          language: _currentLanguage,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusIcon(MessageStatus status) {
+    switch (status) {
+      case MessageStatus.sent:
+        return Icon(Icons.check, size: 12, color: Colors.grey);
+      case MessageStatus.delivered:
+        return Icon(Icons.done_all, size: 12, color: Colors.grey);
+      case MessageStatus.read:
+        return Icon(Icons.done_all, size: 12, color: Colors.blue);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final texts = _localizations[_currentLanguage]!;
-
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: Colors.blue,
-              child: Text('U', style: TextStyle(color: Colors.white)),
-            ),
-            SizedBox(width: 12),
-            Text('Другой пользователь'),
-          ],
+        title: GestureDetector(
+          onTap: _showProfile,
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Colors.red,
+                child: Text(widget.otherUser.name[0],
+                    style: TextStyle(color: Colors.white)),
+              ),
+              SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.otherUser.name, style: TextStyle(fontSize: 16)),
+                  Text('online',
+                      style: TextStyle(fontSize: 12, color: Colors.green)),
+                ],
+              ),
+            ],
+          ),
         ),
-        backgroundColor: Colors.blue,
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.red,
         actions: [
           IconButton(
-            icon: Text(
-              _currentLanguage == 'ru' ? 'EN' : 'RU',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
+            icon: Text(_currentLanguage == 'ru' ? 'EN' : 'RU',
+                style: TextStyle(color: Colors.red)),
             onPressed: _switchLanguage,
           ),
         ],
@@ -98,28 +130,53 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.all(16),
-              reverse: true,
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages.reversed.toList()[index];
-                return _buildMessageBubble(message);
-              },
+            child: Container(
+              color: Colors.grey[900],
+              child: ListView.builder(
+                padding: EdgeInsets.all(16),
+                reverse: true,
+                itemCount: _messages.length,
+                itemBuilder: (context, index) {
+                  final message = _messages.reversed.toList()[index];
+                  return _buildMessageBubble(message);
+                },
+              ),
             ),
           ),
+
+          // ПАНЕЛЬ ВВОДА С ИКОНКАМИ
           Container(
             padding: EdgeInsets.all(16),
-            color: Colors.white,
+            color: Colors.black,
             child: Row(
               children: [
+                // ИКОНКА ФОТО
+                IconButton(
+                  icon: Icon(Icons.photo_camera, color: Colors.red),
+                  onPressed: () {},
+                ),
+                // ИКОНКА ГОЛОСОВОГО
+                IconButton(
+                  icon: Icon(Icons.mic, color: Colors.red),
+                  onPressed: () {},
+                ),
+
                 Expanded(
                   child: TextField(
                     controller: _messageController,
+                    style: TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      hintText: texts['type_message']!,
+                      hintText: _currentLanguage == 'ru'
+                          ? 'Введите сообщение...'
+                          : 'Type a message...',
+                      hintStyle: TextStyle(color: Colors.grey),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25),
+                        borderSide: BorderSide(color: Colors.red),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25),
+                        borderSide: BorderSide(color: Colors.red),
                       ),
                       contentPadding: EdgeInsets.symmetric(horizontal: 16),
                     ),
@@ -128,7 +185,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 SizedBox(width: 8),
                 CircleAvatar(
-                  backgroundColor: Colors.blue,
+                  backgroundColor: Colors.red,
                   child: IconButton(
                     icon: Icon(Icons.send, color: Colors.white, size: 20),
                     onPressed: _sendMessage,
@@ -154,7 +211,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 maxWidth: MediaQuery.of(context).size.width * 0.7),
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: message.isMe ? Colors.blue : Colors.grey[300],
+              color: message.isMe ? Colors.red : Colors.grey[800],
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
@@ -162,17 +219,21 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 Text(
                   message.text,
-                  style: TextStyle(
-                    color: message.isMe ? Colors.white : Colors.black,
-                  ),
+                  style: TextStyle(color: Colors.white),
                 ),
                 SizedBox(height: 4),
-                Text(
-                  '${message.time.hour}:${message.time.minute.toString().padLeft(2, '0')}',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: message.isMe ? Colors.white70 : Colors.grey[600],
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${message.time.hour}:${message.time.minute.toString().padLeft(2, '0')}',
+                      style: TextStyle(fontSize: 10, color: Colors.white70),
+                    ),
+                    if (message.isMe) ...[
+                      SizedBox(width: 6),
+                      _buildStatusIcon(message.status),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -187,6 +248,11 @@ class Message {
   final String text;
   final bool isMe;
   final DateTime time;
+  final MessageStatus status;
 
-  Message({required this.text, required this.isMe, required this.time});
+  Message(
+      {required this.text,
+      required this.isMe,
+      required this.time,
+      required this.status});
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'chat_screen.dart';
 import 'user_search_screen.dart';
+import '../models/user_model.dart';
 
 class MainChatScreen extends StatefulWidget {
   @override
@@ -49,13 +50,14 @@ class _MainChatScreenState extends State<MainChatScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(texts[_currentIndex == 0 ? 'chats' : 'search']!),
-        backgroundColor: Colors.blue,
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.red,
         actions: [
           IconButton(
             icon: Text(
               _currentLanguage == 'ru' ? 'EN' : 'RU',
               style: TextStyle(
-                color: Colors.white,
+                color: Colors.red,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -63,7 +65,7 @@ class _MainChatScreenState extends State<MainChatScreen> {
             onPressed: _switchLanguage,
           ),
           IconButton(
-            icon: Icon(Icons.logout),
+            icon: Icon(Icons.logout, color: Colors.red),
             onPressed: _logout,
           ),
         ],
@@ -82,10 +84,13 @@ class _MainChatScreenState extends State<MainChatScreen> {
                 );
               },
               child: Icon(Icons.chat, color: Colors.white),
-              backgroundColor: Colors.blue,
+              backgroundColor: Colors.red,
             )
           : null,
       bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Colors.black,
+        selectedItemColor: Colors.red,
+        unselectedItemColor: Colors.grey,
         currentIndex: _currentIndex,
         onTap: (index) {
           setState(() => _currentIndex = index);
@@ -106,23 +111,26 @@ class _MainChatScreenState extends State<MainChatScreen> {
 
   Widget _buildChatsScreen(Map<String, String> texts) {
     return Container(
-      color: Colors.grey[100],
+      color: Colors.grey[900],
       child: ListView.builder(
         padding: EdgeInsets.all(8),
         itemCount: 5,
         itemBuilder: (context, index) {
           return Card(
+            color: Colors.grey[800],
             margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: Colors.blue,
+                backgroundColor: Colors.red,
                 child: Text(
                   'U${index + 1}',
                   style: TextStyle(color: Colors.white),
                 ),
               ),
-              title: Text('Пользователь ${index + 1}'),
-              subtitle: Text('Последнее сообщение в чате...'),
+              title: Text('Пользователь ${index + 1}',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: Text('Последнее сообщение в чате...',
+                  style: TextStyle(color: Colors.grey)),
               trailing: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -132,7 +140,7 @@ class _MainChatScreenState extends State<MainChatScreen> {
                   Container(
                     padding: EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: Colors.blue,
+                      color: Colors.red,
                       shape: BoxShape.circle,
                     ),
                     child: Text('1',
@@ -144,8 +152,15 @@ class _MainChatScreenState extends State<MainChatScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) =>
-                          ChatScreen(language: _currentLanguage)),
+                      builder: (context) => ChatScreen(
+                            language: _currentLanguage,
+                            otherUser: UserModel(
+                              uid: 'user_${index + 1}',
+                              email: 'user${index + 1}@mail.com',
+                              name: 'Пользователь ${index + 1}',
+                              bio: 'Тестовый пользователь ${index + 1}',
+                            ),
+                          )),
                 );
               },
             ),

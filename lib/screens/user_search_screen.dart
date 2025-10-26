@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'chat_screen.dart';
+import '../models/user_model.dart';
 
 class UserSearchScreen extends StatefulWidget {
   final String language;
@@ -35,11 +36,31 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
     _currentLanguage = widget.language;
 
     _users = [
-      AppUser(name: 'Алексей', email: 'alex@mail.com', id: '1'),
-      AppUser(name: 'Мария', email: 'maria@mail.com', id: '2'),
-      AppUser(name: 'Дмитрий', email: 'dima@mail.com', id: '3'),
-      AppUser(name: 'Анна', email: 'anna@mail.com', id: '4'),
-      AppUser(name: 'Сергей', email: 'sergey@mail.com', id: '5'),
+      AppUser(
+          id: '1',
+          name: 'Алексей',
+          email: 'alex@mail.com',
+          bio: 'Люблю кодить и пить кофе'),
+      AppUser(
+          id: '2',
+          name: 'Мария',
+          email: 'maria@mail.com',
+          bio: 'Дизайнер и художник'),
+      AppUser(
+          id: '3',
+          name: 'Дмитрий',
+          email: 'dima@mail.com',
+          bio: 'Разработчик игр'),
+      AppUser(
+          id: '4',
+          name: 'Анна',
+          email: 'anna@mail.com',
+          bio: 'Фотограф и путешественник'),
+      AppUser(
+          id: '5',
+          name: 'Сергей',
+          email: 'sergey@mail.com',
+          bio: 'Музыкант и продюсер'),
     ];
     _filteredUsers = _users;
   }
@@ -64,16 +85,17 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
     final texts = _localizations[_currentLanguage]!;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(_currentLanguage == 'ru' ? 'Поиск' : 'Search'),
-        backgroundColor: Colors.blue,
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.red,
         actions: [
           IconButton(
             icon: Text(
               _currentLanguage == 'ru' ? 'EN' : 'RU',
               style: TextStyle(
-                color: Colors.white,
+                color: Colors.red,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -88,11 +110,18 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
             padding: EdgeInsets.all(16),
             child: TextField(
               controller: _searchController,
+              style: TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: texts['search_users']!,
-                prefixIcon: Icon(Icons.search),
+                hintStyle: TextStyle(color: Colors.grey),
+                prefixIcon: Icon(Icons.search, color: Colors.red),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.red),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.red),
                 ),
                 contentPadding: EdgeInsets.symmetric(horizontal: 16),
               ),
@@ -106,7 +135,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                       texts['no_users']!,
                       style: TextStyle(
                         fontSize: 16,
-                        color: Colors.grey[600],
+                        color: Colors.grey,
                       ),
                     ),
                   )
@@ -115,11 +144,12 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                     itemBuilder: (context, index) {
                       final user = _filteredUsers[index];
                       return Card(
+                        color: Colors.grey[800],
                         margin:
                             EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: Colors.blue,
+                            backgroundColor: Colors.red,
                             child: Text(
                               user.name[0],
                               style: TextStyle(
@@ -128,25 +158,26 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                               ),
                             ),
                           ),
-                          title: Text(
-                            user.name,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          subtitle: Text(user.email),
+                          title: Text(user.name,
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
+                          subtitle: Text(user.email,
+                              style: TextStyle(color: Colors.grey)),
                           trailing: ElevatedButton(
                             onPressed: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) =>
-                                      ChatScreen(language: _currentLanguage),
+                                  builder: (context) => ChatScreen(
+                                    language: _currentLanguage,
+                                    otherUser: user.toUserModel(),
+                                  ),
                                 ),
                               );
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
+                              backgroundColor: Colors.red,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
                               ),
@@ -174,6 +205,17 @@ class AppUser {
   final String id;
   final String name;
   final String email;
+  final String? bio;
 
-  AppUser({required this.id, required this.name, required this.email});
+  AppUser(
+      {required this.id, required this.name, required this.email, this.bio});
+
+  UserModel toUserModel() {
+    return UserModel(
+      uid: id,
+      email: email,
+      name: name,
+      bio: bio,
+    );
+  }
 }
