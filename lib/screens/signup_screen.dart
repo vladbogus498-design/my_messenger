@@ -5,7 +5,7 @@ import 'login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   final String language;
-  
+
   SignupScreen({required this.language});
 
   @override
@@ -26,7 +26,8 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   bool _isValidEmail(String email) {
-    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+    final emailRegex =
+        RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
     return emailRegex.hasMatch(email);
   }
 
@@ -75,7 +76,7 @@ class _SignupScreenState extends State<SignupScreen> {
     final confirmPassword = _confirmPasswordController.text.trim();
     final texts = _localizations[_currentLanguage]!;
 
-    if (email.isEmpty  password.isEmpty  confirmPassword.isEmpty) {
+    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(texts['fill_fields']!)),
       );
@@ -110,23 +111,24 @@ class _SignupScreenState extends State<SignupScreen> {
         email: email,
         password: password,
       );
-      
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => MainChatScreen()),
       );
     } on FirebaseAuthException catch (e) {
       String errorMessage = texts['error']!;
-      
+
       if (e.code == 'email-already-in-use') {
-        errorMessage = texts['email_already_used']!;} else if (e.code == 'weak-password') {
+        errorMessage = texts['email_already_used']!;
+      } else if (e.code == 'weak-password') {
         errorMessage = texts['weak_password']!;
       } else if (e.code == 'invalid-email') {
         errorMessage = texts['invalid_email']!;
       } else {
         errorMessage = '${texts['error']!}: ${e.message}';
       }
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorMessage)),
       );
@@ -190,7 +192,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
               SizedBox(height: 40),
-              
               TextField(
                 controller: _emailController,
                 decoration: InputDecoration(
@@ -201,7 +202,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 keyboardType: TextInputType.emailAddress,
               ),
               SizedBox(height: 20),
-              
               TextField(
                 controller: _passwordController,
                 decoration: InputDecoration(
@@ -212,7 +212,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 obscureText: true,
               ),
               SizedBox(height: 20),
-              
               TextField(
                 controller: _confirmPasswordController,
                 decoration: InputDecoration(
@@ -223,7 +222,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 obscureText: true,
               ),
               SizedBox(height: 30),
-              
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -234,7 +232,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: Text(
                           texts['signup_button']!,
@@ -247,13 +246,14 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
               ),
               SizedBox(height: 20),
-              
               Center(
                 child: TextButton(
                   onPressed: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(builder: (context) => LoginScreen(language: _currentLanguage)),
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              LoginScreen(language: _currentLanguage)),
                     );
                   },
                   child: Text(
