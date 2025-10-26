@@ -2,25 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// ИМПОРТИРУЕМ ТВОИ ЭКРАНЫ
+import 'screens/login_screen.dart';
+import 'screens/main_chat_screen.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
     await Firebase.initializeApp();
-    print("✅ Firebase подключен!");
 
-    // Пробуем анонимный вход, но если ошибка - всё равно запускаем
+    // Пробуем анонимный вход
     try {
       await FirebaseAuth.instance.signInAnonymously();
-      print("✅ Вошли анонимно!");
     } catch (e) {
-      print("⚠️ Анонимный вход не сработал: $e");
+      print("Анонимный вход не сработал: $e");
     }
 
     runApp(MyApp());
   } catch (e) {
-    print("❌ Ошибка инициализации: $e");
-    // ВСЕГДА запускаем приложение, даже с ошибками
+    // Даже при ошибке запускаем
     runApp(MyApp());
   }
 }
@@ -29,51 +30,28 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Мой Мессенджер',
+      title: 'My Messenger',
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        useMaterial3: true,
       ),
-      home: MyHomePage(),
-    );
-  }
-}
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          // Если грузится - показываем загрузку
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
 
-class MyHomePage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Мой Мессенджер'),
-        backgroundColor: Colors.blue,
-      ),
-      body: Container(
-        color: Colors.white,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.chat, size: 64, color: Colors.blue),
-              SizedBox(height: 20),
-              Text(
-                'Мессенджер Запущен!',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 10),
-              Text(
-                'Firebase подключен',
-                style: TextStyle(fontSize: 16, color: Colors.green),
-              ),
-              SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: () {
-                  // Здесь будет переход к чатам
-                },
-                child: Text('Начать общение'),
-              ),
-            ],
-          ),
-        ),
+          // Если пользователь есть - показываем чаты
+          if (snapshot.hasData) {
+            return MainChatScreen(); // ТВОЙ ГЛАВНЫЙ ЭКРАН ЧАТОВ!
+          }
+
+          // Если нет - показываем логин
+          return LoginScreen(); // ТВОЙ ЭКРАН ВХОДА
+        },
       ),
     );
   }
