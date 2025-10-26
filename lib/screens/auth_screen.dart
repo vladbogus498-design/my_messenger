@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
 import 'signup_screen.dart';
@@ -32,14 +31,14 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Map<String, Map<String, String>> _localizations = {
     'ru': {
-      'welcome': 'Добро пожаловать!',
+      'welcome': 'DarkKick Messenger',
       'choose_action': 'Выберите действие',
       'login': 'ВОЙТИ',
       'signup': 'ЗАРЕГИСТРИРОВАТЬСЯ',
       'anonymous': 'Войти анонимно',
     },
     'en': {
-      'welcome': 'Welcome!',
+      'welcome': 'DarkKick Messenger',
       'choose_action': 'Choose action',
       'login': 'LOGIN',
       'signup': 'SIGN UP',
@@ -58,16 +57,16 @@ class _AuthScreenState extends State<AuthScreen> {
     final texts = _localizations[_currentLanguage]!;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.blue,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
           IconButton(
             icon: Text(
               _currentLanguage == 'ru' ? 'EN' : 'RU',
               style: TextStyle(
-                color: Colors.white,
+                color: Colors.red,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -82,31 +81,33 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // ЛОГОТИП ВМЕСТО ИКОНКИ
-              SvgPicture.asset(
-                'assets/logo.svg',
-                height: 100,
-                width: 100,
-              ),
-              SizedBox(height: 20),
-              Text(
-                texts['welcome']!,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
+              // ДЕМОН ЛОГОТИП
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.bolt, size: 50, color: Colors.red),
+                  SizedBox(width: 10),
+                  Text(
+                    'DarkKick',
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
               ),
               SizedBox(height: 10),
               Text(
-                texts['choose_action']!,
+                'Messenger',
                 style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
+                  fontSize: 18,
+                  color: Colors.red[300],
                 ),
               ),
               SizedBox(height: 40),
 
+              // КНОПКА ВОЙТИ
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -120,7 +121,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                    backgroundColor: Colors.red,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -137,6 +138,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               SizedBox(height: 16),
 
+              // КНОПКА РЕГИСТРАЦИИ
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -150,9 +152,10 @@ class _AuthScreenState extends State<AuthScreen> {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: Colors.grey[900],
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.red),
                     ),
                   ),
                   child: Text(
@@ -160,13 +163,14 @@ class _AuthScreenState extends State<AuthScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: Colors.red,
                     ),
                   ),
                 ),
               ),
               SizedBox(height: 20),
 
+              // АНОНИМНЫЙ ВХОД
               TextButton(
                 onPressed: () async {
                   try {
@@ -179,7 +183,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 },
                 child: Text(
                   texts['anonymous']!,
-                  style: TextStyle(color: Colors.blue),
+                  style: TextStyle(color: Colors.red),
                 ),
               ),
             ],
