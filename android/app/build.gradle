@@ -24,7 +24,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace = "com.example.my_messenger"
-    compileSdk = flutter.compileSdkVersion
+    compileSdkVersion 33  // ← ФИКС
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -34,10 +34,11 @@ android {
 
     defaultConfig {
         applicationId = "com.example.my_messenger"
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        minSdkVersion 21  // ← ФИКС
+        targetSdkVersion 33  // ← ФИКС
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
+        multiDexEnabled true
     }
 
     buildTypes {
@@ -52,3 +53,7 @@ flutter {
 }
 
 apply plugin: 'com.google.gms.google-services'
+
+dependencies {
+    implementation 'androidx.multidex:multidex:2.0.1'  // ← ДОБАВЬ
+}
