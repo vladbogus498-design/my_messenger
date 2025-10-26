@@ -18,17 +18,20 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
   List<AppUser> _users = [];
   List<AppUser> _filteredUsers = [];
   late String _currentLanguage;
+  bool _isCreatingChat = false;
 
   Map<String, Map<String, String>> _localizations = {
     'ru': {
       'search_users': 'Поиск пользователей...',
       'no_users': 'Пользователи не найдены',
       'start_chat': 'Начать чат',
+      'creating_chat': 'Создаём чат...',
     },
     'en': {
       'search_users': 'Search users...',
       'no_users': 'No users found',
       'start_chat': 'Start chat',
+      'creating_chat': 'Creating chat...',
     },
   };
 
@@ -39,15 +42,20 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
 
     _users = [
       AppUser(
+          id: '16', // Твой тест-аккаунт 2
+          name: 'Test User 16',
+          email: 'test16@mail.com',
+          bio: 'Тестовый аккаунт 16'),
+      AppUser(
+          id: '17', // Твой тест-аккаунт 1
+          name: 'Test User 17',
+          email: 'test17@mail.com',
+          bio: 'Тестовый аккаунт 17'),
+      AppUser(
           id: 'user_1',
           name: 'Подруга',
           email: 'ttdvlvd@gmail.com',
-          bio: 'Тестируем мессенджер вместе! 🚀'),
-      AppUser(
-          id: 'user_2',
-          name: 'Влад',
-          email: 'vladbogus943@gmail.com',
-          bio: 'Создатель этого крутого мессенджера! 💻'),
+          bio: 'Тестируем мессенджер'),
     ];
     _filteredUsers = _users;
   }
@@ -68,14 +76,26 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
   }
 
   Future<void> _startChat(AppUser user) async {
+    if (_isCreatingChat) return;
+
+    setState(() => _isCreatingChat = true);
+
     try {
+      print('🔄 Создаём чат с ${user.name}...');
+
       // Создаём чат в Firestore
       await _chatService.createChat(user.id);
 
       // Получаем ID чата
       final chatId = _chatService.getChatId(user.id);
 
-      Navigator.push(
+      print('✅ Чат создан: $chatId');
+
+      // Немного задержки для стабильности
+      await Future.delayed(Duration(milliseconds: 300));
+
+      // Переходим в чат
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (context) => ChatScreen(
@@ -84,20 +104,15 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
             chatId: chatId,
           ),
         ),
+        (route) => false, // Закрываем все предыдущие экраны
       );
     } catch (e) {
-      print('Ошибка создания чата: $e');
-      // Если ошибка, всё равно переходим в чат
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ChatScreen(
-            language: _currentLanguage,
-            otherUser: user.toUserModel(),
-            chatId: 'temp_chat_${user.id}',
-          ),
-        ),
+      print('❌ Ошибка создания чата: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка создания чата')),
       );
+    } finally {
+      setState(() => _isCreatingChat = false);
     }
   }
 
@@ -185,22 +200,24 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                                   fontWeight: FontWeight.bold)),
                           subtitle: Text(user.email,
                               style: TextStyle(color: Colors.grey)),
-                          trailing: ElevatedButton(
-                            onPressed: () => _startChat(user),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                            ),
-                            child: Text(
-                              texts['start_chat']!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
+                          trailing: _isCreatingChat
+                              ? CircularProgressIndicator(color: Colors.red)
+                              : ElevatedButton(
+                                  onPressed: () => _startChat(user),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    texts['start_chat']!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
                         ),
                       );
                     },
@@ -220,7 +237,6 @@ class AppUser {
 
   AppUser(
       {required this.id, required this.name, required this.email, this.bio});
-
   UserModel toUserModel() {
     return UserModel(
       uid: id,
