@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'chat_screen.dart';
 import '../models/user_model.dart';
+import '../services/chat_service.dart';
 
 class UserSearchScreen extends StatefulWidget {
   final String language;
 
-  UserSearchScreen({required this.language});
+  const UserSearchScreen({required this.language});
 
   @override
   _UserSearchScreenState createState() => _UserSearchScreenState();
@@ -13,6 +14,7 @@ class UserSearchScreen extends StatefulWidget {
 
 class _UserSearchScreenState extends State<UserSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final ChatService _chatService = ChatService();
   List<AppUser> _users = [];
   List<AppUser> _filteredUsers = [];
   late String _currentLanguage;
@@ -37,30 +39,15 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
 
     _users = [
       AppUser(
-          id: '1',
+          id: 'user_1',
           name: 'Подруга',
           email: 'ttdvlvd@gmail.com',
           bio: 'Тестируем мессенджер вместе! 🚀'),
       AppUser(
-          id: '2',
+          id: 'user_2',
           name: 'Влад',
           email: 'vladbogus943@gmail.com',
           bio: 'Создатель этого крутого мессенджера! 💻'),
-      AppUser(
-          id: '3',
-          name: 'Алексей',
-          email: 'alex@mail.com',
-          bio: 'Люблю кодить и пить кофе'),
-      AppUser(
-          id: '4',
-          name: 'Мария',
-          email: 'maria@mail.com',
-          bio: 'Дизайнер и художник'),
-      AppUser(
-          id: '5',
-          name: 'Дмитрий',
-          email: 'dima@mail.com',
-          bio: 'Разработчик игр'),
     ];
     _filteredUsers = _users;
   }
@@ -78,6 +65,40 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
             user.email.toLowerCase().contains(query.toLowerCase());
       }).toList();
     });
+  }
+
+  Future<void> _startChat(AppUser user) async {
+    try {
+      // Создаём чат в Firestore
+      await _chatService.createChat(user.id);
+
+      // Получаем ID чата
+      final chatId = _chatService.getChatId(user.id);
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatScreen(
+            language: _currentLanguage,
+            otherUser: user.toUserModel(),
+            chatId: chatId,
+          ),
+        ),
+      );
+    } catch (e) {
+      print('Ошибка создания чата: $e');
+      // Если ошибка, всё равно переходим в чат
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatScreen(
+            language: _currentLanguage,
+            otherUser: user.toUserModel(),
+            chatId: 'temp_chat_${user.id}',
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -165,17 +186,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                           subtitle: Text(user.email,
                               style: TextStyle(color: Colors.grey)),
                           trailing: ElevatedButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ChatScreen(
-                                    language: _currentLanguage,
-                                    otherUser: user.toUserModel(),
-                                  ),
-                                ),
-                              );
-                            },
+                            onPressed: () => _startChat(user),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
                               shape: RoundedRectangleBorder(

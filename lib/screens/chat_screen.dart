@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
-import '../models/message_model.dart';
-import 'profile_screen.dart';
 import '../models/user_model.dart';
+import 'profile_screen.dart';
+import '../services/chat_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String language;
-  final UserModel otherUser; // добавляем получателя
+  final UserModel otherUser;
+  final String chatId;
 
-  ChatScreen({required this.language, required this.otherUser});
+  ChatScreen({
+    required this.language,
+    required this.otherUser,
+    required this.chatId,
+  });
 
   @override
   _ChatScreenState createState() => _ChatScreenState();
@@ -15,37 +20,13 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
-  final List<Message> _messages = [];
+  final ChatService _chatService = ChatService();
   late String _currentLanguage;
 
   @override
   void initState() {
     super.initState();
     _currentLanguage = widget.language;
-
-    // Тестовые сообщения со статусами
-    _messages.addAll([
-      Message(
-          text: 'Привет! Как дела?',
-          isMe: false,
-          time: DateTime.now().subtract(Duration(minutes: 5)),
-          status: MessageStatus.read),
-      Message(
-          text: 'Привет! Всё отлично, а у тебя?',
-          isMe: true,
-          time: DateTime.now().subtract(Duration(minutes: 4)),
-          status: MessageStatus.read),
-      Message(
-          text: 'Тоже всё хорошо! Что нового?',
-          isMe: false,
-          time: DateTime.now().subtract(Duration(minutes: 3)),
-          status: MessageStatus.delivered),
-      Message(
-          text: 'Сегодня кодил новый мессенджер!',
-          isMe: true,
-          time: DateTime.now().subtract(Duration(minutes: 2)),
-          status: MessageStatus.sent),
-    ]);
   }
 
   void _switchLanguage() {
@@ -55,17 +36,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
 
-    setState(() {
-      _messages.add(Message(
-        text: _messageController.text,
-        isMe: true,
-        time: DateTime.now(),
-        status: MessageStatus.sent,
-      ));
-    });
-
+    _chatService.sendMessage(widget.chatId, text);
     _messageController.clear();
   }
 
@@ -81,17 +55,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildStatusIcon(MessageStatus status) {
-    switch (status) {
-      case MessageStatus.sent:
-        return Icon(Icons.check, size: 12, color: Colors.grey);
-      case MessageStatus.delivered:
-        return Icon(Icons.done_all, size: 12, color: Colors.grey);
-      case MessageStatus.read:
-        return Icon(Icons.done_all, size: 12, color: Colors.blue);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -102,8 +65,10 @@ class _ChatScreenState extends State<ChatScreen> {
             children: [
               CircleAvatar(
                 backgroundColor: Colors.red,
-                child: Text(widget.otherUser.name[0],
-                    style: TextStyle(color: Colors.white)),
+                child: Text(
+                  widget.otherUser.name[0],
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
               SizedBox(width: 12),
               Column(
@@ -132,35 +97,53 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: Container(
               color: Colors.grey[900],
-              child: ListView.builder(
-                padding: EdgeInsets.all(16),
-                reverse: true,
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  final message = _messages.reversed.toList()[index];
-                  return _buildMessageBubble(message);
+              child: StreamBuilder(
+                stream: _chatService.getMessagesStream(widget.chatId),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Ошибка загрузки сообщений'));
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(
+                        child: CircularProgressIndicator(color: Colors.red));
+                  }
+
+                  final messages = snapshot.data?.docs ?? [];
+
+                  return ListView.builder(
+                    reverse: true,
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final message = messages.reversed.toList()[index];
+                      final data = message.data() as Map<String, dynamic>;
+                      final isMe =
+                          data['senderId'] == _chatService.getCurrentUserId();
+
+                      return _buildMessageBubble(
+                        data['text'] ?? '',
+                        isMe,
+                        data['timestamp']?.toDate() ?? DateTime.now(),
+                      );
+                    },
+                  );
                 },
               ),
             ),
           ),
-
-          // ПАНЕЛЬ ВВОДА С ИКОНКАМИ
           Container(
             padding: EdgeInsets.all(16),
             color: Colors.black,
             child: Row(
               children: [
-                // ИКОНКА ФОТО
                 IconButton(
                   icon: Icon(Icons.photo_camera, color: Colors.red),
                   onPressed: () {},
                 ),
-                // ИКОНКА ГОЛОСОВОГО
                 IconButton(
                   icon: Icon(Icons.mic, color: Colors.red),
                   onPressed: () {},
                 ),
-
                 Expanded(
                   child: TextField(
                     controller: _messageController,
@@ -199,39 +182,36 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(Message message) {
+  Widget _buildMessageBubble(String text, bool isMe, DateTime time) {
     return Container(
-      margin: EdgeInsets.symmetric(vertical: 4),
+      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 16),
       child: Row(
         mainAxisAlignment:
-            message.isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
           Container(
             constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.7),
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: message.isMe ? Colors.red : Colors.grey[800],
+              color: isMe ? Colors.red : Colors.grey[700],
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  message.text,
-                  style: TextStyle(color: Colors.white),
-                ),
+                Text(text, style: TextStyle(color: Colors.white)),
                 SizedBox(height: 4),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${message.time.hour}:${message.time.minute.toString().padLeft(2, '0')}',
+                      '${time.hour}:${time.minute.toString().padLeft(2, '0')}',
                       style: TextStyle(fontSize: 10, color: Colors.white70),
                     ),
-                    if (message.isMe) ...[
+                    if (isMe) ...[
                       SizedBox(width: 6),
-                      _buildStatusIcon(message.status),
+                      Icon(Icons.done_all, size: 12, color: Colors.white70),
                     ],
                   ],
                 ),
@@ -242,17 +222,4 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
-}
-
-class Message {
-  final String text;
-  final bool isMe;
-  final DateTime time;
-  final MessageStatus status;
-
-  Message(
-      {required this.text,
-      required this.isMe,
-      required this.time,
-      required this.status});
 }

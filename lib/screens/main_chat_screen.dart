@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'chat_screen.dart';
 import 'user_search_screen.dart';
 import '../models/user_model.dart';
+import '../services/chat_service.dart';
 
 class MainChatScreen extends StatefulWidget {
   @override
@@ -13,6 +15,7 @@ class _MainChatScreenState extends State<MainChatScreen> {
   int _currentIndex = 0;
   final User? user = FirebaseAuth.instance.currentUser;
   String _currentLanguage = 'ru';
+  final ChatService _chatService = ChatService();
 
   Map<String, Map<String, String>> _localizations = {
     'ru': {
@@ -21,7 +24,6 @@ class _MainChatScreenState extends State<MainChatScreen> {
       'no_chats': 'Нет чатов',
       'start_chat': 'Начните общение',
       'logout': 'Выйти',
-      'new_chat': 'Новый чат',
     },
     'en': {
       'chats': 'Chats',
@@ -29,7 +31,6 @@ class _MainChatScreenState extends State<MainChatScreen> {
       'no_chats': 'No chats',
       'start_chat': 'Start chatting',
       'logout': 'Logout',
-      'new_chat': 'New chat',
     },
   };
 
@@ -110,63 +111,120 @@ class _MainChatScreenState extends State<MainChatScreen> {
   }
 
   Widget _buildChatsScreen(Map<String, String> texts) {
-    return Container(
-      color: Colors.grey[900],
-      child: ListView.builder(
-        padding: EdgeInsets.all(8),
-        itemCount: 5,
-        itemBuilder: (context, index) {
-          return Card(
-            color: Colors.grey[800],
-            margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.red,
-                child: Text(
-                  'U${index + 1}',
-                  style: TextStyle(color: Colors.white),
+    return StreamBuilder<QuerySnapshot>(
+      stream: _chatService.getChatsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+              child: Text('Ошибка загрузки чатов',
+                  style: TextStyle(color: Colors.white)));
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator(color: Colors.red));
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.chat_bubble, size: 64, color: Colors.red),
+                SizedBox(height: 16),
+                Text(texts['no_chats']!,
+                    style: TextStyle(fontSize: 18, color: Colors.white)),
+                SizedBox(height: 8),
+                Text(
+                  'Начните новый чат с помощью кнопки ниже',
+                  style: TextStyle(color: Colors.grey),
                 ),
-              ),
-              title: Text('Пользователь ${index + 1}',
-                  style: TextStyle(color: Colors.white)),
-              subtitle: Text('Последнее сообщение в чате...',
-                  style: TextStyle(color: Colors.grey)),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('12:30',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  SizedBox(height: 4),
-                  Container(
-                    padding: EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text('1',
-                        style: TextStyle(fontSize: 10, color: Colors.white)),
-                  ),
-                ],
-              ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => ChatScreen(
-                            language: _currentLanguage,
-                            otherUser: UserModel(
-                              uid: 'user_${index + 1}',
-                              email: 'user${index + 1}@mail.com',
-                              name: 'Пользователь ${index + 1}',
-                              bio: 'Тестовый пользователь ${index + 1}',
-                            ),
-                          )),
-                );
-              },
+              ],
             ),
           );
-        },
-      ),
+        }
+
+        final chats = snapshot.data!.docs;
+
+        return Container(
+          color: Colors.grey[900],
+          child: ListView.builder(
+            padding: EdgeInsets.all(8),
+            itemCount: chats.length,
+            itemBuilder: (context, index) {
+              final chat = chats[index];
+              final data = chat.data() as Map<String, dynamic>;
+
+              // Временная заглушка - показываем тестового пользователя
+              final otherUser = UserModel(
+                uid: 'user_1',
+                email: 'ttdvlvd@gmail.com',
+                name: 'Подруга',
+                bio: 'Тестируем мессенджер',
+              );
+
+              return Card(
+                color: Colors.grey[800],
+                margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.red,
+                    child: Text(
+                      otherUser.name[0],
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  title: Text(otherUser.name,
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: Text(
+                    data['lastMessage'] ?? 'Нет сообщений',
+                    style: TextStyle(color: Colors.grey),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _formatTime(data['lastMessageTime']?.toDate()),
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      SizedBox(height: 4),
+                      if ((data['unreadCount'] ?? 0) > 0)
+                        Container(
+                          padding: EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${data['unreadCount']}',
+                            style: TextStyle(fontSize: 10, color: Colors.white),
+                          ),
+                        ),
+                    ],
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => ChatScreen(
+                                language: _currentLanguage,
+                                otherUser: otherUser,
+                                chatId: chat.id,
+                              )),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
+  }
+
+  String _formatTime(DateTime? time) {
+    if (time == null) return '';
+    return '${time.hour}:${time.minute.toString().padLeft(2, '0')}';
   }
 }
