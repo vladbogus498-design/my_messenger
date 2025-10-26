@@ -38,26 +38,31 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
     _users = [
       AppUser(
           id: '1',
+          name: 'Подруга',
+          email: 'ttdvlvd@gmail.com',
+          bio: 'Тестируем мессенджер вместе! 🚀'),
+      AppUser(
+          id: '2',
           name: 'Алексей',
           email: 'alex@mail.com',
           bio: 'Люблю кодить и пить кофе'),
       AppUser(
-          id: '2',
+          id: '3',
           name: 'Мария',
           email: 'maria@mail.com',
           bio: 'Дизайнер и художник'),
       AppUser(
-          id: '3',
+          id: '4',
           name: 'Дмитрий',
           email: 'dima@mail.com',
           bio: 'Разработчик игр'),
       AppUser(
-          id: '4',
+          id: '5',
           name: 'Анна',
           email: 'anna@mail.com',
           bio: 'Фотограф и путешественник'),
       AppUser(
-          id: '5',
+          id: '6',
           name: 'Сергей',
           email: 'sergey@mail.com',
           bio: 'Музыкант и продюсер'),
