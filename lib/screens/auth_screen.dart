@@ -81,7 +81,7 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // ДЕМОН ЛОГОТИП
+              // ДЕМОН ЛОГОТИП БЕЗ SVG
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
