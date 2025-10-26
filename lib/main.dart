@@ -2,15 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// Импортируем твои экраны
+import 'screens/auth_wrapper.dart';
+import 'screens/login_screen.dart';
+import 'screens/chat_screen.dart';
+import 'screens/main_chat_screen.dart';
+import 'screens/user_search_screen.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // ПРОСТАЯ ИНИЦИАЛИЗАЦИЯ БЕЗ OPTIONS
     await Firebase.initializeApp();
     print("✅ Firebase подключен!");
 
-    // АНОНИМНЫЙ ВХОД
     await FirebaseAuth.instance.signInAnonymously();
     print("✅ Вошли анонимно!");
 
@@ -20,9 +25,7 @@ void main() async {
     runApp(
       MaterialApp(
         home: Scaffold(
-          body: Center(
-            child: Text("Ошибка: $e"),
-          ),
+          body: Center(child: Text("Ошибка: $e")),
         ),
       ),
     );
@@ -33,22 +36,11 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        backgroundColor: Colors.green,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Приложение РАБОТАЕТ!',
-                style: TextStyle(fontSize: 20, color: Colors.white),
-              ),
-              SizedBox(height: 20),
-              CircularProgressIndicator(color: Colors.white),
-            ],
-          ),
-        ),
+      title: 'My Messenger',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
       ),
+      home: AuthWrapper(), // Используем твой AuthWrapper для навигации
     );
   }
 }
