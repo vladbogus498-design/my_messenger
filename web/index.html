@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="DARKKICK">
+  
+  <!-- КОСТЫЛЬ ДЛЯ ОТКЛЮЧЕНИЯ ШЕЙДЕРОВ -->
+  <script>
+    window.flutterWebRenderer = "html";
+    window.preventShaderCompilation = true;
+  </script>
+  
+  <title>DARKKICK</title>
+  <style>
+    body { margin: 0; padding: 0; background: black; }
+    #loading { color: white; text-align: center; padding: 50px; }
+  </style>
+</head>
+<body>
+  <div id="loading">Loading DARKKICK...</div>
+  <script src="main.dart.js" type="application/javascript"></script>
+</body>
+</html>
