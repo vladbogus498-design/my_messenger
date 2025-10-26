@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
 import 'signup_screen.dart';
@@ -81,7 +82,12 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.chat_bubble, size: 80, color: Colors.blue),
+              // ЛОГОТИП ВМЕСТО ИКОНКИ
+              SvgPicture.asset(
+                'assets/logo.svg',
+                height: 100,
+                width: 100,
+              ),
               SizedBox(height: 20),
               Text(
                 texts['welcome']!,
@@ -100,6 +106,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
               SizedBox(height: 40),
+
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -129,6 +136,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
               SizedBox(height: 16),
+
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -158,6 +166,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
               SizedBox(height: 20),
+
               TextButton(
                 onPressed: () async {
                   try {
