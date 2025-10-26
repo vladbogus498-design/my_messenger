@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import 'profile_screen.dart';
 import '../services/chat_service.dart';
@@ -99,7 +100,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: Container(
               color: Colors.grey[900],
-              child: StreamBuilder<QuerySnapshot>(
+              child: StreamBuilder(
                 stream: _chatService.getMessagesStream(widget.chatId),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
