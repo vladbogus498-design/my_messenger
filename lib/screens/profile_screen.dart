@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:darkkick_messenger/screens/login_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   @override
@@ -102,13 +103,13 @@ class ProfileScreen extends StatelessWidget {
                 SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () async {
-                    // Выход из Firebase
                     await FirebaseAuth.instance.signOut();
-
-                    // Переход на экран входа
                     Navigator.pushAndRemoveUntil(
                       context,
-                      MaterialPageRoute(builder: (context) => LoginScreen()),
+                      MaterialPageRoute(
+                          builder: (context) => LoginScreen(
+                                language: 'ru',
+                              )),
                       (route) => false,
                     );
                   },
