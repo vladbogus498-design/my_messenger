@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/chat_service.dart';
 import '../models/chat.dart';
+import 'user_search_screen.dart'; // Добавь этот импорт
 
 class ChatScreen extends StatefulWidget {
   @override
@@ -26,15 +27,16 @@ class _ChatScreenState extends State<ChatScreen> {
         _chats = chats;
         _isLoading = false;
       });
+      print('✅ Загружено ${chats.length} чатов');
     } catch (e) {
-      print('Ошибка загрузки чатов: $e');
+      print('❌ Ошибка загрузки чатов: $e');
       setState(() => _isLoading = false);
     }
   }
 
   void _openChat(Chat chat) {
-    // ТВОЙ КОД ДЛЯ ОТКРЫТИЯ ЧАТА
-    print('Открываем чат: ${chat.id}');
+    print('🟢 Открываем чат: ${chat.id}');
+    // Твой код открытия чата
   }
 
   @override
@@ -43,6 +45,16 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: Text('Чаты'),
         actions: [
+          IconButton(
+            icon: Icon(Icons.add),
+            onPressed: () {
+              // Создать новый чат
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => UserSearchScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: Icon(Icons.refresh),
             onPressed: _loadChats,

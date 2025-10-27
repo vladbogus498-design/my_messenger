@@ -6,19 +6,30 @@ class UserSearchScreen extends StatefulWidget {
 }
 
 class _UserSearchScreenState extends State<UserSearchScreen> {
-  // Временный фикс - убираем ChatService
-  void _searchUsers(String query) {
-    // Твой код поиска
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Search Users'),
+        title: Text('Поиск пользователей'),
       ),
-      body: Center(
-        child: Text('Search Screen - fix later'),
+      body: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Введите имя пользователя...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Text('Здесь будет список пользователей'),
+            ),
+          ),
+        ],
       ),
     );
   }
