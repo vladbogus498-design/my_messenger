@@ -15,9 +15,7 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.grey[900],
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
         ),
-        cardColor: Colors.grey[800], // ПРОСТО cardColor вместо cardTheme
       ),
       home: MainChatScreen(),
     );
