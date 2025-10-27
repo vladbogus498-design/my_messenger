@@ -26,7 +26,6 @@ class SingleChatScreen extends StatelessWidget {
                 ),
               ),
             ),
-            // Можно добавить поле ввода сообщения позже
           ],
         ),
       ),
