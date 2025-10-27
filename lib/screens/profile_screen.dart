@@ -103,15 +103,17 @@ class ProfileScreen extends StatelessWidget {
                 SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () async {
-                    await FirebaseAuth.instance.signOut();
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => LoginScreen(
-                                language: 'ru',
-                              )),
-                      (route) => false,
-                    );
+                    try {
+                      await FirebaseAuth.instance.signOut();
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => LoginScreen(language: 'ru')),
+                        (route) => false,
+                      );
+                    } catch (e) {
+                      print('Ошибка выхода: $e');
+                    }
                   },
                   child: Text('Выйти', style: TextStyle(color: Colors.white)),
                   style: ElevatedButton.styleFrom(
