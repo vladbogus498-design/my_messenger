@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/chat_service.dart';
 import '../models/chat.dart';
-import 'user_search_screen.dart'; // Добавь этот импорт
+import 'single_chat_screen.dart';
+import 'user_search_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   @override
@@ -20,23 +21,52 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _loadChats() async {
     setState(() => _isLoading = true);
-
     try {
       final chats = await ChatService.getUserChats();
       setState(() {
         _chats = chats;
         _isLoading = false;
       });
-      print('✅ Загружено ${chats.length} чатов');
     } catch (e) {
-      print('❌ Ошибка загрузки чатов: $e');
       setState(() => _isLoading = false);
     }
   }
 
+  // СОЗДАНИЕ ТЕСТОВОГО ЧАТА
+  void _createTestChat() async {
+    try {
+      await ChatService.createTestChat();
+      _loadChats(); // Перезагружаем список
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Тестовый чат создан!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка: $e')),
+      );
+    }
+  }
+
   void _openChat(Chat chat) {
-    print('🟢 Открываем чат: ${chat.id}');
-    // Твой код открытия чата
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (context) => SingleChatScreen(chatId: chat.id)),
+    );
+  }
+
+  // ИКОНКА СТАТУСА СООБЩЕНИЯ
+  Widget _buildMessageStatus(String status) {
+    switch (status) {
+      case 'sent':
+        return Icon(Icons.check, size: 16, color: Colors.grey);
+      case 'delivered':
+        return Icon(Icons.done_all, size: 16, color: Colors.grey);
+      case 'read':
+        return Icon(Icons.done_all, size: 16, color: Colors.blue);
+      default:
+        return Icon(Icons.access_time, size: 16, color: Colors.grey);
+    }
   }
 
   @override
@@ -47,13 +77,7 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.add),
-            onPressed: () {
-              // Создать новый чат
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => UserSearchScreen()),
-              );
-            },
+            onPressed: _createTestChat, // ТЕСТОВЫЙ ЧАТ
           ),
           IconButton(
             icon: Icon(Icons.refresh),
@@ -74,7 +98,13 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Text(chat.name[0]),
                       ),
                       title: Text(chat.name),
-                      subtitle: Text(chat.lastMessage ?? ''),
+                      subtitle: Row(
+                        children: [
+                          Expanded(child: Text(chat.lastMessage ?? '')),
+                          _buildMessageStatus(chat.lastMessageStatus), // СТАТУС
+                        ],
+                      ),
+                      trailing: Text('12:30'), // Время
                       onTap: () => _openChat(chat),
                     );
                   },

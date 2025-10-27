@@ -3,6 +3,7 @@ class Chat {
   final String name;
   final List<String> participants;
   final String lastMessage;
+  final String lastMessageStatus; // НОВОЕ ПОЛЕ
   final DateTime lastMessageTime;
 
   Chat({
@@ -10,6 +11,7 @@ class Chat {
     required this.name,
     required this.participants,
     required this.lastMessage,
+    required this.lastMessageStatus,
     required this.lastMessageTime,
   });
 }
