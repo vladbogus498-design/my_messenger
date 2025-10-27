@@ -1,16 +1,29 @@
-# my_messenger
+# DarkKick Messenger 💬
 
-A new Flutter project.
+Professional cross-platform messenger built with **Flutter + Firebase**.
 
-## Getting Started
+## 🚀 Features
+- ✅ User Authentication (Firebase Auth)
+- ✅ Real-time Chat (Firestore Database)  
+- ✅ Modern Dark UI
+- ✅ Cross-platform (Android/iOS/Web)
+- ✅ English Interface
 
-This project is a starting point for a Flutter application.
+## 🛠 Technologies
+- **Flutter** - Google's UI toolkit
+- **Firebase** - Backend & Authentication
+- **Dart** - Programming language
+- **GitHub** - Version control
+- **Codemagic** - CI/CD builds
 
-A few resources to get you started if this is your first Flutter project:
+## 📱 Demo
+- **APK Download**: [Codemagic Builds]
+- **Live Demo**: Install APK on Android
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## 🏗 Architecture
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+lib/
+├──models/      # Data structures
+├──services/    # Business logic
+├── screens/     # UI components
+└──main.dart    # App entry point
