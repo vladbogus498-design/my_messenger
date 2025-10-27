@@ -1,31 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'screens/auth_screen.dart';
+import 'screens/main_chat_screen.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  try {
-    await Firebase.initializeApp();
-    print("✅ Firebase подключен!");
-    runApp(MyApp());
-  } catch (e) {
-    print("❌ Ошибка Firebase: $e");
-    // Запускаем даже с ошибкой Firebase
-    runApp(MyApp());
-  }
+void main() {
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'DarkKick Messenger',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
+      title: 'DarkKick',
+      theme: ThemeData.dark().copyWith(
+        primaryColor: Colors.red[800],
+        scaffoldBackgroundColor: Colors.grey[900],
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+        ),
+        cardColor: Colors.grey[800], // ПРОСТО cardColor вместо cardTheme
       ),
-      home: AuthScreen(),
-      debugShowCheckedModeBanner: false,
+      home: MainChatScreen(),
     );
   }
 }
