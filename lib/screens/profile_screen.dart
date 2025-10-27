@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfileScreen extends StatelessWidget {
   @override
@@ -100,7 +101,17 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: () => print('Выход'),
+                  onPressed: () async {
+                    // Выход из Firebase
+                    await FirebaseAuth.instance.signOut();
+
+                    // Переход на экран входа
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (context) => LoginScreen()),
+                      (route) => false,
+                    );
+                  },
                   child: Text('Выйти', style: TextStyle(color: Colors.white)),
                   style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red[800]),
