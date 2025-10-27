@@ -28,45 +28,44 @@ class _ChatScreenState extends State<ChatScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      print('❌ Ошибка загрузки чатов: $e');
       setState(() => _isLoading = false);
     }
   }
 
-  // СОЗДАНИЕ ТЕСТОВОГО ЧАТА
+  // ФИКС: СОЗДАНИЕ ТЕСТОВОГО ЧАТА
   void _createTestChat() async {
     try {
       await ChatService.createTestChat();
       _loadChats(); // Перезагружаем список
+
+      // Показываем уведомление
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Тестовый чат создан!')),
+        SnackBar(
+          content: Text('✅ Тестовый чат создан!'),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка: $e')),
+        SnackBar(
+          content: Text('❌ Ошибка: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
+  // ФИКС: ОТКРЫТИЕ ЧАТА
   void _openChat(Chat chat) {
+    print('🟢 Открываем чат: ${chat.id}');
     Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (context) => SingleChatScreen(chatId: chat.id)),
+        builder: (context) =>
+            SingleChatScreen(chatId: chat.id, chatName: chat.name),
+      ),
     );
-  }
-
-  // ИКОНКА СТАТУСА СООБЩЕНИЯ
-  Widget _buildMessageStatus(String status) {
-    switch (status) {
-      case 'sent':
-        return Icon(Icons.check, size: 16, color: Colors.grey);
-      case 'delivered':
-        return Icon(Icons.done_all, size: 16, color: Colors.grey);
-      case 'read':
-        return Icon(Icons.done_all, size: 16, color: Colors.blue);
-      default:
-        return Icon(Icons.access_time, size: 16, color: Colors.grey);
-    }
   }
 
   @override
@@ -77,7 +76,8 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.add),
-            onPressed: _createTestChat, // ТЕСТОВЫЙ ЧАТ
+            onPressed: _createTestChat, // ФИКС: кнопка создания чата
+            tooltip: 'Создать тестовый чат',
           ),
           IconButton(
             icon: Icon(Icons.refresh),
@@ -88,24 +88,35 @@ class _ChatScreenState extends State<ChatScreen> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : _chats.isEmpty
-              ? Center(child: Text('Нет чатов'))
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Нет чатов'),
+                      SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: _createTestChat,
+                        child: Text('Создать тестовый чат'),
+                      ),
+                    ],
+                  ),
+                )
               : ListView.builder(
                   itemCount: _chats.length,
                   itemBuilder: (context, index) {
                     final chat = _chats[index];
                     return ListTile(
                       leading: CircleAvatar(
-                        child: Text(chat.name[0]),
+                        backgroundColor: Colors.red,
+                        child: Text(
+                          chat.name[0],
+                          style: TextStyle(color: Colors.white),
+                        ),
                       ),
                       title: Text(chat.name),
-                      subtitle: Row(
-                        children: [
-                          Expanded(child: Text(chat.lastMessage ?? '')),
-                          _buildMessageStatus(chat.lastMessageStatus), // СТАТУС
-                        ],
-                      ),
-                      trailing: Text('12:30'), // Время
-                      onTap: () => _openChat(chat),
+                      subtitle: Text(chat.lastMessage ?? 'Нет сообщений'),
+                      trailing: Icon(Icons.arrow_forward),
+                      onTap: () => _openChat(chat), // ФИКС: открытие чата
                     );
                   },
                 ),

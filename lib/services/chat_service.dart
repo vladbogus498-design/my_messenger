@@ -6,25 +6,23 @@ class ChatService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // СОЗДАНИЕ ТЕСТОВОГО ЧАТА
+  // ФИКС: СОЗДАНИЕ ТЕСТОВОГО ЧАТА
   static Future<void> createTestChat() async {
     try {
       final userId = _auth.currentUser!.uid;
       final chatRef = _firestore.collection('chats').doc();
 
+      // Создаем чат с самим собой для теста
       await chatRef.set({
         'name': 'Тестовый чат',
-        'participants': [
-          userId,
-          'test_user_${DateTime.now().millisecondsSinceEpoch}'
-        ],
+        'participants': [userId], // Только текущий пользователь
         'lastMessage': 'Привет! Это тестовое сообщение',
         'lastMessageStatus': 'read',
         'lastMessageTime': Timestamp.now(),
         'createdAt': Timestamp.now(),
       });
 
-      // Добавляем тестовые сообщения
+      // Добавляем тестовое сообщение
       await _firestore
           .collection('chats')
           .doc(chatRef.id)
@@ -35,13 +33,15 @@ class ChatService {
         'timestamp': Timestamp.now(),
         'status': 'read',
       });
+
+      print('✅ Тестовый чат создан: ${chatRef.id}');
     } catch (e) {
-      print('Ошибка создания тестового чата: $e');
+      print('❌ Ошибка создания тестового чата: $e');
       rethrow;
     }
   }
 
-  // ОСТАЛЬНЫЕ МЕТОДЫ ОСТАЮТСЯ БЕЗ ИЗМЕНЕНИЙ
+  // ФИКС: ПОЛУЧЕНИЕ ЧАТОВ ПОЛЬЗОВАТЕЛЯ
   static Future<List<Chat>> getUserChats() async {
     try {
       final userId = _auth.currentUser?.uid;

@@ -1,37 +1,35 @@
 import 'package:flutter/material.dart';
-import 'profile_screen.dart'; // ДОБАВИМ ИМПОРТ ПРОФИЛЯ
 
 class SingleChatScreen extends StatelessWidget {
   final String chatId;
+  final String chatName;
 
-  SingleChatScreen({required this.chatId});
+  SingleChatScreen({required this.chatId, required this.chatName});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: GestureDetector(
-          // ДЕЛАЕМ ТАПАБЕЛЬНЫМ
-          onTap: () {
-            // ПЕРЕХОД НА ПРОФИЛЬ
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => ProfileScreen()),
-            );
-          },
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                child: Text('U'),
+        title: Text(chatName),
+        backgroundColor: Colors.black,
+      ),
+      body: Container(
+        color: Colors.grey[900],
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Text(
+                  'Чат "$chatName"\n\nЗдесь будут сообщения',
+                  style: TextStyle(color: Colors.white54, fontSize: 16),
+                  textAlign: TextAlign.center,
+                ),
               ),
-              SizedBox(width: 10),
-              Text('Имя пользователя'),
-            ],
-          ),
+            ),
+            // Можно добавить поле ввода сообщения позже
+          ],
         ),
       ),
-      body: Container(),
     );
   }
 }
