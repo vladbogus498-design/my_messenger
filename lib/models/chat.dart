@@ -19,4 +19,16 @@ class Chat {
   String toString() {
     return 'Chat{id: $id, name: $name, participants: $participants}';
   }
+
+  // Для дебага
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'participants': participants,
+      'lastMessage': lastMessage,
+      'lastMessageStatus': lastMessageStatus,
+      'lastMessageTime': lastMessageTime.toString(),
+    };
+  }
 }

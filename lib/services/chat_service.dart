@@ -6,7 +6,7 @@ class ChatService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // ФИКС: СОЗДАНИЕ ЧАТА С ПРОВЕРКОЙ
+  // СОЗДАНИЕ ТЕСТОВОГО ЧАТА
   static Future<void> createTestChat() async {
     try {
       final userId = _auth.currentUser!.uid;
@@ -14,21 +14,21 @@ class ChatService {
 
       final chatRef = _firestore.collection('chats').doc();
 
-      // ФИКС: УНИКАЛЬНОЕ ИМЯ ЧАТА
+      // ФИКС: УНИКАЛЬНОЕ ИМЯ И ПРАВИЛЬНЫЕ ДАННЫЕ
       final chatData = {
         'name': 'Тестовый чат $timestamp',
         'participants': [userId],
         'lastMessage': 'Привет! Это тестовое сообщение',
         'lastMessageStatus': 'read',
         'lastMessageTime': Timestamp.now(),
-        'createdAt': Timestamp.now(),
+        'createdAt': Timestamp.now(), // ВАЖНО: для сортировки
       };
 
       print('🔄 Создаем чат с данными: $chatData');
 
       await chatRef.set(chatData);
 
-      // ФИКС: СООБЩЕНИЕ ДЛЯ ЧАТА
+      // ФИКС: СОЗДАЕМ ПЕРВОЕ СООБЩЕНИЕ
       await _firestore
           .collection('chats')
           .doc(chatRef.id)
@@ -38,6 +38,7 @@ class ChatService {
         'senderId': userId,
         'timestamp': Timestamp.now(),
         'status': 'read',
+        'type': 'text',
       });
 
       print('✅ Чат создан успешно: ${chatRef.id}');
@@ -47,34 +48,39 @@ class ChatService {
     }
   }
 
-  // ФИКС: ЗАГРУЗКА ЧАТОВ С ДЕБАГОМ
+  // ФИКС: ЗАГРУЗКА ЧАТОВ С ПРАВИЛЬНОЙ СОРТИРОВКОЙ
   static Future<List<Chat>> getUserChats() async {
     try {
       final userId = _auth.currentUser?.uid;
       if (userId == null) {
-        print('❌ Пользователь не авторизован');
+        print('❌ getUserChats: пользователь не авторизован');
         return [];
       }
 
-      print('🔄 Запрашиваем чаты для пользователя: $userId');
+      print('🔄 getUserChats: запрашиваем чаты для пользователя $userId');
 
       final querySnapshot = await _firestore
           .collection('chats')
           .where('participants', arrayContains: userId)
-          .orderBy('lastMessageTime', descending: true)
+          .orderBy('createdAt', descending: true) // ФИКС: используем createdAt
           .get();
 
-      print('✅ Получено ${querySnapshot.docs.length} чатов из Firestore');
+      print('✅ getUserChats: получено ${querySnapshot.docs.length} чатов');
+
+      // ДЕБАГ: выводим все полученные чаты
+      for (final doc in querySnapshot.docs) {
+        final data = doc.data();
+        print(
+            '📨 Чат: ${doc.id} | ${data['name']} | participants: ${data['participants']}');
+      }
 
       final chats = querySnapshot.docs.map((doc) {
         final data = doc.data();
-        print('📨 Чат ${doc.id}: ${data['name']}');
-
         return Chat(
           id: doc.id,
           name: data['name'] ?? 'Без названия',
           participants: List<String>.from(data['participants'] ?? []),
-          lastMessage: data['lastMessage'] ?? '',
+          lastMessage: data['lastMessage'] ?? 'Нет сообщений',
           lastMessageStatus: data['lastMessageStatus'] ?? 'sent',
           lastMessageTime: (data['lastMessageTime'] as Timestamp?)?.toDate() ??
               DateTime.now(),
@@ -83,8 +89,28 @@ class ChatService {
 
       return chats;
     } catch (e) {
-      print('❌ Firestore error: $e');
+      print('❌ getUserChats error: $e');
       return [];
+    }
+  }
+
+  // ФИКС: ПРОВЕРКА СУЩЕСТВОВАНИЯ ЧАТОВ (для дебага)
+  static Future<void> debugChats() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) return;
+
+      final allChats = await _firestore.collection('chats').get();
+      print('🔍 DEBUG: Всего чатов в базе: ${allChats.docs.length}');
+
+      for (final doc in allChats.docs) {
+        final data = doc.data();
+        final participants = List<String>.from(data['participants'] ?? []);
+        print(
+            '🔍 Чат: ${data['name']} | participants: $participants | contains $userId: ${participants.contains(userId)}');
+      }
+    } catch (e) {
+      print('❌ DEBUG error: $e');
     }
   }
 }
