@@ -3,7 +3,7 @@ class Chat {
   final String name;
   final List<String> participants;
   final String lastMessage;
-  final String lastMessageStatus; // НОВОЕ ПОЛЕ
+  final String lastMessageStatus;
   final DateTime lastMessageTime;
 
   Chat({
@@ -14,4 +14,9 @@ class Chat {
     required this.lastMessageStatus,
     required this.lastMessageTime,
   });
+
+  @override
+  String toString() {
+    return 'Chat{id: $id, name: $name, participants: $participants}';
+  }
 }

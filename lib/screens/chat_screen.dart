@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/chat_service.dart';
 import '../models/chat.dart';
 import 'single_chat_screen.dart';
-import 'user_search_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   @override
@@ -19,10 +18,15 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadChats();
   }
 
+  // ФИКС: ПЕРЕЗАГРУЗКА СПИСКА ЧАТОВ
   void _loadChats() async {
+    print('🔄 Загружаем чаты...');
     setState(() => _isLoading = true);
+
     try {
       final chats = await ChatService.getUserChats();
+      print('✅ Загружено ${chats.length} чатов');
+
       setState(() {
         _chats = chats;
         _isLoading = false;
@@ -33,20 +37,25 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // ФИКС: СОЗДАНИЕ ТЕСТОВОГО ЧАТА
+  // ФИКС: СОЗДАНИЕ ЧАТА С МГНОВЕННЫМ ОБНОВЛЕНИЕМ
   void _createTestChat() async {
     try {
+      print('🔄 Создаем тестовый чат...');
       await ChatService.createTestChat();
-      _loadChats(); // Перезагружаем список
+      print('✅ Чат создан, обновляем список...');
 
-      // Показываем уведомление
+      // НЕМЕДЛЕННОЕ ОБНОВЛЕНИЕ после создания
+      _loadChats();
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('✅ Тестовый чат создан!'),
           backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
         ),
       );
     } catch (e) {
+      print('❌ Ошибка создания чата: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('❌ Ошибка: $e'),
@@ -56,7 +65,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // ФИКС: ОТКРЫТИЕ ЧАТА
   void _openChat(Chat chat) {
     print('🟢 Открываем чат: ${chat.id}');
     Navigator.push(
@@ -76,7 +84,7 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.add),
-            onPressed: _createTestChat, // ФИКС: кнопка создания чата
+            onPressed: _createTestChat,
             tooltip: 'Создать тестовый чат',
           ),
           IconButton(
@@ -92,8 +100,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Нет чатов'),
-                      SizedBox(height: 10),
+                      Icon(Icons.chat, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text(
+                        'Нет чатов',
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      ),
+                      SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _createTestChat,
                         child: Text('Создать тестовый чат'),
@@ -101,24 +114,34 @@ class _ChatScreenState extends State<ChatScreen> {
                     ],
                   ),
                 )
-              : ListView.builder(
-                  itemCount: _chats.length,
-                  itemBuilder: (context, index) {
-                    final chat = _chats[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.red,
-                        child: Text(
-                          chat.name[0],
-                          style: TextStyle(color: Colors.white),
+              : RefreshIndicator(
+                  onRefresh: () async => _loadChats(),
+                  child: ListView.builder(
+                    itemCount: _chats.length,
+                    itemBuilder: (context, index) {
+                      final chat = _chats[index];
+                      return Card(
+                        margin:
+                            EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.red,
+                            child: Text(
+                              chat.name.isNotEmpty ? chat.name[0] : '?',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                          title: Text(
+                            chat.name,
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(chat.lastMessage ?? 'Нет сообщений'),
+                          trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () => _openChat(chat),
                         ),
-                      ),
-                      title: Text(chat.name),
-                      subtitle: Text(chat.lastMessage ?? 'Нет сообщений'),
-                      trailing: Icon(Icons.arrow_forward),
-                      onTap: () => _openChat(chat), // ФИКС: открытие чата
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
     );
   }

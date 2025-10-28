@@ -6,20 +6,29 @@ class ChatService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // ФИКС: СОЗДАНИЕ ЧАТА С ПРОВЕРКОЙ
   static Future<void> createTestChat() async {
     try {
       final userId = _auth.currentUser!.uid;
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+
       final chatRef = _firestore.collection('chats').doc();
 
-      await chatRef.set({
-        'name': 'Тестовый чат',
+      // ФИКС: УНИКАЛЬНОЕ ИМЯ ЧАТА
+      final chatData = {
+        'name': 'Тестовый чат $timestamp',
         'participants': [userId],
         'lastMessage': 'Привет! Это тестовое сообщение',
         'lastMessageStatus': 'read',
         'lastMessageTime': Timestamp.now(),
         'createdAt': Timestamp.now(),
-      });
+      };
 
+      print('🔄 Создаем чат с данными: $chatData');
+
+      await chatRef.set(chatData);
+
+      // ФИКС: СООБЩЕНИЕ ДЛЯ ЧАТА
       await _firestore
           .collection('chats')
           .doc(chatRef.id)
@@ -31,17 +40,23 @@ class ChatService {
         'status': 'read',
       });
 
-      print('✅ Тестовый чат создан: ${chatRef.id}');
+      print('✅ Чат создан успешно: ${chatRef.id}');
     } catch (e) {
       print('❌ Ошибка создания тестового чата: $e');
       rethrow;
     }
   }
 
+  // ФИКС: ЗАГРУЗКА ЧАТОВ С ДЕБАГОМ
   static Future<List<Chat>> getUserChats() async {
     try {
       final userId = _auth.currentUser?.uid;
-      if (userId == null) return [];
+      if (userId == null) {
+        print('❌ Пользователь не авторизован');
+        return [];
+      }
+
+      print('🔄 Запрашиваем чаты для пользователя: $userId');
 
       final querySnapshot = await _firestore
           .collection('chats')
@@ -49,11 +64,15 @@ class ChatService {
           .orderBy('lastMessageTime', descending: true)
           .get();
 
-      return querySnapshot.docs.map((doc) {
+      print('✅ Получено ${querySnapshot.docs.length} чатов из Firestore');
+
+      final chats = querySnapshot.docs.map((doc) {
         final data = doc.data();
+        print('📨 Чат ${doc.id}: ${data['name']}');
+
         return Chat(
           id: doc.id,
-          name: data['name'] ?? 'Chat',
+          name: data['name'] ?? 'Без названия',
           participants: List<String>.from(data['participants'] ?? []),
           lastMessage: data['lastMessage'] ?? '',
           lastMessageStatus: data['lastMessageStatus'] ?? 'sent',
@@ -61,6 +80,8 @@ class ChatService {
               DateTime.now(),
         );
       }).toList();
+
+      return chats;
     } catch (e) {
       print('❌ Firestore error: $e');
       return [];
