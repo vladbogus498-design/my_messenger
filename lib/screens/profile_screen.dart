@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/biometric_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -27,6 +29,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ФИЧА 2: Режим невидимки
   bool _invisibleMode = false;
 
+  // НОВАЯ ФИЧА 3: Биометрия
+  bool _useBiometric = false;
+
+  // НОВАЯ ФИЧА 4: AMOLED тема
+  bool _amoledTheme = false;
+
   final List<String> _timerOptions = [
     '5 seconds',
     '1 minute',
@@ -43,6 +51,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
   ];
 
   Color get _mainColor => _themeColors[_selectedTheme] ?? Colors.deepPurple;
+  Color get _backgroundColor => _amoledTheme ? Colors.black : Colors.grey[900]!;
+  Color get _cardColor => _amoledTheme ? Colors.grey[900]! : Colors.grey[800]!;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  void _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _useBiometric = prefs.getBool('useBiometric') ?? false;
+      _amoledTheme = prefs.getBool('amoledTheme') ?? false;
+      _selectedTheme = prefs.getString('selectedTheme') ?? 'purple';
+    });
+  }
+
+  void _saveSetting(String key, dynamic value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (value is bool) {
+      prefs.setBool(key, value);
+    } else if (value is String) {
+      prefs.setString(key, value);
+    }
+  }
 
   void _logout() async {
     try {
@@ -56,7 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: _cardColor,
         title: Text('Edit Profile', style: TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -90,7 +124,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: _cardColor,
         title:
             Text('Select Theme Color', style: TextStyle(color: Colors.white)),
         content: Container(
@@ -110,6 +144,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               return GestureDetector(
                 onTap: () {
                   setState(() => _selectedTheme = colorKey);
+                  _saveSetting('selectedTheme', colorKey);
                   Navigator.pop(context);
                 },
                 child: Container(
@@ -134,6 +169,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Text('CANCEL', style: TextStyle(color: _mainColor)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _testBiometric() async {
+    final canAuthenticate = await BiometricService.canAuthenticate();
+    if (!canAuthenticate) {
+      _showMessage('Biometric authentication not available on this device');
+      return;
+    }
+
+    final authenticated = await BiometricService.authenticate();
+    if (authenticated) {
+      _showMessage('Biometric authentication successful! ✅');
+    } else {
+      _showMessage('Authentication failed ❌');
+      setState(() => _useBiometric = false);
+      _saveSetting('useBiometric', false);
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: _mainColor,
       ),
     );
   }
@@ -179,7 +240,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final currentStatusColor = _getStatusColor(_userStatus);
 
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: _backgroundColor,
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -221,7 +282,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.grey[800],
+                color: _cardColor,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
@@ -232,7 +293,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SizedBox(width: 8),
                   DropdownButton<String>(
                     value: _userStatus,
-                    dropdownColor: Colors.grey[800],
+                    dropdownColor: _cardColor,
                     style: TextStyle(color: Colors.white, fontSize: 14),
                     underline: Container(),
                     icon: Icon(Icons.arrow_drop_down, color: Colors.white),
@@ -263,7 +324,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
             SizedBox(height: 30),
-// Account Info Card
+
+            // Account Info Card
             _buildInfoCard(
               title: 'ACCOUNT INFORMATION',
               children: [
@@ -284,7 +346,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildInfoCard(
               title: 'PRIVACY & SETTINGS',
               children: [
-                // ФИЧА 2: Режим невидимки
+                // НОВАЯ ФИЧА: Биометрия
+                _buildSwitchRow(
+                  'Biometric Lock',
+                  'Use fingerprint/face to unlock app',
+                  _useBiometric,
+                  (value) async {
+                    if (value) {
+                      final canAuth = await BiometricService.canAuthenticate();
+                      if (canAuth) {
+                        setState(() => _useBiometric = true);
+                        _saveSetting('useBiometric', true);
+                        _testBiometric();
+                      } else {
+                        _showMessage('Biometric not available on this device');
+                      }
+                    } else {
+                      setState(() => _useBiometric = false);
+                      _saveSetting('useBiometric', false);
+                    }
+                  },
+                ),
+// НОВАЯ ФИЧА: AMOLED тема
+                _buildSwitchRow(
+                  'AMOLED Black Theme',
+                  'True black for OLED screens',
+                  _amoledTheme,
+                  (value) {
+                    setState(() => _amoledTheme = value);
+                    _saveSetting('amoledTheme', value);
+                  },
+                ),
+
+                // Режим невидимки
                 _buildSwitchRow(
                   'Invisible Mode',
                   'Hide your online status from everyone',
@@ -304,7 +398,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Spacer(),
                       DropdownButton<String>(
                         value: _selfDestructTimer,
-                        dropdownColor: Colors.grey[800],
+                        dropdownColor: _cardColor,
                         style: TextStyle(color: Colors.white, fontSize: 12),
                         onChanged: (value) {
                           setState(() => _selfDestructTimer = value!);
@@ -387,6 +481,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
+// Test Biometric Button
+            SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _testBiometric,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey[700],
+                foregroundColor: Colors.white,
+              ),
+              child: Text('TEST BIOMETRIC AUTH'),
+            ),
 
             SizedBox(height: 20),
 
@@ -404,7 +508,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildInfoCard(
       {required String title, required List<Widget> children}) {
     return Card(
-      color: Colors.grey[800],
+      color: _cardColor,
       child: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
