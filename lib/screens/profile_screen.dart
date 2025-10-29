@@ -12,6 +12,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _notifications = true;
   bool _privacyMode = true;
   String _selfDestructTimer = '5 seconds';
+  String _userStatus = 'Online';
+
   final List<String> _timerOptions = [
     '5 seconds',
     '1 minute',
@@ -19,12 +21,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     '1 day',
     '1 week'
   ];
+  final List<String> _statusOptions = [
+    'Online',
+    'Busy',
+    'Away',
+    'Invisible',
+    'Do Not Disturb'
+  ];
 
   void _logout() async {
     try {
-      await FirebaseAuth.instance
-          .signOut(); // ФИКС: прямое использование FirebaseAuth
-      // Navigation will be handled by auth stream
+      await FirebaseAuth.instance.signOut();
     } catch (e) {
       print('Logout error: $e');
     }
@@ -43,8 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               radius: 40,
               backgroundColor: Colors.deepPurple,
               child: Text(
-                _user?.email?.substring(0, 1).toUpperCase() ??
-                    'U', // ФИКС: проверка на null
+                _user?.email?.substring(0, 1).toUpperCase() ?? 'U',
                 style: TextStyle(fontSize: 24, color: Colors.white),
               ),
             ),
@@ -65,6 +71,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'Online':
+        return Colors.green;
+      case 'Busy':
+        return Colors.orange;
+      case 'Away':
+        return Colors.yellow;
+      case 'Invisible':
+        return Colors.grey;
+      case 'Do Not Disturb':
+        return Colors.red;
+      default:
+        return Colors.green;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'Online':
+        return Icons.circle;
+      case 'Busy':
+        return Icons.work;
+      case 'Away':
+        return Icons.access_time;
+      case 'Invisible':
+        return Icons.visibility_off;
+      case 'Do Not Disturb':
+        return Icons.notifications_off;
+      default:
+        return Icons.circle;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -79,25 +119,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
               radius: 50,
               backgroundColor: Colors.deepPurple,
               child: Text(
-                _user?.email?.substring(0, 1).toUpperCase() ??
-                    'U', // ФИКС: проверка на null
+                _user?.email?.substring(0, 1).toUpperCase() ?? 'U',
                 style: TextStyle(fontSize: 36, color: Colors.white),
               ),
             ),
             SizedBox(height: 16),
             Text(
-              _user?.email ?? 'Unknown User', // ФИКС: проверка на null
+              _user?.email ?? 'Unknown User',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 4),
-            Text(
-              'DarkKick Premium User',
-              style: TextStyle(color: Colors.deepPurple),
+            SizedBox(height: 8),
+
+            // Status Selector
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey[800],
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(_getStatusIcon(_userStatus),
+                      color: _getStatusColor(_userStatus), size: 16),
+                  SizedBox(width: 8),
+                  DropdownButton<String>(
+                    value: _userStatus,
+                    dropdownColor: Colors.grey[800],
+                    style: TextStyle(color: Colors.white, fontSize: 14),
+                    underline: Container(),
+                    icon: Icon(Icons.arrow_drop_down, color: Colors.white),
+                    onChanged: (value) {
+                      setState(() => _userStatus = value!);
+                    },
+                    items: _statusOptions.map((status) {
+                      return DropdownMenuItem(
+                        value: status,
+                        child: Row(
+                          children: [
+                            Icon(_getStatusIcon(status),
+                                color: _getStatusColor(status), size: 16),
+                            SizedBox(width: 8),
+                            Text(status),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
             ),
+
             SizedBox(height: 8),
             Text(
               'Member since: ${DateTime.now().toString().substring(0, 10)}',
@@ -110,13 +186,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: 'ACCOUNT INFORMATION',
               children: [
                 _buildInfoRow(
-                    'User ID',
-                    _user?.uid.substring(0, 8) ??
-                        'Unknown'), // ФИКС: убрал + '...'
+                    'User ID', _user?.uid.substring(0, 8) ?? 'Unknown'),
                 _buildInfoRow('Email Verified',
                     _user?.emailVerified.toString() ?? 'false'),
                 _buildInfoRow('Account Type', 'PREMIUM 🚀'),
                 _buildInfoRow('Storage Used', '15% of 1GB'),
+                _buildInfoRow('Current Status', _userStatus),
               ],
             ),
 
@@ -126,7 +201,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildInfoCard(
               title: 'PRIVACY & SETTINGS',
               children: [
-// Self-Destruct Timer
+                // Self-Destruct Timer
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
                   child: Row(
@@ -169,8 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _darkTheme,
                   (value) => setState(() => _darkTheme = value),
                 ),
-
-                // Notifications
+// Notifications
                 _buildSwitchRow(
                   'Notifications',
                   'Message alerts',
