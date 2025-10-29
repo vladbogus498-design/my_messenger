@@ -16,82 +16,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  // ДЕМО-СООБЩЕНИЯ ДЛЯ КАЖДОГО ЧАТА
-  final Map<String, List<Map<String, String>>> _demoMessages = {
-    '1': [
-      // DarkKick Team
-      {
-        'text': 'Welcome to DarkKick! 🚀',
-        'sender': 'system',
-        'time': '2 min ago'
-      },
-      {
-        'text': 'Messages here self-destruct automatically!',
-        'sender': 'dev',
-        'time': '1 min ago'
-      },
-      {
-        'text': 'Try sending a message below!',
-        'sender': 'system',
-        'time': 'now'
-      },
-    ],
-    '2': [
-      // Flutter Developers
-      {
-        'text': 'This is where real messages will appear!',
-        'sender': 'flutter_bot',
-        'time': '5 min ago'
-      },
-      {
-        'text': 'You can type below and see it here',
-        'sender': 'system',
-        'time': '3 min ago'
-      },
-      {
-        'text': 'Firebase integration is ready!',
-        'sender': 'firebase_dev',
-        'time': '1 min ago'
-      },
-    ],
-    '3': [
-      // Secret Group
-      {
-        'text': 'Mission: Create the best messenger!',
-        'sender': 'agent1',
-        'time': '10 min ago'
-      },
-      {
-        'text': 'Self-destruct feature coming soon...',
-        'sender': 'agent2',
-        'time': '8 min ago'
-      },
-      {
-        'text': 'Stay tuned for updates!',
-        'sender': 'admin',
-        'time': '5 min ago'
-      },
-    ],
-    '4': [
-      // Ephemeral Chat
-      {
-        'text': 'This message will disappear in 5...4...3...',
-        'sender': 'system',
-        'time': '1 min ago'
-      },
-      {
-        'text': 'Ephemeral messaging - no traces left!',
-        'sender': 'privacy_bot',
-        'time': '30 sec ago'
-      },
-      {
-        'text': 'Your privacy is protected here',
-        'sender': 'system',
-        'time': 'now'
-      },
-    ],
-  };
+  final ScrollController _scrollController = ScrollController();
 
   void _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
@@ -109,17 +34,24 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           'text': message,
           'senderId': user.uid,
           'senderName': user.email?.split('@').first ?? 'You',
-          'timestamp': DateTime.now(),
+          'timestamp': Timestamp.now(),
           'type': 'text',
         });
 
         // Обновляем последнее сообщение в чате
         await _firestore.collection('chats').doc(widget.chatId).update({
           'lastMessage': message,
-          'lastMessageTime': DateTime.now(),
+          'lastMessageTime': Timestamp.now(),
         });
 
         _messageController.clear();
+
+        // Прокрутка вниз после отправки
+        _scrollController.animateTo(
+          0,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       } catch (e) {
         print('Error sending message: $e');
       }
@@ -128,10 +60,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final demoMessages = _demoMessages[widget.chatId] ??
-        [
-          {'text': 'Start the conversation!', 'sender': 'system', 'time': 'now'}
-        ];
+    final user = _auth.currentUser;
 
     return Scaffold(
       appBar: AppBar(
@@ -141,77 +70,117 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: Container(
-              color: Colors.grey[900],
-              child: ListView.builder(
-                padding: EdgeInsets.all(16),
-                reverse: false,
-                itemCount: demoMessages.length,
-                itemBuilder: (context, index) {
-                  final message = demoMessages[index];
-                  final isSystem = message['sender'] == 'system';
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('chats')
+                  .doc(widget.chatId)
+                  .collection('messages')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return Center(child: CircularProgressIndicator());
+                }
 
-                  return Container(
-                    margin: EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      mainAxisAlignment: isSystem
-                          ? MainAxisAlignment.center
-                          : MainAxisAlignment.start,
-                      children: [
-                        if (!isSystem) ...[
-                          CircleAvatar(
-                            radius: 16,
-                            backgroundColor: Colors.deepPurple,
-                            child: Text(
-                              message['sender']![0].toUpperCase(),
-                              style:
-                                  TextStyle(color: Colors.white, fontSize: 12),
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                        ],
-                        Flexible(
-                          child: Container(
-                            padding: EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: isSystem
-                                  ? Colors.grey[800]
-                                  : Colors.deepPurple,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (!isSystem)
-                                  Text(
-                                    message['sender']!,
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                Text(
-                                  message['text']!,
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  message['time']!,
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                final messages = snapshot.data!.docs;
+
+                if (messages.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'No messages yet\nStart the conversation!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey, fontSize: 16),
                     ),
                   );
-                },
-              ),
+                }
+
+                return Container(
+                  color: Colors.grey[900],
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: EdgeInsets.all(16),
+                    reverse: true, // Новые сообщения внизу
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final message = messages[index];
+                      final data = message.data() as Map<String, dynamic>;
+                      final isMe = data['senderId'] == user?.uid;
+
+                      return Container(
+                        margin: EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisAlignment: isMe
+                              ? MainAxisAlignment.end
+                              : MainAxisAlignment.start,
+                          children: [
+                            if (!isMe) ...[
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: Colors.deepPurple,
+                                child: Text(
+                                  data['senderName']?[0].toUpperCase() ?? '?',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 12),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                            ],
+                            Flexible(
+                              child: Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isMe
+                                      ? Colors.deepPurple
+                                      : Colors.grey[800],
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (!isMe)
+                                      Text(
+                                        data['senderName'] ?? 'Unknown',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    Text(
+                                      data['text'] ?? '',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      _formatTime(data['timestamp']),
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (isMe) ...[
+                              SizedBox(width: 8),
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: Colors.green,
+                                child: Text(
+                                  'You'[0],
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
           ),
 
@@ -234,15 +203,17 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                       ),
                       filled: true,
                       fillColor: Colors.grey[700],
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
+                    onSubmitted: (_) => _sendMessage(),
                   ),
                 ),
                 SizedBox(width: 8),
                 CircleAvatar(
                   backgroundColor: Colors.deepPurple,
                   child: IconButton(
-                    icon: Icon(Icons.send, color: Colors.white),
+                    icon: Icon(Icons.send, color: Colors.white, size: 20),
                     onPressed: _sendMessage,
                   ),
                 ),
@@ -252,5 +223,22 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         ],
       ),
     );
+  }
+
+  String _formatTime(dynamic timestamp) {
+    if (timestamp == null) return 'now';
+
+    try {
+      final time = timestamp is Timestamp ? timestamp.toDate() : DateTime.now();
+      final now = DateTime.now();
+      final difference = now.difference(time);
+
+      if (difference.inMinutes < 1) return 'now';
+      if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+      if (difference.inHours < 24) return '${difference.inHours}h ago';
+      return '${difference.inDays}d ago';
+    } catch (e) {
+      return 'now';
+    }
   }
 }
