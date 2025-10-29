@@ -14,6 +14,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _selfDestructTimer = '5 seconds';
   String _userStatus = 'Online';
 
+  // ФИЧА 1: Выбор цвета темы
+  String _selectedTheme = 'purple';
+  Map<String, Color> _themeColors = {
+    'purple': Colors.deepPurple,
+    'blue': Colors.blueAccent,
+    'red': Colors.redAccent,
+    'green': Colors.green,
+    'orange': Colors.orange,
+  };
+
+  // ФИЧА 2: Режим невидимки
+  bool _invisibleMode = false;
+
   final List<String> _timerOptions = [
     '5 seconds',
     '1 minute',
@@ -28,6 +41,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     'Invisible',
     'Do Not Disturb'
   ];
+
+  Color get _mainColor => _themeColors[_selectedTheme] ?? Colors.deepPurple;
 
   void _logout() async {
     try {
@@ -48,7 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             CircleAvatar(
               radius: 40,
-              backgroundColor: Colors.deepPurple,
+              backgroundColor: _mainColor,
               child: Text(
                 _user?.email?.substring(0, 1).toUpperCase() ?? 'U',
                 style: TextStyle(fontSize: 24, color: Colors.white),
@@ -64,7 +79,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('CLOSE', style: TextStyle(color: Colors.deepPurple)),
+            child: Text('CLOSE', style: TextStyle(color: _mainColor)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showThemeSelector() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title:
+            Text('Select Theme Color', style: TextStyle(color: Colors.white)),
+        content: Container(
+          width: double.maxFinite,
+          child: GridView.builder(
+            shrinkWrap: true,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemCount: _themeColors.length,
+            itemBuilder: (context, index) {
+              final colorKey = _themeColors.keys.elementAt(index);
+              final color = _themeColors[colorKey]!;
+
+              return GestureDetector(
+                onTap: () {
+                  setState(() => _selectedTheme = colorKey);
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(20),
+                    border: _selectedTheme == colorKey
+                        ? Border.all(color: Colors.white, width: 3)
+                        : null,
+                  ),
+                  child: _selectedTheme == colorKey
+                      ? Icon(Icons.check, color: Colors.white, size: 30)
+                      : null,
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('CANCEL', style: TextStyle(color: _mainColor)),
           ),
         ],
       ),
@@ -72,6 +139,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Color _getStatusColor(String status) {
+    if (_invisibleMode) return Colors.grey;
+
     switch (status) {
       case 'Online':
         return Colors.green;
@@ -107,6 +176,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentStatusColor = _getStatusColor(_userStatus);
+
     return Scaffold(
       backgroundColor: Colors.grey[900],
       body: SingleChildScrollView(
@@ -115,12 +186,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             // Header
             SizedBox(height: 40),
-            CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.deepPurple,
-              child: Text(
-                _user?.email?.substring(0, 1).toUpperCase() ?? 'U',
-                style: TextStyle(fontSize: 36, color: Colors.white),
+            GestureDetector(
+              onTap: _showThemeSelector,
+              child: CircleAvatar(
+                radius: 50,
+                backgroundColor: _mainColor,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _user?.email?.substring(0, 1).toUpperCase() ?? 'U',
+                      style: TextStyle(fontSize: 36, color: Colors.white),
+                    ),
+                    Text(
+                      'Tap to change color',
+                      style: TextStyle(color: Colors.white70, fontSize: 8),
+                    ),
+                  ],
+                ),
               ),
             ),
             SizedBox(height: 16),
@@ -145,7 +228,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(_getStatusIcon(_userStatus),
-                      color: _getStatusColor(_userStatus), size: 16),
+                      color: currentStatusColor, size: 16),
                   SizedBox(width: 8),
                   DropdownButton<String>(
                     value: _userStatus,
@@ -180,8 +263,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
             SizedBox(height: 30),
-
-            // Account Info Card
+// Account Info Card
             _buildInfoCard(
               title: 'ACCOUNT INFORMATION',
               children: [
@@ -192,6 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildInfoRow('Account Type', 'PREMIUM 🚀'),
                 _buildInfoRow('Storage Used', '15% of 1GB'),
                 _buildInfoRow('Current Status', _userStatus),
+                _buildInfoRow('Theme Color', _selectedTheme.toUpperCase()),
               ],
             ),
 
@@ -201,12 +284,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildInfoCard(
               title: 'PRIVACY & SETTINGS',
               children: [
+                // ФИЧА 2: Режим невидимки
+                _buildSwitchRow(
+                  'Invisible Mode',
+                  'Hide your online status from everyone',
+                  _invisibleMode,
+                  (value) => setState(() => _invisibleMode = value),
+                ),
+
                 // Self-Destruct Timer
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
                   child: Row(
                     children: [
-                      Icon(Icons.timer, color: Colors.deepPurple, size: 20),
+                      Icon(Icons.timer, color: _mainColor, size: 20),
                       SizedBox(width: 12),
                       Text('Self-Destruct Timer',
                           style: TextStyle(color: Colors.white)),
@@ -244,7 +335,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _darkTheme,
                   (value) => setState(() => _darkTheme = value),
                 ),
-// Notifications
+
+                // Notifications
                 _buildSwitchRow(
                   'Notifications',
                   'Message alerts',
@@ -274,12 +366,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _showEditDialog,
+                    onPressed: _showThemeSelector,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[800],
+                      backgroundColor: _mainColor,
                       foregroundColor: Colors.white,
                     ),
-                    child: Text('EDIT PROFILE'),
+                    child: Text('CHANGE THEME'),
                   ),
                 ),
                 SizedBox(width: 12),
@@ -321,7 +413,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Text(
               title,
               style: TextStyle(
-                color: Colors.deepPurple,
+                color: _mainColor,
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
@@ -365,7 +457,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: Colors.deepPurple,
+            activeColor: _mainColor,
           ),
         ],
       ),
@@ -377,7 +469,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, color: Colors.deepPurple, size: 16),
+          Icon(icon, color: _mainColor, size: 16),
           SizedBox(width: 8),
           Text(label, style: TextStyle(color: Colors.grey, fontSize: 14)),
           Spacer(),
