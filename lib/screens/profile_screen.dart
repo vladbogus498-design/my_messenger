@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/biometric_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -16,7 +15,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _selfDestructTimer = '5 seconds';
   String _userStatus = 'Online';
 
-  // ФИЧА 1: Выбор цвета темы
   String _selectedTheme = 'purple';
   Map<String, Color> _themeColors = {
     'purple': Colors.deepPurple,
@@ -26,13 +24,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     'orange': Colors.orange,
   };
 
-  // ФИЧА 2: Режим невидимки
   bool _invisibleMode = false;
-
-  // НОВАЯ ФИЧА 3: Биометрия
   bool _useBiometric = false;
-
-  // НОВАЯ ФИЧА 4: AMOLED тема
   bool _amoledTheme = false;
 
   final List<String> _timerOptions = [
@@ -54,70 +47,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Color get _backgroundColor => _amoledTheme ? Colors.black : Colors.grey[900]!;
   Color get _cardColor => _amoledTheme ? Colors.grey[900]! : Colors.grey[800]!;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSettings();
-  }
-
-  void _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _useBiometric = prefs.getBool('useBiometric') ?? false;
-      _amoledTheme = prefs.getBool('amoledTheme') ?? false;
-      _selectedTheme = prefs.getString('selectedTheme') ?? 'purple';
-    });
-  }
-
-  void _saveSetting(String key, dynamic value) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (value is bool) {
-      prefs.setBool(key, value);
-    } else if (value is String) {
-      prefs.setString(key, value);
-    }
-  }
-
   void _logout() async {
     try {
       await FirebaseAuth.instance.signOut();
     } catch (e) {
       print('Logout error: $e');
     }
-  }
-
-  void _showEditDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: _cardColor,
-        title: Text('Edit Profile', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 40,
-              backgroundColor: _mainColor,
-              child: Text(
-                _user?.email?.substring(0, 1).toUpperCase() ?? 'U',
-                style: TextStyle(fontSize: 24, color: Colors.white),
-              ),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Profile picture coming soon!',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('CLOSE', style: TextStyle(color: _mainColor)),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showThemeSelector() {
@@ -144,7 +79,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               return GestureDetector(
                 onTap: () {
                   setState(() => _selectedTheme = colorKey);
-                  _saveSetting('selectedTheme', colorKey);
                   Navigator.pop(context);
                 },
                 child: Container(
@@ -176,7 +110,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _testBiometric() async {
     final canAuthenticate = await BiometricService.canAuthenticate();
     if (!canAuthenticate) {
-      _showMessage('Biometric authentication not available on this device');
+      _showMessage(
+          'Biometric authentication not available on this device\nCheck device security settings');
       return;
     }
 
@@ -184,9 +119,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (authenticated) {
       _showMessage('Biometric authentication successful! ✅');
     } else {
-      _showMessage('Authentication failed ❌');
-      setState(() => _useBiometric = false);
-      _saveSetting('useBiometric', false);
+      _showMessage(
+          'Authentication failed ❌\nUser canceled or authentication error');
     }
   }
 
@@ -245,7 +179,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: EdgeInsets.all(16),
         child: Column(
           children: [
-            // Header
             SizedBox(height: 40),
             GestureDetector(
               onTap: _showThemeSelector,
@@ -277,8 +210,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             SizedBox(height: 8),
-
-            // Status Selector
             Container(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
@@ -317,15 +248,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-
             SizedBox(height: 8),
             Text(
               'Member since: ${DateTime.now().toString().substring(0, 10)}',
               style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
             SizedBox(height: 30),
-
-            // Account Info Card
             _buildInfoCard(
               title: 'ACCOUNT INFORMATION',
               children: [
@@ -339,14 +267,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildInfoRow('Theme Color', _selectedTheme.toUpperCase()),
               ],
             ),
-
             SizedBox(height: 20),
-
-            // Privacy & Settings Card
             _buildInfoCard(
               title: 'PRIVACY & SETTINGS',
               children: [
-                // НОВАЯ ФИЧА: Биометрия
                 _buildSwitchRow(
                   'Biometric Lock',
                   'Use fingerprint/face to unlock app',
@@ -356,37 +280,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       final canAuth = await BiometricService.canAuthenticate();
                       if (canAuth) {
                         setState(() => _useBiometric = true);
-                        _saveSetting('useBiometric', true);
                         _testBiometric();
                       } else {
                         _showMessage('Biometric not available on this device');
                       }
                     } else {
                       setState(() => _useBiometric = false);
-                      _saveSetting('useBiometric', false);
                     }
                   },
                 ),
-// НОВАЯ ФИЧА: AMOLED тема
                 _buildSwitchRow(
                   'AMOLED Black Theme',
                   'True black for OLED screens',
                   _amoledTheme,
                   (value) {
                     setState(() => _amoledTheme = value);
-                    _saveSetting('amoledTheme', value);
                   },
                 ),
-
-                // Режим невидимки
                 _buildSwitchRow(
                   'Invisible Mode',
                   'Hide your online status from everyone',
                   _invisibleMode,
                   (value) => setState(() => _invisibleMode = value),
                 ),
-
-                // Self-Destruct Timer
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
                   child: Row(
@@ -413,24 +329,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                 ),
-
-                // Privacy Mode
                 _buildSwitchRow(
                   'Privacy Mode',
                   'Hide typing status',
                   _privacyMode,
                   (value) => setState(() => _privacyMode = value),
                 ),
-
-                // Dark Theme
                 _buildSwitchRow(
                   'Dark Theme',
                   'Always stay dark',
                   _darkTheme,
                   (value) => setState(() => _darkTheme = value),
                 ),
-
-                // Notifications
                 _buildSwitchRow(
                   'Notifications',
                   'Message alerts',
@@ -439,10 +349,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-
             SizedBox(height: 20),
-
-            // Stats Card
             _buildInfoCard(
               title: 'YOUR STATS',
               children: [
@@ -452,10 +359,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildStatRow('Privacy Score', '98%', Icons.security),
               ],
             ),
-
             SizedBox(height: 30),
-
-            // Action Buttons
             Row(
               children: [
                 Expanded(
@@ -481,20 +385,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-// Test Biometric Button
             SizedBox(height: 12),
             ElevatedButton(
               onPressed: _testBiometric,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey[700],
+                backgroundColor: Colors.blueGrey[700],
                 foregroundColor: Colors.white,
               ),
-              child: Text('TEST BIOMETRIC AUTH'),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.fingerprint, size: 20),
+                  SizedBox(width: 8),
+                  Text('TEST BIOMETRIC AUTH'),
+                ],
+              ),
             ),
-
             SizedBox(height: 20),
-
-            // App Info
             Text(
               'DarkKick v1.0.0 • Messages that leave no trace',
               style: TextStyle(color: Colors.grey, fontSize: 12),

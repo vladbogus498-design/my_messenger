@@ -5,7 +5,9 @@ class BiometricService {
 
   static Future<bool> canAuthenticate() async {
     try {
-      return await _auth.canCheckBiometrics;
+      final canCheck = await _auth.canCheckBiometrics;
+      final isAvailable = await _auth.isDeviceSupported();
+      return canCheck && isAvailable;
     } catch (e) {
       print('Biometric check error: $e');
       return false;

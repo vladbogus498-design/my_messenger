@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/auth_screen.dart';
-import 'screens/chat_screen.dart'; // Используем chat_screen вместо main_screen
+import 'screens/chat_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +36,7 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (snapshot.hasData) {
-          return ChatScreen(); // Используем ChatScreen вместо MainScreen
+          return ChatScreen();
         }
 
         return AuthScreen();
