@@ -17,7 +17,7 @@ class BiometricService {
   static Future<bool> authenticate() async {
     try {
       final result = await _auth.authenticate(
-        localizedReason: 'Authenticate to access DarkKick',
+        localizedReason: 'Scan your fingerprint to unlock DarkKick',
       );
       return result;
     } catch (e) {
