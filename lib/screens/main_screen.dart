@@ -4,12 +4,12 @@ import 'chat_screen.dart';
 import 'contacts_screen.dart';
 import 'profile_screen.dart';
 
-class MainChatScreen extends StatefulWidget {
+class MainScreen extends StatefulWidget {
   @override
-  _MainChatScreenState createState() => _MainChatScreenState();
+  _MainScreenState createState() => _MainScreenState();
 }
 
-class _MainChatScreenState extends State<MainChatScreen> {
+class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = [

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/biometric_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -47,6 +48,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Color get _backgroundColor => _amoledTheme ? Colors.black : Colors.grey[900]!;
   Color get _cardColor => _amoledTheme ? Colors.grey[900]! : Colors.grey[800]!;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  void _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _selectedTheme = prefs.getString('selectedTheme') ?? 'purple';
+      _amoledTheme = prefs.getBool('amoledTheme') ?? false;
+      _userStatus = prefs.getString('userStatus') ?? 'Online';
+      _invisibleMode = prefs.getBool('invisibleMode') ?? false;
+      _useBiometric = prefs.getBool('useBiometric') ?? false;
+      _selfDestructTimer = prefs.getString('selfDestructTimer') ?? '5 seconds';
+      _darkTheme = prefs.getBool('darkTheme') ?? true;
+      _notifications = prefs.getBool('notifications') ?? true;
+      _privacyMode = prefs.getBool('privacyMode') ?? true;
+    });
+  }
+
+  void _saveSetting(String key, dynamic value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (value is bool) {
+      await prefs.setBool(key, value);
+    } else if (value is String) {
+      await prefs.setString(key, value);
+    }
+    print('✅ Saved setting: $key = $value');
+  }
+
   void _logout() async {
     try {
       await FirebaseAuth.instance.signOut();
@@ -79,6 +111,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               return GestureDetector(
                 onTap: () {
                   setState(() => _selectedTheme = colorKey);
+                  _saveSetting('selectedTheme', colorKey);
                   Navigator.pop(context);
                 },
                 child: Container(
@@ -230,6 +263,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: Icon(Icons.arrow_drop_down, color: Colors.white),
                     onChanged: (value) {
                       setState(() => _userStatus = value!);
+                      _saveSetting('userStatus', value);
                     },
                     items: _statusOptions.map((status) {
                       return DropdownMenuItem(
@@ -280,12 +314,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       final canAuth = await BiometricService.canAuthenticate();
                       if (canAuth) {
                         setState(() => _useBiometric = true);
+                        _saveSetting('useBiometric', true);
                         _testBiometric();
                       } else {
                         _showMessage('Biometric not available on this device');
                       }
                     } else {
                       setState(() => _useBiometric = false);
+                      _saveSetting('useBiometric', false);
                     }
                   },
                 ),
@@ -295,13 +331,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _amoledTheme,
                   (value) {
                     setState(() => _amoledTheme = value);
+                    _saveSetting('amoledTheme', value);
                   },
                 ),
                 _buildSwitchRow(
                   'Invisible Mode',
                   'Hide your online status from everyone',
                   _invisibleMode,
-                  (value) => setState(() => _invisibleMode = value),
+                  (value) {
+                    setState(() => _invisibleMode = value);
+                    _saveSetting('invisibleMode', value);
+                  },
                 ),
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
@@ -318,6 +358,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: TextStyle(color: Colors.white, fontSize: 12),
                         onChanged: (value) {
                           setState(() => _selfDestructTimer = value!);
+                          _saveSetting('selfDestructTimer', value);
                         },
                         items: _timerOptions.map((option) {
                           return DropdownMenuItem(
@@ -333,19 +374,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Privacy Mode',
                   'Hide typing status',
                   _privacyMode,
-                  (value) => setState(() => _privacyMode = value),
+                  (value) {
+                    setState(() => _privacyMode = value);
+                    _saveSetting('privacyMode', value);
+                  },
                 ),
                 _buildSwitchRow(
                   'Dark Theme',
                   'Always stay dark',
                   _darkTheme,
-                  (value) => setState(() => _darkTheme = value),
+                  (value) {
+                    setState(() => _darkTheme = value);
+                    _saveSetting('darkTheme', value);
+                  },
                 ),
                 _buildSwitchRow(
                   'Notifications',
                   'Message alerts',
                   _notifications,
-                  (value) => setState(() => _notifications = value),
+                  (value) {
+                    setState(() => _notifications = value);
+                    _saveSetting('notifications', value);
+                  },
                 ),
               ],
             ),
