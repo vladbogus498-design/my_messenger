@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class ChatInputPanel extends StatefulWidget {
   final String chatId;
   final String currentUserId;
   final Function(String, String) onSendMessage;
   final Function(String) onImageUpload;
+  final TextEditingController? typingController;
 
   const ChatInputPanel({
     Key? key,
@@ -13,6 +15,7 @@ class ChatInputPanel extends StatefulWidget {
     required this.currentUserId,
     required this.onSendMessage,
     required this.onImageUpload,
+    this.typingController,
   }) : super(key: key);
 
   @override
@@ -23,7 +26,10 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
   final TextEditingController _messageController = TextEditingController();
   bool _showAttachmentMenu = false;
 
-  // 📸 Временное решение для фото (демо-режим)
+  TextEditingController get _effectiveController {
+    return widget.typingController ?? _messageController;
+  }
+
   Future<void> _sendPhoto() async {
     try {
       final ImagePicker picker = ImagePicker();
@@ -35,30 +41,28 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
       );
 
       if (image != null) {
-        // Демо-режим: используем случайное фото из интернета
-        final String demoImageUrl =
-            'https://picsum.photos/200/300?random=${DateTime.now().millisecondsSinceEpoch}';
-        widget.onImageUpload(demoImageUrl);
+        _showSnackBar('Загружаем фото...');
+        var SupabaseStorageService;
+        final String imageUrl = await SupabaseStorageService.uploadChatImage(
+            File(image.path), widget.chatId);
 
+        widget.onImageUpload(imageUrl);
         _showSnackBar('Фото отправлено! 📸');
       }
     } catch (e) {
-      print('❌ Ошибка выбора фото: $e');
+      print('❌ Ошибка загрузки фото: $e');
       _showSnackBar('Ошибка загрузки фото');
     }
   }
 
-  // 🎤 Голосовое сообщение (заглушка)
   void _startVoiceRecording() {
     _showSnackBar('Голосовые сообщения скоро будут! 🎤');
   }
 
-  // 📍 Местоположение (заглушка)
   void _sendLocation() {
     _showSnackBar('Отправка местоположения скоро будет! 📍');
   }
 
-  // 📎 Меню прикреплений
   void _toggleAttachmentMenu() {
     setState(() {
       _showAttachmentMenu = !_showAttachmentMenu;
@@ -71,12 +75,12 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
     );
   }
 
-  // ✉️ Отправка текстового сообщения
   void _sendTextMessage() {
-    final text = _messageController.text.trim();
+    final text = _effectiveController.text.trim();
     if (text.isNotEmpty) {
       widget.onSendMessage(text, 'text');
-      _messageController.clear();
+      _effectiveController.clear();
+      setState(() {});
     }
   }
 
@@ -90,26 +94,22 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
       ),
       child: Column(
         children: [
-          // 📎 Меню прикреплений
           if (_showAttachmentMenu) ...[
             Container(
               padding: EdgeInsets.symmetric(vertical: 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // 📸 Фото
                   _AttachmentButton(
                     icon: Icons.photo,
                     label: 'Фото',
                     onTap: _sendPhoto,
                   ),
-                  // 🎤 Голосовое
                   _AttachmentButton(
                     icon: Icons.mic,
                     label: 'Голосовое',
                     onTap: _startVoiceRecording,
                   ),
-                  // 📍 Местоположение
                   _AttachmentButton(
                     icon: Icons.location_on,
                     label: 'Место',
@@ -120,43 +120,28 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
             ),
             Divider(height: 1),
           ],
-
-          // ✏️ Поле ввода + кнопки
           Row(
             children: [
-              // 📎 Кнопка прикреплений
               IconButton(
                 icon: Icon(Icons.attach_file),
                 onPressed: _toggleAttachmentMenu,
-                tooltip: 'Прикрепить файл',
               ),
-
-              // 📝 Поле ввода
               Expanded(
                 child: TextField(
-                  controller: _messageController,
+                  controller: _effectiveController,
                   decoration: InputDecoration(
                     hintText: 'Сообщение...',
-                    hintStyle: TextStyle(color: Colors.grey),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(25),
-                      borderSide: BorderSide.none,
                     ),
-                    filled: true,
-                    fillColor: Colors.grey[800],
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
                   ),
-                  style: TextStyle(color: Colors.white),
                   onSubmitted: (_) => _sendTextMessage(),
                 ),
               ),
-
-              // ▶️ Кнопка отправки
               IconButton(
-                icon: Icon(Icons.send, color: Colors.blue),
+                icon: Icon(Icons.send),
                 onPressed: _sendTextMessage,
-                tooltip: 'Отправить сообщение',
               ),
             ],
           ),
@@ -166,7 +151,6 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
   }
 }
 
-// 🎯 Кнопка меню прикреплений
 class _AttachmentButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -183,25 +167,13 @@ class _AttachmentButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: Colors.blue.shade100.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(25),
-            ),
-            child: Icon(icon, color: Colors.blue, size: 24),
+          CircleAvatar(
+            backgroundColor: Colors.blue.shade100,
+            child: Icon(icon, color: Colors.blue),
           ),
-          SizedBox(height: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey,
-              fontSize: 12,
-            ),
-          ),
+          SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 12)),
         ],
       ),
     );
