@@ -176,7 +176,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                   subtitle: 'Encrypt all messages automatically',
                   value: _encryptionEnabled,
                   onChanged: _toggleEncryption,
-                  icon: Icons.encrypted,
+                  icon: Icons.lock_outline,
                 ),
                 Divider(color: Colors.grey[700]),
                 ListTile(
@@ -207,7 +207,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                     _showMessage(
                         'Screenshot blocking ${value ? "enabled" : "disabled"}');
                   },
-                  icon: Icons.screenshot,
+                  icon: Icons.screenshot_monitor,
                 ),
                 Divider(color: Colors.grey[700]),
                 _buildSwitchTile(
