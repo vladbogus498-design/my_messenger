@@ -23,10 +23,11 @@ class EncryptionService {
     try {
       final key = generateKey(password);
       final iv = generateIV();
-      final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
+      final encrypter =
+          encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
 
       final encrypted = encrypter.encrypt(plainText, iv: iv);
-      
+
       // Возвращаем IV + зашифрованный текст (разделенные :)
       return '${iv.base64}:${encrypted.base64}';
     } catch (e) {
@@ -45,9 +46,10 @@ class EncryptionService {
 
       final iv = encrypt.IV.fromBase64(parts[0]);
       final encrypted = encrypt.Encrypted.fromBase64(parts[1]);
-      
+
       final key = generateKey(password);
-      final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
+      final encrypter =
+          encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
 
       final decrypted = encrypter.decrypt(encrypted, iv: iv);
       return decrypted;
@@ -72,10 +74,10 @@ class EncryptionService {
 
   /// Генерация случайного безопасного пароля для чата
   static String generateSecurePassword({int length = 32}) {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#\$%^&*()_+-=[]{}|;:,.<>?';
+    const chars =
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#\$%^&*()_+-=[]{}|;:,.<>?';
     final random = Random.secure();
-    return String.fromCharCodes(
-      List.generate(length, (index) => chars.codeUnitAt(random.nextInt(chars.length)))
-    );
+    return String.fromCharCodes(List.generate(
+        length, (index) => chars.codeUnitAt(random.nextInt(chars.length))));
   }
 }

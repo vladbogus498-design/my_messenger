@@ -5,8 +5,12 @@ class Message {
   final String chatId;
   final String senderId;
   final String text;
-  final String type;
+  final String type; // 'text', 'image', 'voice', 'sticker'
   final String? imageUrl;
+  final String? voiceAudioBase64; // base64 закодированное голосовое сообщение
+  final int? voiceDuration; // длительность голосового сообщения в секундах
+  final String? stickerId; // ID стикера
+  final bool isEncrypted; // флаг шифрования
   final DateTime timestamp;
   final String? replyToId;
   final String? replyToText;
@@ -23,6 +27,10 @@ class Message {
     required this.text,
     required this.type,
     this.imageUrl,
+    this.voiceAudioBase64,
+    this.voiceDuration,
+    this.stickerId,
+    this.isEncrypted = false,
     required this.timestamp,
     this.replyToId,
     this.replyToText,
@@ -41,6 +49,10 @@ class Message {
       text: data['text'] ?? '',
       type: data['type'] ?? 'text',
       imageUrl: data['imageUrl'],
+      voiceAudioBase64: data['voiceAudioBase64'],
+      voiceDuration: data['voiceDuration'],
+      stickerId: data['stickerId'],
+      isEncrypted: data['isEncrypted'] ?? false,
       timestamp: (data['timestamp'] as Timestamp).toDate(),
       replyToId: data['replyToId'],
       replyToText: data['replyToText'],
@@ -59,6 +71,10 @@ class Message {
       'text': text,
       'type': type,
       'imageUrl': imageUrl,
+      if (voiceAudioBase64 != null) 'voiceAudioBase64': voiceAudioBase64,
+      if (voiceDuration != null) 'voiceDuration': voiceDuration,
+      if (stickerId != null) 'stickerId': stickerId,
+      'isEncrypted': isEncrypted,
       'timestamp': timestamp,
       'replyToId': replyToId,
       'replyToText': replyToText,
@@ -93,6 +109,10 @@ class Message {
       reactions: newReactions,
       isTyping: isTyping,
       status: status,
+      voiceAudioBase64: voiceAudioBase64,
+      voiceDuration: voiceDuration,
+      stickerId: stickerId,
+      isEncrypted: isEncrypted,
     );
   }
 }

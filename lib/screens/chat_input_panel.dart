@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:async';
 import '../services/storage_service.dart';
 import '../services/chat_service.dart';
+import '../services/voice_message_service.dart';
+import '../widgets/sticker_picker.dart';
 
 class ChatInputPanel extends StatefulWidget {
   final String chatId;
   final String currentUserId;
   final Function(String, String) onSendMessage;
   final Function(String) onImageUpload;
+  final Function(String, int)? onVoiceMessageSent; // (base64Audio, duration)
+  final Function(String)? onStickerSent; // (stickerId)
   final TextEditingController? typingController;
 
   const ChatInputPanel({
@@ -17,6 +22,8 @@ class ChatInputPanel extends StatefulWidget {
     required this.currentUserId,
     required this.onSendMessage,
     required this.onImageUpload,
+    this.onVoiceMessageSent,
+    this.onStickerSent,
     this.typingController,
   }) : super(key: key);
 
@@ -27,6 +34,12 @@ class ChatInputPanel extends StatefulWidget {
 class _ChatInputPanelState extends State<ChatInputPanel> {
   final TextEditingController _messageController = TextEditingController();
   bool _showAttachmentMenu = false;
+  bool _isRecording = false;
+  bool _showStickerPicker = false;
+  Duration _recordingDuration = Duration.zero;
+  List<double> _waveform = [];
+  Timer? _waveformTimer;
+  String? _recordingFilePath;
 
   TextEditingController get _effectiveController {
     return widget.typingController ?? _messageController;
@@ -68,21 +81,91 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
     }
   }
 
-  void _startVoiceRecording() async {
+  Future<void> _startVoiceRecording() async {
+    if (_isRecording) return;
+
     try {
-      // Устанавливаем статус "записывает голосовое"
+      setState(() {
+        _isRecording = true;
+        _recordingDuration = Duration.zero;
+        _waveform = [];
+      });
+
       await ChatService.setRecordingVoiceStatus(widget.chatId, true);
-      _showSnackBar('Записываем голосовое... 🎤');
-      
-      // Симуляция записи (в реальном приложении здесь будет запись аудио)
-      await Future.delayed(Duration(seconds: 3));
+
+      _recordingFilePath = await VoiceMessageService.recordVoiceMessage(
+        onDurationUpdate: (duration) {
+          if (mounted) {
+            setState(() {
+              _recordingDuration = duration;
+            });
+          }
+        },
+        onWaveformUpdate: (waveform) {
+          if (mounted) {
+            setState(() {
+              _waveform = waveform;
+            });
+          }
+        },
+      );
+
+      if (_recordingFilePath == null) {
+        throw Exception('Failed to start recording');
+      }
     } catch (e) {
       print('❌ Ошибка записи голосового: $e');
-    } finally {
-      // Убираем статус
+      setState(() {
+        _isRecording = false;
+      });
       await ChatService.setRecordingVoiceStatus(widget.chatId, false);
-      _showSnackBar('Голосовые сообщения скоро будут! 🎤');
+      _showSnackBar('Ошибка записи');
     }
+  }
+
+  Future<void> _stopVoiceRecording({bool send = true}) async {
+    if (!_isRecording) return;
+
+    try {
+      final audioBytes = await VoiceMessageService.stopRecording();
+      
+      setState(() {
+        _isRecording = false;
+      });
+
+      await ChatService.setRecordingVoiceStatus(widget.chatId, false);
+
+      if (send && audioBytes != null && _recordingFilePath != null) {
+        // Конвертируем аудио в base64
+        final base64Audio = await VoiceMessageService.encodeAudioToBase64(_recordingFilePath!);
+        final durationSeconds = _recordingDuration.inSeconds;
+
+        // Отправляем голосовое сообщение
+        if (widget.onVoiceMessageSent != null) {
+          widget.onVoiceMessageSent!(base64Audio, durationSeconds);
+        }
+
+        _showSnackBar('Голосовое сообщение отправлено! 🎤');
+      }
+
+      setState(() {
+        _recordingDuration = Duration.zero;
+        _waveform = [];
+        _recordingFilePath = null;
+      });
+    } catch (e) {
+      print('❌ Ошибка остановки записи: $e');
+      _showSnackBar('Ошибка отправки голосового');
+    }
+  }
+
+  void _sendSticker(String stickerId) {
+    if (widget.onStickerSent != null) {
+      widget.onStickerSent!(stickerId);
+    }
+    setState(() {
+      _showStickerPicker = false;
+    });
   }
 
   void _sendLocation() {
@@ -111,16 +194,37 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
   }
 
   @override
+  void dispose() {
+    _waveformTimer?.cancel();
+    if (_isRecording) {
+      _stopVoiceRecording(send: false);
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        border: Border(top: BorderSide(color: Colors.grey.shade300)),
-      ),
-      child: Column(
-        children: [
-          if (_showAttachmentMenu) ...[
+    return Column(
+      children: [
+        // Визуализация записи голосового сообщения
+        if (_isRecording) _buildRecordingWidget(),
+        
+        // Пicker стикеров
+        if (_showStickerPicker)
+          StickerPicker(
+            onStickerSelected: _sendSticker,
+            onDismiss: () => setState(() => _showStickerPicker = false),
+          ),
+        
+        Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            border: Border(top: BorderSide(color: Colors.grey.shade300)),
+          ),
+          child: Column(
+            children: [
+              if (_showAttachmentMenu) ...[
             Container(
               padding: EdgeInsets.symmetric(vertical: 10),
               child: Row(
@@ -134,7 +238,12 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
                   _AttachmentButton(
                     icon: Icons.mic,
                     label: 'Голосовое',
-                    onTap: _startVoiceRecording,
+                    onTap: _isRecording ? () => _stopVoiceRecording() : _startVoiceRecording,
+                  ),
+                  _AttachmentButton(
+                    icon: Icons.emoji_emotions,
+                    label: 'Стикер',
+                    onTap: () => setState(() => _showStickerPicker = !_showStickerPicker),
                   ),
                   _AttachmentButton(
                     icon: Icons.location_on,
@@ -170,6 +279,63 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
                 onPressed: _sendTextMessage,
               ),
             ],
+          ),
+        ],
+      ),
+    ),
+      ],
+    );
+  }
+
+  Widget _buildRecordingWidget() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      color: Colors.red.withOpacity(0.1),
+      child: Row(
+        children: [
+          Icon(Icons.mic, color: Colors.red),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Запись...',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+                ),
+                SizedBox(height: 4),
+                // Визуализация waveform
+                if (_waveform.isNotEmpty)
+                  Row(
+                    children: _waveform.map((value) {
+                      return Container(
+                        width: 3,
+                        height: value * 30,
+                        margin: EdgeInsets.symmetric(horizontal: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                SizedBox(height: 4),
+                Text(
+                  '${_recordingDuration.inMinutes.toString().padLeft(2, '0')}:${(_recordingDuration.inSeconds % 60).toString().padLeft(2, '0')}',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.send, color: Colors.red),
+            onPressed: () => _stopVoiceRecording(send: true),
+            tooltip: 'Отправить',
+          ),
+          IconButton(
+            icon: Icon(Icons.cancel, color: Colors.grey),
+            onPressed: () => _stopVoiceRecording(send: false),
+            tooltip: 'Отменить',
           ),
         ],
       ),

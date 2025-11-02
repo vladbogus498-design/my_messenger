@@ -20,6 +20,11 @@ dependencies:
   shared_preferences: ^2.2.2
   encrypt: ^5.0.1
   crypto: ^3.0.3
+  pointycastle: ^3.7.3
+  microphone: ^1.0.1
+  audioplayers: ^5.2.1
+  path_provider: ^2.1.1
+  permission_handler: ^11.0.1
 
 dev_dependencies:
   flutter_test:

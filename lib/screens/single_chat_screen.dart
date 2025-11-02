@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 import '../services/chat_service.dart';
+import '../services/voice_message_service.dart';
 import '../models/message.dart';
+import '../models/chat.dart';
 import 'chat_input_panel.dart';
 import 'user_profile_screen.dart';
+import '../widgets/reaction_picker.dart';
 
 class SingleChatScreen extends StatefulWidget {
   final String chatId;
@@ -30,14 +34,39 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   List<String> _typingUsers = [];
   List<String> _sendingPhotoUsers = [];
   List<String> _recordingVoiceUsers = [];
+  String? _playingVoiceMessageId;
+  Chat? _chatData;
+  Timer? _playbackCheckTimer;
 
   @override
   void initState() {
     super.initState();
     _loadMessages();
+    _loadChatData();
     _setupTypingListener();
     _setupTypingDetection();
     _markMessagesAsRead();
+  }
+
+  Future<void> _loadChatData() async {
+    try {
+      final chats = await ChatService.getUserChats();
+      _chatData = chats.firstWhere(
+        (chat) => chat.id == widget.chatId,
+        orElse: () => chats.isNotEmpty
+            ? chats.first
+            : Chat(
+                id: widget.chatId,
+                name: widget.chatName,
+                participants: [],
+                lastMessage: '',
+                lastMessageStatus: 'sent',
+                lastMessageTime: DateTime.now(),
+              ),
+      );
+    } catch (e) {
+      print('Error loading chat data: $e');
+    }
   }
 
   Future<void> _markMessagesAsRead() async {
@@ -147,7 +176,6 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   Future<void> _sendImageMessage(String imageUrl) async {
     try {
-      // Статус устанавливается в chat_input_panel, но на всякий случай убираем после отправки
       await ChatService.sendMessage(
         chatId: widget.chatId,
         text: '[Photo]',
@@ -155,18 +183,92 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         imageUrl: imageUrl,
         replyToId: _replyingTo?.id,
         replyToText: _replyingTo?.text,
+        encrypt: false, // Можно добавить опцию шифрования
       );
 
-      // Убираем статус после отправки
       await ChatService.setSendingPhotoStatus(widget.chatId, false);
-
       setState(() => _replyingTo = null);
       _loadMessages();
     } catch (e) {
       print('Error: $e');
-      // Убираем статус в случае ошибки
       await ChatService.setSendingPhotoStatus(widget.chatId, false);
     }
+  }
+
+  Future<void> _sendVoiceMessage(String base64Audio, int durationSeconds) async {
+    try {
+      await ChatService.sendMessage(
+        chatId: widget.chatId,
+        text: '🎤 Голосовое сообщение',
+        type: 'voice',
+        voiceAudioBase64: base64Audio,
+        voiceDuration: durationSeconds,
+        replyToId: _replyingTo?.id,
+        replyToText: _replyingTo?.text,
+      );
+
+      setState(() => _replyingTo = null);
+      _loadMessages();
+    } catch (e) {
+      print('Error sending voice message: $e');
+    }
+  }
+
+  Future<void> _sendSticker(String stickerId) async {
+    try {
+      await ChatService.sendMessage(
+        chatId: widget.chatId,
+        text: '',
+        type: 'sticker',
+        stickerId: stickerId,
+      );
+
+      _loadMessages();
+    } catch (e) {
+      print('Error sending sticker: $e');
+    }
+  }
+
+  Future<void> _playVoiceMessage(Message message) async {
+    if (message.voiceAudioBase64 == null) return;
+
+    final messageId = message.id;
+    
+    // Если уже воспроизводится этот же файл - останавливаем
+    if (_playingVoiceMessageId == messageId && VoiceMessageService.isPlayingMessage(messageId)) {
+      await VoiceMessageService.stopPlaying();
+      setState(() => _playingVoiceMessageId = null);
+      return;
+    }
+
+    // Останавливаем предыдущее воспроизведение
+    if (_playingVoiceMessageId != null) {
+      await VoiceMessageService.stopPlaying();
+    }
+
+    setState(() => _playingVoiceMessageId = messageId);
+    await VoiceMessageService.playVoiceMessage(message.voiceAudioBase64!, messageId);
+    
+    // Обновляем состояние после завершения воспроизведения
+    // Слушаем изменения статуса через периодическую проверку
+    _playbackCheckTimer?.cancel();
+    _playbackCheckTimer = Timer.periodic(Duration(milliseconds: 500), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (!VoiceMessageService.isPlayingMessage(messageId)) {
+        timer.cancel();
+        _playbackCheckTimer = null;
+        if (mounted) {
+          setState(() {
+            if (_playingVoiceMessageId == messageId) {
+              _playingVoiceMessageId = null;
+            }
+          });
+        }
+      }
+    });
   }
 
   Future<void> _forwardMessage() async {
@@ -223,18 +325,47 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       child: Wrap(
         spacing: 4,
         children: message.reactions.entries.map((entry) {
-          return Container(
-            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.grey[800],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              entry.value,
-              style: TextStyle(fontSize: 12),
+          return GestureDetector(
+            onTap: () => _addReaction(message, entry.value),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.grey[800],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                entry.value,
+                style: TextStyle(fontSize: 12),
+              ),
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildStickerWidget(String stickerId) {
+    // Маппинг ID стикеров на эмодзи (можно расширить)
+    final stickerMap = {
+      'thumbs_up': '👍',
+      'heart': '❤️',
+      'fire': '🔥',
+      'party': '🎉',
+      'rocket': '🚀',
+      'star': '⭐',
+      'trophy': '🏆',
+      'clap': '👏',
+      'cool': '😎',
+      'wink': '😉',
+    };
+
+    final emoji = stickerMap[stickerId] ?? '😀';
+    
+    return Container(
+      padding: EdgeInsets.all(8),
+      child: Text(
+        emoji,
+        style: TextStyle(fontSize: 64),
       ),
     );
   }
@@ -447,21 +578,44 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                             ],
                           ),
 
-                        // Voice message indicator
-                        if (message.type == 'voice')
-                          Row(
-                            children: [
-                              Icon(Icons.mic, color: Colors.white, size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Голосовое сообщение',
-                                style: TextStyle(color: Colors.white),
+                        // Voice message
+                        if (message.type == 'voice' && message.voiceAudioBase64 != null)
+                          GestureDetector(
+                            onTap: () => _playVoiceMessage(message),
+                            child: Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[700],
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                            ],
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _playingVoiceMessageId == message.id && VoiceMessageService.isPlayingMessage(message.id)
+                                        ? Icons.pause
+                                        : Icons.play_arrow,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    '${(message.voiceDuration ?? 0) ~/ 60}:${((message.voiceDuration ?? 0) % 60).toString().padLeft(2, '0')}',
+                                    style: TextStyle(color: Colors.white, fontSize: 16),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Icon(Icons.mic, color: Colors.white, size: 16),
+                                ],
+                              ),
+                            ),
                           ),
 
+                        // Sticker message
+                        if (message.type == 'sticker' && message.stickerId != null)
+                          _buildStickerWidget(message.stickerId!),
+
                         // Text content
-                        if (message.text.isNotEmpty && message.type != 'voice')
+                        if (message.text.isNotEmpty && message.type != 'voice' && message.type != 'sticker')
                           Text(
                             message.text,
                             style: TextStyle(color: Colors.white),
@@ -652,6 +806,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
             currentUserId: _currentUser?.uid ?? '',
             onSendMessage: _sendTextMessage,
             onImageUpload: _sendImageMessage,
+            onVoiceMessageSent: _sendVoiceMessage,
+            onStickerSent: _sendSticker,
             typingController: _typingController,
           ),
         ],
@@ -661,6 +817,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   @override
   void dispose() {
+    _playbackCheckTimer?.cancel();
+    VoiceMessageService.stopPlaying();
     _scrollController.dispose();
     _typingController.dispose();
     ChatService.setTypingStatus(widget.chatId, false);

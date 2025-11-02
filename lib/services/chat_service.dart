@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/message.dart';
 import '../models/chat.dart';
+import 'e2e_encryption_service.dart';
 
 class ChatService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -33,15 +34,31 @@ class ChatService {
           .orderBy('timestamp', descending: false)
           .get();
 
-      return snapshot.docs.map((doc) {
+      final messages = await Future.wait(snapshot.docs.map((doc) async {
         final data = doc.data();
+        var messageText = data['text'] ?? '';
+        final isEncrypted = data['isEncrypted'] ?? false;
+
+        // Дешифруем сообщение, если оно зашифровано
+        if (isEncrypted && messageText.isNotEmpty) {
+          try {
+            messageText = await E2EEncryptionService.decryptMessage(messageText);
+          } catch (e) {
+            print('❌ Error decrypting message: $e');
+          }
+        }
+
         return Message(
           id: doc.id,
           chatId: chatId,
           senderId: data['senderId'] ?? '',
-          text: data['text'] ?? '',
+          text: messageText,
           type: data['type'] ?? 'text',
           imageUrl: data['imageUrl'],
+          voiceAudioBase64: data['voiceAudioBase64'],
+          voiceDuration: data['voiceDuration'],
+          stickerId: data['stickerId'],
+          isEncrypted: isEncrypted,
           timestamp: (data['timestamp'] as Timestamp).toDate(),
           replyToId: data['replyToId'],
           replyToText: data['replyToText'],
@@ -51,7 +68,9 @@ class ChatService {
           isTyping: data['isTyping'] ?? false,
           status: data['status'] ?? 'sent',
         );
-      }).toList();
+      }));
+
+      return messages;
     } catch (e) {
       print('❌ Error loading messages: $e');
       return [];
@@ -63,18 +82,42 @@ class ChatService {
     required String text,
     required String type,
     String? imageUrl,
+    String? voiceAudioBase64,
+    int? voiceDuration,
+    String? stickerId,
     String? replyToId,
     String? replyToText,
     bool isForwarded = false,
     String? originalSender,
+    bool encrypt = false,
+    List<String>? recipientIds,
   }) async {
     try {
+      var messageText = text;
+      var isEncrypted = false;
+
+      // Шифруем сообщение, если требуется
+      if (encrypt && messageText.isNotEmpty && recipientIds != null && recipientIds.isNotEmpty) {
+        try {
+          // Для простоты шифруем для первого получателя (в групповых чатах нужна более сложная логика)
+          messageText = await E2EEncryptionService.encryptMessage(messageText, recipientIds[0]);
+          isEncrypted = true;
+        } catch (e) {
+          print('❌ Error encrypting message: $e');
+          // Продолжаем с незашифрованным сообщением
+        }
+      }
+
       final messageData = {
-        'text': text,
+        'text': messageText,
         'type': type,
         'senderId': _auth.currentUser?.uid,
         'timestamp': FieldValue.serverTimestamp(),
         if (imageUrl != null) 'imageUrl': imageUrl,
+        if (voiceAudioBase64 != null) 'voiceAudioBase64': voiceAudioBase64,
+        if (voiceDuration != null) 'voiceDuration': voiceDuration,
+        if (stickerId != null) 'stickerId': stickerId,
+        'isEncrypted': isEncrypted,
         if (replyToId != null) 'replyToId': replyToId,
         if (replyToText != null) 'replyToText': replyToText,
         'isForwarded': isForwarded,

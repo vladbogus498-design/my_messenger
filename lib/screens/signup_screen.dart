@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'main_chat_screen.dart';
 import 'login_screen.dart';
 import '../services/user_service.dart';
+import '../services/rsa_key_service.dart';
 
 class SignupScreen extends StatefulWidget {
   final String language;
@@ -121,6 +122,14 @@ class _SignupScreenState extends State<SignupScreen> {
           email,
           name,
         );
+        
+        // Инициализируем RSA ключи для E2E шифрования
+        try {
+          await RSAKeyService.initializeKeys();
+        } catch (e) {
+          print('⚠️ Warning: Failed to initialize RSA keys: $e');
+          // Продолжаем регистрацию даже если ключи не инициализировались
+        }
       }
 
       Navigator.pushReplacement(
