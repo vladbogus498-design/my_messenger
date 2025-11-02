@@ -26,6 +26,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   bool _isEditing = false;
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  bool get _isMyProfile {
+    return widget.isMyProfile || _auth.currentUser?.uid == widget.userId;
+  }
 
   @override
   void initState() {
@@ -66,7 +71,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           SnackBar(content: Text('Загружаем аватар...')),
         );
 
-        final imageUrl = await StorageService.uploadUserAvatar(File(image.path));
+        final imageUrl =
+            await StorageService.uploadUserAvatar(File(image.path));
         await UserService.updateUserData(photoURL: imageUrl);
 
         await _loadUserData();
@@ -87,10 +93,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         name: _nameController.text.trim(),
         bio: _bioController.text.trim(),
       );
-      
+
       setState(() => _isEditing = false);
       await _loadUserData();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Профиль сохранен! ✅')),
       );
@@ -118,7 +124,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           backgroundColor: Colors.black,
         ),
         body: Center(
-          child: Text('Пользователь не найден', style: TextStyle(color: Colors.white)),
+          child: Text('Пользователь не найден',
+              style: TextStyle(color: Colors.white)),
         ),
       );
     }
@@ -128,7 +135,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       appBar: AppBar(
         title: Text(_isEditing ? 'Редактирование' : 'Профиль'),
         backgroundColor: Colors.black,
-        actions: widget.isMyProfile
+        actions: _isMyProfile
             ? [
                 if (_isEditing)
                   IconButton(
@@ -149,7 +156,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             SizedBox(height: 20),
             // Аватар
             GestureDetector(
-              onTap: widget.isMyProfile && !_isEditing ? _uploadAvatar : null,
+              onTap: _isMyProfile && !_isEditing ? _uploadAvatar : null,
               child: Stack(
                 children: [
                   CircleAvatar(
@@ -165,7 +172,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           )
                         : null,
                   ),
-                  if (widget.isMyProfile && !_isEditing)
+                  if (_isMyProfile && !_isEditing)
                     Positioned(
                       bottom: 0,
                       right: 0,
@@ -179,9 +186,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ),
             ),
             SizedBox(height: 16),
-            
+
             // Имя
-            if (_isEditing && widget.isMyProfile)
+            if (_isEditing && _isMyProfile)
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: TextField(
@@ -203,19 +210,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-            
+
             SizedBox(height: 8),
-            
+
             // Email
             Text(
               _user!.email,
               style: TextStyle(color: Colors.grey, fontSize: 14),
             ),
-            
+
             SizedBox(height: 16),
-            
+
             // Био
-            if (_isEditing && widget.isMyProfile)
+            if (_isEditing && _isMyProfile)
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: TextField(
@@ -240,9 +247,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   textAlign: TextAlign.center,
                 ),
               ),
-            
+
             SizedBox(height: 30),
-            
+
             // Информация
             Container(
               margin: EdgeInsets.symmetric(horizontal: 20),
@@ -255,9 +262,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 children: [
                   _buildInfoRow('ID пользователя', _user!.uid.substring(0, 8)),
                   Divider(),
-                  _buildInfoRow('Зарегистрирован', _user!.createdAt != null
-                      ? '${_user!.createdAt!.day}.${_user!.createdAt!.month}.${_user!.createdAt!.year}'
-                      : 'Неизвестно'),
+                  _buildInfoRow(
+                      'Зарегистрирован',
+                      _user!.createdAt != null
+                          ? '${_user!.createdAt!.day}.${_user!.createdAt!.month}.${_user!.createdAt!.year}'
+                          : 'Неизвестно'),
                 ],
               ),
             ),
@@ -287,4 +296,3 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     super.dispose();
   }
 }
-

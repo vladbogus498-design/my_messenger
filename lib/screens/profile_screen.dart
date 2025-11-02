@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/biometric_service.dart';
+import 'user_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -84,6 +85,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await FirebaseAuth.instance.signOut();
     } catch (e) {
       print('Logout error: $e');
+    }
+  }
+
+  void _openMyProfile() {
+    final userId = _user?.uid;
+    if (userId != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UserProfileScreen(
+            userId: userId,
+            isMyProfile: true,
+          ),
+        ),
+      );
     }
   }
 
@@ -214,23 +230,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             SizedBox(height: 40),
             GestureDetector(
-              onTap: _showThemeSelector,
-              child: CircleAvatar(
-                radius: 50,
-                backgroundColor: _mainColor,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      _user?.email?.substring(0, 1).toUpperCase() ?? 'U',
-                      style: TextStyle(fontSize: 36, color: Colors.white),
+              onTap: _openMyProfile,
+              child: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: _mainColor,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _user?.email?.substring(0, 1).toUpperCase() ?? 'U',
+                          style: TextStyle(fontSize: 36, color: Colors.white),
+                        ),
+                        Text(
+                          'Tap to edit',
+                          style: TextStyle(color: Colors.white70, fontSize: 8),
+                        ),
+                      ],
                     ),
-                    Text(
-                      'Tap to change color',
-                      style: TextStyle(color: Colors.white70, fontSize: 8),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Colors.blue,
+                      child: Icon(Icons.edit, size: 20, color: Colors.white),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             SizedBox(height: 16),

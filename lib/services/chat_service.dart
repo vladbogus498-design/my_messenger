@@ -160,6 +160,40 @@ class ChatService {
     }
   }
 
+  // 📸 Статус "отправляет фото"
+  static Future<void> setSendingPhotoStatus(
+      String chatId, bool isSending) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      await _firestore.collection('chats').doc(chatId).update({
+        'sendingPhotoUsers': isSending
+            ? FieldValue.arrayUnion([userId])
+            : FieldValue.arrayRemove([userId])
+      });
+    } catch (e) {
+      print('❌ Error setting photo status: $e');
+    }
+  }
+
+  // 🎤 Статус "записывает голосовое"
+  static Future<void> setRecordingVoiceStatus(
+      String chatId, bool isRecording) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      await _firestore.collection('chats').doc(chatId).update({
+        'recordingVoiceUsers': isRecording
+            ? FieldValue.arrayUnion([userId])
+            : FieldValue.arrayRemove([userId])
+      });
+    } catch (e) {
+      print('❌ Error setting voice status: $e');
+    }
+  }
+
   // 👀 Получение статусов "печатает"
   static Stream<List<String>> getTypingUsers(String chatId) {
     return _firestore
@@ -170,6 +204,33 @@ class ChatService {
       final data = snapshot.data();
       final typingUsers = data?['typingUsers'] as List<dynamic>?;
       return typingUsers?.cast<String>() ?? [];
+    });
+  }
+
+  // 📸 Получение статусов "отправляет фото"
+  static Stream<List<String>> getSendingPhotoUsers(String chatId) {
+    return _firestore
+        .collection('chats')
+        .doc(chatId)
+        .snapshots()
+        .map((snapshot) {
+      final data = snapshot.data();
+      final sendingPhotoUsers = data?['sendingPhotoUsers'] as List<dynamic>?;
+      return sendingPhotoUsers?.cast<String>() ?? [];
+    });
+  }
+
+  // 🎤 Получение статусов "записывает голосовое"
+  static Stream<List<String>> getRecordingVoiceUsers(String chatId) {
+    return _firestore
+        .collection('chats')
+        .doc(chatId)
+        .snapshots()
+        .map((snapshot) {
+      final data = snapshot.data();
+      final recordingVoiceUsers =
+          data?['recordingVoiceUsers'] as List<dynamic>?;
+      return recordingVoiceUsers?.cast<String>() ?? [];
     });
   }
 
@@ -216,7 +277,8 @@ class ChatService {
   }
 
   // ✅ Обновить статус сообщения на "доставлено"
-  static Future<void> markMessageAsDelivered(String chatId, String messageId) async {
+  static Future<void> markMessageAsDelivered(
+      String chatId, String messageId) async {
     try {
       await _firestore
           .collection('chats')

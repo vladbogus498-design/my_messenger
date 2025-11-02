@@ -28,6 +28,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   Message? _forwardingMessage;
   final TextEditingController _typingController = TextEditingController();
   List<String> _typingUsers = [];
+  List<String> _sendingPhotoUsers = [];
+  List<String> _recordingVoiceUsers = [];
 
   @override
   void initState() {
@@ -49,6 +51,26 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         setState(() {
           _typingUsers =
               typingUsers.where((id) => id != _currentUser?.uid).toList();
+        });
+      }
+    });
+
+    ChatService.getSendingPhotoUsers(widget.chatId).listen((sendingPhotoUsers) {
+      if (mounted) {
+        setState(() {
+          _sendingPhotoUsers =
+              sendingPhotoUsers.where((id) => id != _currentUser?.uid).toList();
+        });
+      }
+    });
+
+    ChatService.getRecordingVoiceUsers(widget.chatId)
+        .listen((recordingVoiceUsers) {
+      if (mounted) {
+        setState(() {
+          _recordingVoiceUsers = recordingVoiceUsers
+              .where((id) => id != _currentUser?.uid)
+              .toList();
         });
       }
     });
@@ -125,6 +147,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   Future<void> _sendImageMessage(String imageUrl) async {
     try {
+      // Статус устанавливается в chat_input_panel, но на всякий случай убираем после отправки
       await ChatService.sendMessage(
         chatId: widget.chatId,
         text: '[Photo]',
@@ -133,10 +156,16 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         replyToId: _replyingTo?.id,
         replyToText: _replyingTo?.text,
       );
+
+      // Убираем статус после отправки
+      await ChatService.setSendingPhotoStatus(widget.chatId, false);
+
       setState(() => _replyingTo = null);
       _loadMessages();
     } catch (e) {
       print('Error: $e');
+      // Убираем статус в случае ошибки
+      await ChatService.setSendingPhotoStatus(widget.chatId, false);
     }
   }
 
@@ -164,7 +193,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   Widget _buildMessageStatusIcon(String status) {
     IconData icon;
     Color color;
-    
+
     switch (status) {
       case 'sent':
         icon = Icons.check;
@@ -386,19 +415,53 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  message.imageUrl!,
-                                  width: 200,
-                                  height: 150,
-                                  fit: BoxFit.cover,
+                                child: Stack(
+                                  children: [
+                                    Image.network(
+                                      message.imageUrl!,
+                                      width: 200,
+                                      height: 150,
+                                      fit: BoxFit.cover,
+                                    ),
+                                    Positioned(
+                                      top: 4,
+                                      right: 4,
+                                      child: Container(
+                                        padding: EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black54,
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Icon(
+                                          Icons.photo,
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                               SizedBox(height: 8),
                             ],
                           ),
 
+                        // Voice message indicator
+                        if (message.type == 'voice')
+                          Row(
+                            children: [
+                              Icon(Icons.mic, color: Colors.white, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Голосовое сообщение',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ],
+                          ),
+
                         // Text content
-                        if (message.text.isNotEmpty)
+                        if (message.text.isNotEmpty && message.type != 'voice')
                           Text(
                             message.text,
                             style: TextStyle(color: Colors.white),
@@ -411,8 +474,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                           children: [
                             Text(
                               '${message.timestamp.hour}:${message.timestamp.minute.toString().padLeft(2, '0')}',
-                              style:
-                                  TextStyle(color: Colors.grey[400], fontSize: 12),
+                              style: TextStyle(
+                                  color: Colors.grey[400], fontSize: 12),
                             ),
                             if (isMyMessage) ...[
                               SizedBox(width: 4),
@@ -485,8 +548,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     // Для простоты берем первого участника, который не является текущим пользователем
     // В реальном приложении нужно получить список участников чата
     final chat = await ChatService.getUserChats();
-    final currentChat = chat.firstWhere((c) => c.id == widget.chatId, orElse: () => chat.first);
-    
+    final currentChat =
+        chat.firstWhere((c) => c.id == widget.chatId, orElse: () => chat.first);
+
     String otherUserId = '';
     if (currentChat.participants.isNotEmpty) {
       otherUserId = currentChat.participants.firstWhere(
@@ -522,18 +586,42 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(widget.chatName),
-            if (_typingUsers.isNotEmpty)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.edit, size: 12, color: Colors.grey),
-                  SizedBox(width: 4),
-                  Text(
-                    'Печатает...',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
+              if (_recordingVoiceUsers.isNotEmpty)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.mic, size: 12, color: Colors.grey),
+                    SizedBox(width: 4),
+                    Text(
+                      'Записывает голосовое...',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                )
+              else if (_sendingPhotoUsers.isNotEmpty)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.photo, size: 12, color: Colors.grey),
+                    SizedBox(width: 4),
+                    Text(
+                      'Отправляет фото...',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                )
+              else if (_typingUsers.isNotEmpty)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit, size: 12, color: Colors.grey),
+                    SizedBox(width: 4),
+                    Text(
+                      'Печатает...',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),

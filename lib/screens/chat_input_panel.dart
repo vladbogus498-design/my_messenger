@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/storage_service.dart';
+import '../services/chat_service.dart';
 
 class ChatInputPanel extends StatefulWidget {
   final String chatId;
@@ -42,12 +43,18 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
       );
 
       if (image != null) {
+        // Устанавливаем статус "отправляет фото"
+        await ChatService.setSendingPhotoStatus(widget.chatId, true);
+
         _showSnackBar('Загружаем фото...');
         final String imageUrl = await StorageService.uploadChatImage(
             File(image.path), widget.chatId);
 
         widget.onImageUpload(imageUrl);
         _showSnackBar('Фото отправлено! 📸');
+
+        // Убираем статус "отправляет фото"
+        await ChatService.setSendingPhotoStatus(widget.chatId, false);
       }
     } catch (e) {
       print('❌ Ошибка загрузки фото: $e');
@@ -55,7 +62,16 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
     }
   }
 
-  void _startVoiceRecording() {
+  void _startVoiceRecording() async {
+    // Устанавливаем статус "записывает голосовое"
+    await ChatService.setRecordingVoiceStatus(widget.chatId, true);
+    _showSnackBar('Записываем голосовое... 🎤');
+
+    // Симуляция записи (в реальном приложении здесь будет запись аудио)
+    await Future.delayed(Duration(seconds: 3));
+
+    // Убираем статус
+    await ChatService.setRecordingVoiceStatus(widget.chatId, false);
     _showSnackBar('Голосовые сообщения скоро будут! 🎤');
   }
 
