@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/chat_service.dart';
 import '../models/message.dart';
 import 'chat_input_panel.dart';
+import 'user_profile_screen.dart';
 
 class SingleChatScreen extends StatefulWidget {
   final String chatId;
