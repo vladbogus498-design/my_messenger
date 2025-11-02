@@ -49,6 +49,7 @@ class ChatService {
           originalSender: data['originalSender'],
           reactions: Map<String, String>.from(data['reactions'] ?? {}),
           isTyping: data['isTyping'] ?? false,
+          status: data['status'] ?? 'sent',
         );
       }).toList();
     } catch (e) {
@@ -80,6 +81,7 @@ class ChatService {
         if (originalSender != null) 'originalSender': originalSender,
         'reactions': {},
         'isTyping': false,
+        'status': 'sent',
       };
 
       await _firestore
@@ -173,5 +175,57 @@ class ChatService {
 
   static void createTestChat() {
     print('Creating test chat...');
+  }
+
+  // ✅ Отметить сообщение как прочитанное
+  static Future<void> markMessageAsRead(String chatId, String messageId) async {
+    try {
+      await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .doc(messageId)
+          .update({'status': 'read'});
+    } catch (e) {
+      print('❌ Error marking message as read: $e');
+    }
+  }
+
+  // ✅ Отметить все сообщения в чате как прочитанные
+  static Future<void> markAllMessagesAsRead(String chatId) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final snapshot = await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .where('senderId', isNotEqualTo: userId)
+          .where('status', isEqualTo: 'sent')
+          .get();
+
+      final batch = _firestore.batch();
+      for (var doc in snapshot.docs) {
+        batch.update(doc.reference, {'status': 'read'});
+      }
+      await batch.commit();
+    } catch (e) {
+      print('❌ Error marking all messages as read: $e');
+    }
+  }
+
+  // ✅ Обновить статус сообщения на "доставлено"
+  static Future<void> markMessageAsDelivered(String chatId, String messageId) async {
+    try {
+      await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .doc(messageId)
+          .update({'status': 'delivered'});
+    } catch (e) {
+      print('❌ Error marking message as delivered: $e');
+    }
   }
 }

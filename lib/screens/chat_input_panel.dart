@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../services/storage_service.dart';
 
 class ChatInputPanel extends StatefulWidget {
   final String chatId;
@@ -42,8 +43,7 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
 
       if (image != null) {
         _showSnackBar('Загружаем фото...');
-        var SupabaseStorageService;
-        final String imageUrl = await SupabaseStorageService.uploadChatImage(
+        final String imageUrl = await StorageService.uploadChatImage(
             File(image.path), widget.chatId);
 
         widget.onImageUpload(imageUrl);

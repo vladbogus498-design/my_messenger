@@ -34,6 +34,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     _loadMessages();
     _setupTypingListener();
     _setupTypingDetection();
+    _markMessagesAsRead();
+  }
+
+  Future<void> _markMessagesAsRead() async {
+    // Отмечаем все сообщения как прочитанные при открытии чата
+    await ChatService.markAllMessagesAsRead(widget.chatId);
   }
 
   void _setupTypingListener() {
@@ -152,6 +158,31 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   bool _isMyMessage(String senderId) {
     return senderId == _currentUser?.uid;
+  }
+
+  Widget _buildMessageStatusIcon(String status) {
+    IconData icon;
+    Color color;
+    
+    switch (status) {
+      case 'sent':
+        icon = Icons.check;
+        color = Colors.grey[400]!;
+        break;
+      case 'delivered':
+        icon = Icons.done_all;
+        color = Colors.grey[400]!;
+        break;
+      case 'read':
+        icon = Icons.done_all;
+        color = Colors.blue;
+        break;
+      default:
+        icon = Icons.check;
+        color = Colors.grey[400]!;
+    }
+
+    return Icon(icon, size: 14, color: color);
   }
 
   Widget _buildReactions(Message message) {
@@ -372,12 +403,21 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                             style: TextStyle(color: Colors.white),
                           ),
 
-                        // Timestamp
+                        // Timestamp and status
                         SizedBox(height: 4),
-                        Text(
-                          '${message.timestamp.hour}:${message.timestamp.minute.toString().padLeft(2, '0')}',
-                          style:
-                              TextStyle(color: Colors.grey[400], fontSize: 12),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${message.timestamp.hour}:${message.timestamp.minute.toString().padLeft(2, '0')}',
+                              style:
+                                  TextStyle(color: Colors.grey[400], fontSize: 12),
+                            ),
+                            if (isMyMessage) ...[
+                              SizedBox(width: 4),
+                              _buildMessageStatusIcon(message.status),
+                            ],
+                          ],
                         ),
                       ],
                     ),
@@ -439,20 +479,62 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     );
   }
 
+  void _showUserProfile() async {
+    // Получаем ID другого пользователя из чата
+    // Для простоты берем первого участника, который не является текущим пользователем
+    // В реальном приложении нужно получить список участников чата
+    final chat = await ChatService.getUserChats();
+    final currentChat = chat.firstWhere((c) => c.id == widget.chatId, orElse: () => chat.first);
+    
+    String otherUserId = '';
+    if (currentChat.participants.isNotEmpty) {
+      otherUserId = currentChat.participants.firstWhere(
+        (id) => id != _currentUser?.uid,
+        orElse: () => currentChat.participants.first,
+      );
+    }
+
+    if (otherUserId.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UserProfileScreen(
+            userId: otherUserId,
+            isMyProfile: false,
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.chatName),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: GestureDetector(
+          onTap: () => _showUserProfile(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.chatName),
             if (_typingUsers.isNotEmpty)
-              Text(
-                'Печатает...',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.edit, size: 12, color: Colors.grey),
+                  SizedBox(width: 4),
+                  Text(
+                    'Печатает...',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
               ),
-          ],
+            ],
+          ),
         ),
         backgroundColor: Colors.black,
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/chat_service.dart' as service;
 import '../models/chat.dart' as model;
 import 'single_chat_screen.dart';
+import 'search_users_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   @override
@@ -106,6 +107,15 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Text('DarkKick Chats'),
         backgroundColor: Colors.black,
         actions: [
+          IconButton(
+            icon: Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => SearchUsersScreen()),
+              );
+            },
+          ),
           IconButton(icon: Icon(Icons.add), onPressed: _createTestChat),
           IconButton(icon: Icon(Icons.refresh), onPressed: _handleRefresh),
         ],

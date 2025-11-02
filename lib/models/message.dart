@@ -14,6 +14,7 @@ class Message {
   final String? originalSender;
   final Map<String, String> reactions; // реакции: {userId: emoji}
   final bool isTyping; // статус "печатает"
+  final String status; // 'sent', 'delivered', 'read' - статус прочтения
 
   Message({
     required this.id,
@@ -29,6 +30,7 @@ class Message {
     this.originalSender,
     this.reactions = const {},
     this.isTyping = false,
+    this.status = 'sent',
   });
 
   factory Message.fromFirestore(Map<String, dynamic> data, String id) {
@@ -46,6 +48,7 @@ class Message {
       originalSender: data['originalSender'],
       reactions: Map<String, String>.from(data['reactions'] ?? {}),
       isTyping: data['isTyping'] ?? false,
+      status: data['status'] ?? 'sent',
     );
   }
 
@@ -63,6 +66,7 @@ class Message {
       'originalSender': originalSender,
       'reactions': reactions,
       'isTyping': isTyping,
+      'status': status,
     };
   }
 
@@ -88,6 +92,7 @@ class Message {
       originalSender: originalSender,
       reactions: newReactions,
       isTyping: isTyping,
+      status: status,
     );
   }
 }

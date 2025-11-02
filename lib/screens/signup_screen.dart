@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'main_chat_screen.dart';
 import 'login_screen.dart';
+import '../services/user_service.dart';
 
 class SignupScreen extends StatefulWidget {
   final String language;
@@ -107,10 +108,20 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      // Создаем профиль пользователя
+      if (userCredential.user != null) {
+        final name = email.split('@')[0]; // Используем часть email как имя по умолчанию
+        await UserService.createUserProfile(
+          userCredential.user!.uid,
+          email,
+          name,
+        );
+      }
 
       Navigator.pushReplacement(
         context,
