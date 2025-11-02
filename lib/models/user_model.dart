@@ -4,6 +4,7 @@ class UserModel {
   final String name;
   final String? photoURL;
   final String? bio; // описание профиля
+  final String? tag; // уникальный тег пользователя (например @username)
   final DateTime? createdAt;
 
   UserModel({
@@ -12,6 +13,7 @@ class UserModel {
     required this.name,
     this.photoURL,
     this.bio,
+    this.tag,
     this.createdAt,
   });
 
@@ -22,6 +24,7 @@ class UserModel {
       name: data['name'] ?? '',
       photoURL: data['photoURL'],
       bio: data['bio'],
+      tag: data['tag'],
       createdAt:
           data['createdAt'] != null ? DateTime.parse(data['createdAt']) : null,
     );
@@ -34,6 +37,7 @@ class UserModel {
       'name': name,
       'photoURL': photoURL,
       'bio': bio,
+      'tag': tag,
       'createdAt': createdAt?.toIso8601String(),
     };
   }

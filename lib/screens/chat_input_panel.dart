@@ -46,33 +46,43 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
         // Устанавливаем статус "отправляет фото"
         await ChatService.setSendingPhotoStatus(widget.chatId, true);
 
-        _showSnackBar('Загружаем фото...');
-        final String imageUrl = await StorageService.uploadChatImage(
-            File(image.path), widget.chatId);
+        try {
+          _showSnackBar('Загружаем фото...');
+          final String imageUrl = await StorageService.uploadChatImage(
+              File(image.path), widget.chatId);
 
-        widget.onImageUpload(imageUrl);
-        _showSnackBar('Фото отправлено! 📸');
-
-        // Убираем статус "отправляет фото"
-        await ChatService.setSendingPhotoStatus(widget.chatId, false);
+          widget.onImageUpload(imageUrl);
+          _showSnackBar('Фото отправлено! 📸');
+        } catch (e) {
+          print('❌ Ошибка загрузки фото: $e');
+          _showSnackBar('Ошибка загрузки фото');
+          rethrow;
+        } finally {
+          // Убираем статус "отправляет фото"
+          await ChatService.setSendingPhotoStatus(widget.chatId, false);
+        }
       }
     } catch (e) {
-      print('❌ Ошибка загрузки фото: $e');
-      _showSnackBar('Ошибка загрузки фото');
+      print('❌ Ошибка выбора фото: $e');
+      _showSnackBar('Ошибка выбора фото');
     }
   }
 
   void _startVoiceRecording() async {
-    // Устанавливаем статус "записывает голосовое"
-    await ChatService.setRecordingVoiceStatus(widget.chatId, true);
-    _showSnackBar('Записываем голосовое... 🎤');
-
-    // Симуляция записи (в реальном приложении здесь будет запись аудио)
-    await Future.delayed(Duration(seconds: 3));
-
-    // Убираем статус
-    await ChatService.setRecordingVoiceStatus(widget.chatId, false);
-    _showSnackBar('Голосовые сообщения скоро будут! 🎤');
+    try {
+      // Устанавливаем статус "записывает голосовое"
+      await ChatService.setRecordingVoiceStatus(widget.chatId, true);
+      _showSnackBar('Записываем голосовое... 🎤');
+      
+      // Симуляция записи (в реальном приложении здесь будет запись аудио)
+      await Future.delayed(Duration(seconds: 3));
+    } catch (e) {
+      print('❌ Ошибка записи голосового: $e');
+    } finally {
+      // Убираем статус
+      await ChatService.setRecordingVoiceStatus(widget.chatId, false);
+      _showSnackBar('Голосовые сообщения скоро будут! 🎤');
+    }
   }
 
   void _sendLocation() {
