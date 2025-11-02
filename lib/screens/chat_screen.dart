@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../services/chat_service.dart' as service;
 import '../models/chat.dart' as model;
 import 'single_chat_screen.dart';
@@ -100,22 +99,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _showSelfDestructDemo() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Self-Destruct Feature'),
-        content: Text('🔥 Messages disappear automatically!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('COOL!'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -124,7 +107,7 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Colors.black,
         actions: [
           IconButton(icon: Icon(Icons.add), onPressed: _createTestChat),
-          IconButton(icon: Icon(Icons.refresh), onPressed: _loadChats),
+          IconButton(icon: Icon(Icons.refresh), onPressed: _handleRefresh),
         ],
       ),
       body: Container(
@@ -151,49 +134,57 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             Expanded(
-              child: _isLoading
-                  ? Center(child: CircularProgressIndicator())
-                  : _filteredChats.isEmpty
-                      ? Center(child: Text('No chats yet'))
-                      : ListView.builder(
-                          itemCount: _filteredChats.length,
-                          itemBuilder: (context, index) {
-                            final chat = _filteredChats[index];
-                            final isDemoChat =
-                                _demoChats.any((c) => c.id == chat.id);
+              child: RefreshIndicator(
+                onRefresh: _handleRefresh,
+                child: _isLoading
+                    ? Center(child: CircularProgressIndicator())
+                    : _filteredChats.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No chats yet',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: _filteredChats.length,
+                            itemBuilder: (context, index) {
+                              final chat = _filteredChats[index];
+                              final isDemoChat =
+                                  _demoChats.any((c) => c.id == chat.id);
 
-                            return Card(
-                              color: Colors.grey[800],
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: isDemoChat
-                                      ? Colors.green
-                                      : Colors.deepPurple,
-                                  child: Text(chat.name[0]),
-                                ),
-                                title: Text(chat.name,
-                                    style: TextStyle(color: Colors.white)),
-                                subtitle: Text(chat.lastMessage,
-                                    style: TextStyle(color: Colors.grey)),
-                                trailing: Text(
-                                  '${chat.lastMessageTime.hour}:${chat.lastMessageTime.minute.toString().padLeft(2, '0')}',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => SingleChatScreen(
-                                        chatId: chat.id,
-                                        chatName: chat.name,
+                              return Card(
+                                color: Colors.grey[800],
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: isDemoChat
+                                        ? Colors.green
+                                        : Colors.deepPurple,
+                                    child: Text(chat.name[0]),
+                                  ),
+                                  title: Text(chat.name,
+                                      style: TextStyle(color: Colors.white)),
+                                  subtitle: Text(chat.lastMessage,
+                                      style: TextStyle(color: Colors.grey)),
+                                  trailing: Text(
+                                    '${chat.lastMessageTime.hour}:${chat.lastMessageTime.minute.toString().padLeft(2, '0')}',
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => SingleChatScreen(
+                                          chatId: chat.id,
+                                          chatName: chat.name,
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            );
-                          },
-                        ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+              ),
             ),
           ],
         ),

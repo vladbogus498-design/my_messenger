@@ -7,7 +7,7 @@ class ChatService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  static Future<List> getUserChats() async {
+  static Future<List<Chat>> getUserChats() async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return [];
 
@@ -17,7 +17,7 @@ class ChatService {
           .where('participants', arrayContains: userId)
           .get();
 
-      return snapshot.docs.map((doc) => Chat.fromFirestore(doc)).toList();
+      return snapshot.docs.map<Chat>((doc) => Chat.fromFirestore(doc)).toList();
     } catch (e) {
       print('❌ Error loading chats: $e');
       return [];
