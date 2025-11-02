@@ -21,7 +21,7 @@ dependencies:
   encrypt: ^5.0.1
   crypto: ^3.0.3
   pointycastle: ^3.7.3
-  microphone: ^1.0.1
+  microphone: ^0.1.0
   audioplayers: ^5.2.1
   path_provider: ^2.1.1
   permission_handler: ^11.0.1

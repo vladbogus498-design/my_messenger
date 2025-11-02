@@ -39,7 +39,7 @@ class VoiceMessageService {
 
     try {
       _isRecording = true;
-      
+
       // Получаем путь для временного файла
       final directory = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -47,14 +47,16 @@ class VoiceMessageService {
 
       // Симуляция записи (в реальном приложении используйте microphone package)
       // Здесь просто создаем заглушку для демонстрации
-      Duration recordingDuration = Duration.zero;
-      
+      int tickCount = 0;
+
       _recordingTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
-        recordingDuration = recordingDuration + Duration(milliseconds: 100);
+        tickCount++;
+        final recordingDuration = Duration(milliseconds: tickCount * 100);
         onDurationUpdate(recordingDuration);
-        
+
         // Симуляция waveform
-        final waveform = List.generate(20, (_) => 0.3 + (0.7 * (timer.tick % 10) / 10));
+        final waveform =
+            List.generate(20, (_) => 0.3 + (0.7 * (tickCount % 10) / 10));
         onWaveformUpdate(waveform);
       });
 
@@ -104,14 +106,14 @@ class VoiceMessageService {
   static Future<String> decodeBase64ToAudio(String base64String) async {
     try {
       final bytes = base64Decode(base64String);
-      
+
       final directory = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final filePath = '${directory.path}/voice_playback_$timestamp.m4a';
-      
+
       final file = File(filePath);
       await file.writeAsBytes(bytes);
-      
+
       return filePath;
     } catch (e) {
       print('❌ Error decoding audio: $e');
@@ -120,7 +122,8 @@ class VoiceMessageService {
   }
 
   // Воспроизведение голосового сообщения
-  static Future<void> playVoiceMessage(String base64Audio, String messageId) async {
+  static Future<void> playVoiceMessage(
+      String base64Audio, String messageId) async {
     if (_isPlaying && _currentPlayingId == messageId) {
       // Если уже воспроизводится этот же файл - останавливаем
       await stopPlaying();
@@ -141,9 +144,11 @@ class VoiceMessageService {
 
       // Отменяем предыдущую подписку, если есть
       await _playerCompleteSubscription?.cancel();
-      
+
       // Воспроизводим через audioplayers
-      await _audioPlayer.play(DeviceFileSource(filePath));
+      // Для локальных файлов используем UrlSource с file:// протоколом
+      final fileUri = Uri.file(filePath).toString();
+      await _audioPlayer.play(UrlSource(fileUri));
 
       // Слушаем завершение воспроизведения
       _playerCompleteSubscription = _audioPlayer.onPlayerComplete.listen((_) {
@@ -185,4 +190,3 @@ class VoiceMessageService {
   // Получение статуса воспроизведения
   static bool get isPlayingStatus => _isPlaying;
 }
-

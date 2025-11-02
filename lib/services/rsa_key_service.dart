@@ -14,23 +14,28 @@ class RSAKeyService {
   // Генерация RSA ключевой пары (2048 бит)
   static AsymmetricKeyPair<RSAPublicKey, RSAPrivateKey> generateKeyPair() {
     final random = Random.secure();
-    
+
     // Генерируем seed для SecureRandom
     final seeds = <int>[];
     for (int i = 0; i < 32; i++) {
       seeds.add(random.nextInt(256));
     }
-    
+
     final secureRandom = SecureRandom('Fortuna');
     secureRandom.seed(KeyParameter(Uint8List.fromList(seeds)));
-    
+
     final keyGen = RSAKeyGenerator()
       ..init(ParametersWithRandom(
         RSAKeyGeneratorParameters(BigInt.parse('65537'), 2048, 64),
         secureRandom,
       ));
-    
-    return keyGen.generateKeyPair();
+
+    final keyPair = keyGen.generateKeyPair();
+    // Приводим типы к RSAPublicKey и RSAPrivateKey
+    return AsymmetricKeyPair<RSAPublicKey, RSAPrivateKey>(
+      keyPair.publicKey as RSAPublicKey,
+      keyPair.privateKey as RSAPrivateKey,
+    );
   }
 
   // Сохранение приватного ключа локально (в SharedPreferences)
@@ -68,7 +73,7 @@ class RSAKeyService {
     if (userId == null) throw Exception('User not authenticated');
 
     final publicKeyPEM = _encodeRSAPublicKeyToPEM(publicKey);
-    
+
     try {
       // Пытаемся обновить, если документа нет - создаем
       await _firestore.collection('users').doc(userId).update({
@@ -115,13 +120,13 @@ class RSAKeyService {
 
     // Генерируем новую пару ключей
     final keyPair = generateKeyPair();
-    
+
     // Сохраняем приватный ключ локально
     await savePrivateKey(keyPair.privateKey);
-    
+
     // Публикуем публичный ключ
     await publishPublicKey(keyPair.publicKey);
-    
+
     print('✅ RSA keys initialized and saved');
   }
 
@@ -146,16 +151,16 @@ class RSAKeyService {
         .replaceAll('-----END RSA PRIVATE KEY-----', '')
         .replaceAll('\n', '')
         .trim();
-    
+
     final keyBytes = base64Decode(lines);
     final jsonString = utf8.decode(keyBytes);
     final keyData = jsonDecode(jsonString) as Map<String, dynamic>;
-    
+
     final modulus = BigInt.parse(keyData['n'] as String);
     final exponent = BigInt.parse(keyData['d'] as String);
     final p = BigInt.parse(keyData['p'] as String);
     final q = BigInt.parse(keyData['q'] as String);
-    
+
     return RSAPrivateKey(modulus, exponent, p, q);
   }
 
@@ -177,15 +182,14 @@ class RSAKeyService {
         .replaceAll('-----END RSA PUBLIC KEY-----', '')
         .replaceAll('\n', '')
         .trim();
-    
+
     final keyBytes = base64Decode(lines);
     final jsonString = utf8.decode(keyBytes);
     final keyData = jsonDecode(jsonString) as Map<String, dynamic>;
-    
+
     final modulus = BigInt.parse(keyData['n'] as String);
     final exponent = BigInt.parse(keyData['e'] as String);
-    
+
     return RSAPublicKey(modulus, exponent);
   }
 }
-

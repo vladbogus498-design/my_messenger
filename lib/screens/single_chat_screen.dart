@@ -195,7 +195,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     }
   }
 
-  Future<void> _sendVoiceMessage(String base64Audio, int durationSeconds) async {
+  Future<void> _sendVoiceMessage(
+      String base64Audio, int durationSeconds) async {
     try {
       await ChatService.sendMessage(
         chatId: widget.chatId,
@@ -233,9 +234,10 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     if (message.voiceAudioBase64 == null) return;
 
     final messageId = message.id;
-    
+
     // Если уже воспроизводится этот же файл - останавливаем
-    if (_playingVoiceMessageId == messageId && VoiceMessageService.isPlayingMessage(messageId)) {
+    if (_playingVoiceMessageId == messageId &&
+        VoiceMessageService.isPlayingMessage(messageId)) {
       await VoiceMessageService.stopPlaying();
       setState(() => _playingVoiceMessageId = null);
       return;
@@ -247,8 +249,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     }
 
     setState(() => _playingVoiceMessageId = messageId);
-    await VoiceMessageService.playVoiceMessage(message.voiceAudioBase64!, messageId);
-    
+    await VoiceMessageService.playVoiceMessage(
+        message.voiceAudioBase64!, messageId);
+
     // Обновляем состояние после завершения воспроизведения
     // Слушаем изменения статуса через периодическую проверку
     _playbackCheckTimer?.cancel();
@@ -360,7 +363,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     };
 
     final emoji = stickerMap[stickerId] ?? '😀';
-    
+
     return Container(
       padding: EdgeInsets.all(8),
       child: Text(
@@ -579,7 +582,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                           ),
 
                         // Voice message
-                        if (message.type == 'voice' && message.voiceAudioBase64 != null)
+                        if (message.type == 'voice' &&
+                            message.voiceAudioBase64 != null)
                           GestureDetector(
                             onTap: () => _playVoiceMessage(message),
                             child: Container(
@@ -592,7 +596,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    _playingVoiceMessageId == message.id && VoiceMessageService.isPlayingMessage(message.id)
+                                    _playingVoiceMessageId == message.id &&
+                                            VoiceMessageService
+                                                .isPlayingMessage(message.id)
                                         ? Icons.pause
                                         : Icons.play_arrow,
                                     color: Colors.white,
@@ -601,21 +607,26 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                                   SizedBox(width: 12),
                                   Text(
                                     '${(message.voiceDuration ?? 0) ~/ 60}:${((message.voiceDuration ?? 0) % 60).toString().padLeft(2, '0')}',
-                                    style: TextStyle(color: Colors.white, fontSize: 16),
+                                    style: TextStyle(
+                                        color: Colors.white, fontSize: 16),
                                   ),
                                   SizedBox(width: 8),
-                                  Icon(Icons.mic, color: Colors.white, size: 16),
+                                  Icon(Icons.mic,
+                                      color: Colors.white, size: 16),
                                 ],
                               ),
                             ),
                           ),
 
                         // Sticker message
-                        if (message.type == 'sticker' && message.stickerId != null)
+                        if (message.type == 'sticker' &&
+                            message.stickerId != null)
                           _buildStickerWidget(message.stickerId!),
 
                         // Text content
-                        if (message.text.isNotEmpty && message.type != 'voice' && message.type != 'sticker')
+                        if (message.text.isNotEmpty &&
+                            message.type != 'voice' &&
+                            message.type != 'sticker')
                           Text(
                             message.text,
                             style: TextStyle(color: Colors.white),
