@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import '../services/theme_service.dart';
 import '../services/biometric_service.dart';
 import 'theme_preview_screen.dart';
 import 'premium_subscription_screen.dart';
@@ -459,6 +461,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     setState(() => _darkTheme = value);
                     _saveSetting('darkTheme', value);
                   },
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Provider.of<ThemeService>(context, listen: false).setTheme('dark'),
+                          child: Text('ТЁМНАЯ'),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Provider.of<ThemeService>(context, listen: false).setTheme('light'),
+                          child: Text('СВЕТЛАЯ'),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Provider.of<ThemeService>(context, listen: false).setTheme('amoled'),
+                          child: Text('ЧЁРНАЯ'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 _buildSwitchRow(
                   'Уведомления',
