@@ -3,22 +3,58 @@ import 'package:local_auth/local_auth.dart';
 class BiometricService {
   static final LocalAuthentication _auth = LocalAuthentication();
 
+  /// Проверяет доступность биометрии на устройстве
   static Future<bool> canAuthenticate() async {
     try {
-      final canCheck = await _auth.canCheckBiometrics;
       final isAvailable = await _auth.isDeviceSupported();
-      return canCheck && isAvailable;
+      if (!isAvailable) return false;
+
+      final canCheck = await _auth.canCheckBiometrics;
+      final availableBiometrics = await _auth.getAvailableBiometrics();
+
+      return canCheck && availableBiometrics.isNotEmpty;
     } catch (e) {
       print('Biometric check error: $e');
       return false;
     }
   }
 
-  static Future<bool> authenticate() async {
+  /// Выполняет аутентификацию через биометрию
+  /// Возвращает true при успехе, false при отмене или ошибке
+  static Future<bool> authenticate({String? reason}) async {
     try {
+      // Проверяем доступность перед попыткой аутентификации
+      final canAuth = await canAuthenticate();
+      if (!canAuth) {
+        return false;
+      }
+
+      final availableBiometrics = await _auth.getAvailableBiometrics();
+
+      // Определяем тип биометрии для сообщения
+      String biometricType = 'fingerprint';
+      if (availableBiometrics.contains(BiometricType.face)) {
+        biometricType = 'face';
+      } else if (availableBiometrics.contains(BiometricType.iris)) {
+        biometricType = 'iris';
+      }
+
+      final defaultReason = reason ??
+          (biometricType == 'face'
+              ? 'Используйте Face ID для разблокировки DarkKick'
+              : biometricType == 'iris'
+                  ? 'Используйте сканер радужки для разблокировки DarkKick'
+                  : 'Приложите палец для разблокировки DarkKick');
+
       final result = await _auth.authenticate(
-        localizedReason: 'Scan your fingerprint to unlock DarkKick',
+        localizedReason: defaultReason,
+        options: const AuthenticationOptions(
+          biometricOnly: true,
+          stickyAuth: true,
+          useErrorDialogs: true,
+        ),
       );
+
       return result;
     } catch (e) {
       print('Biometric auth error: $e');
@@ -26,12 +62,37 @@ class BiometricService {
     }
   }
 
+  /// Получает список доступных типов биометрии
   static Future<List<BiometricType>> getAvailableBiometrics() async {
     try {
       return await _auth.getAvailableBiometrics();
     } catch (e) {
       print('Get biometrics error: $e');
       return [];
+    }
+  }
+
+  /// Получает название типа биометрии для отображения
+  static Future<String> getBiometricTypeName() async {
+    try {
+      final availableBiometrics = await getAvailableBiometrics();
+
+      if (availableBiometrics.contains(BiometricType.face)) {
+        return 'Face ID';
+      } else if (availableBiometrics.contains(BiometricType.iris)) {
+        return 'Сканер радужки';
+      } else if (availableBiometrics.contains(BiometricType.fingerprint)) {
+        return 'Отпечаток пальца';
+      }
+
+      // Если есть любой другой тип биометрии
+      if (availableBiometrics.isNotEmpty) {
+        return 'Биометрия';
+      }
+
+      return 'Биометрическая аутентификация';
+    } catch (e) {
+      return 'Биометрия';
     }
   }
 }

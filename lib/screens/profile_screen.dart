@@ -104,12 +104,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showThemeSelector() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: _cardColor,
-        title:
-            Text('Select Theme Color', style: TextStyle(color: Colors.white)),
+        title: Text('Выбрать цвет темы', style: TextStyle(color: Colors.white)),
+        contentPadding: EdgeInsets.all(isMobile ? 12 : 16),
         content: Container(
           width: double.maxFinite,
           child: GridView.builder(
@@ -149,7 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('CANCEL', style: TextStyle(color: _mainColor)),
+            child: Text('ОТМЕНА', style: TextStyle(color: _mainColor)),
           ),
         ],
       ),
@@ -160,16 +163,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final canAuthenticate = await BiometricService.canAuthenticate();
     if (!canAuthenticate) {
       _showMessage(
-          'Biometric authentication not available on this device\nCheck device security settings');
+          'Биометрия недоступна на этом устройстве\nПроверьте настройки безопасности');
       return;
     }
 
+    final biometricName = await BiometricService.getBiometricTypeName();
     final authenticated = await BiometricService.authenticate();
+
     if (authenticated) {
-      _showMessage('Biometric authentication successful! ✅');
+      _showMessage('$biometricName: Успешно! ✅');
     } else {
       _showMessage(
-          'Authentication failed ❌\nUser canceled or authentication error');
+          'Аутентификация не удалась ❌\nОтменено пользователем или ошибка');
     }
   }
 
@@ -221,32 +226,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final currentStatusColor = _getStatusColor(_userStatus);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     return Scaffold(
       backgroundColor: _backgroundColor,
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: EdgeInsets.all(isMobile ? 12 : 16),
+        physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            SizedBox(height: 40),
+            SizedBox(height: isMobile ? 20 : 40),
             GestureDetector(
               onTap: _openMyProfile,
               child: Stack(
                 children: [
                   CircleAvatar(
-                    radius: 50,
+                    radius: isMobile ? 45 : 50,
                     backgroundColor: _mainColor,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
                           _user?.email?.substring(0, 1).toUpperCase() ?? 'U',
-                          style: TextStyle(fontSize: 36, color: Colors.white),
+                          style: TextStyle(
+                            fontSize: isMobile ? 32 : 36,
+                            color: Colors.white,
+                          ),
                         ),
-                        Text(
-                          'Tap to edit',
-                          style: TextStyle(color: Colors.white70, fontSize: 8),
-                        ),
+                        if (!isMobile)
+                          Text(
+                            'Tap to edit',
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 8),
+                          ),
                       ],
                     ),
                   ),
@@ -254,22 +267,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     bottom: 0,
                     right: 0,
                     child: CircleAvatar(
-                      radius: 18,
+                      radius: isMobile ? 16 : 18,
                       backgroundColor: Colors.blue,
-                      child: Icon(Icons.edit, size: 20, color: Colors.white),
+                      child: Icon(
+                        Icons.edit,
+                        size: isMobile ? 18 : 20,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            SizedBox(height: 16),
+            SizedBox(height: isMobile ? 12 : 16),
             Text(
               _user?.email ?? 'Unknown User',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: isMobile ? 16 : 18,
                 fontWeight: FontWeight.bold,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             SizedBox(height: 8),
             Container(
@@ -316,47 +336,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
               'Member since: ${DateTime.now().toString().substring(0, 10)}',
               style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
-            SizedBox(height: 30),
+            SizedBox(height: isMobile ? 20 : 30),
             _buildInfoCard(
-              title: 'ACCOUNT INFORMATION',
+              title: 'ИНФОРМАЦИЯ ОБ АККАУНТЕ',
               children: [
                 _buildInfoRow(
-                    'User ID', _user?.uid.substring(0, 8) ?? 'Unknown'),
-                _buildInfoRow('Email Verified',
-                    _user?.emailVerified.toString() ?? 'false'),
-                _buildInfoRow('Account Type', 'PREMIUM 🚀'),
-                _buildInfoRow('Storage Used', '15% of 1GB'),
-                _buildInfoRow('Current Status', _userStatus),
-                _buildInfoRow('Theme Color', _selectedTheme.toUpperCase()),
+                    'ID пользователя', _user?.uid.substring(0, 8) ?? 'Unknown'),
+                _buildInfoRow('Email подтвержден',
+                    _user?.emailVerified == true ? 'Да' : 'Нет'),
+                _buildInfoRow('Тип аккаунта', 'PREMIUM 🚀'),
+                _buildInfoRow('Использовано хранилища', '15% из 1GB'),
+                _buildInfoRow('Текущий статус', _userStatus),
+                _buildInfoRow('Цвет темы', _selectedTheme.toUpperCase()),
               ],
             ),
-            SizedBox(height: 20),
+            SizedBox(height: isMobile ? 16 : 20),
             _buildInfoCard(
-              title: 'PRIVACY & SETTINGS',
+              title: 'ПРИВАТНОСТЬ И НАСТРОЙКИ',
               children: [
                 _buildSwitchRow(
-                  'Biometric Lock',
-                  'Use fingerprint/face to unlock app',
+                  'Биометрический замок',
+                  'Используйте отпечаток/лицо для разблокировки',
                   _useBiometric,
                   (value) async {
                     if (value) {
                       final canAuth = await BiometricService.canAuthenticate();
                       if (canAuth) {
-                        setState(() => _useBiometric = true);
-                        _saveSetting('useBiometric', true);
-                        _testBiometric();
+                        final authenticated =
+                            await BiometricService.authenticate();
+                        if (authenticated) {
+                          setState(() => _useBiometric = true);
+                          _saveSetting('useBiometric', true);
+                          final biometricName =
+                              await BiometricService.getBiometricTypeName();
+                          _showMessage('$biometricName включен! 🔐');
+                        } else {
+                          _showMessage('Аутентификация не удалась');
+                        }
                       } else {
-                        _showMessage('Biometric not available on this device');
+                        _showMessage('Биометрия недоступна на этом устройстве');
                       }
                     } else {
                       setState(() => _useBiometric = false);
                       _saveSetting('useBiometric', false);
+                      _showMessage('Биометрический замок отключен');
                     }
                   },
                 ),
                 _buildSwitchRow(
-                  'AMOLED Black Theme',
-                  'True black for OLED screens',
+                  'AMOLED черная тема',
+                  'Настоящий черный для OLED экранов',
                   _amoledTheme,
                   (value) {
                     setState(() => _amoledTheme = value);
@@ -364,8 +393,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
                 _buildSwitchRow(
-                  'Invisible Mode',
-                  'Hide your online status from everyone',
+                  'Невидимый режим',
+                  'Скрыть ваш статус онлайн от всех',
                   _invisibleMode,
                   (value) {
                     setState(() => _invisibleMode = value);
@@ -373,18 +402,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
                 Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
+                  padding: EdgeInsets.symmetric(vertical: isMobile ? 6 : 8),
                   child: Row(
                     children: [
-                      Icon(Icons.timer, color: _mainColor, size: 20),
+                      Icon(Icons.timer,
+                          color: _mainColor, size: isMobile ? 18 : 20),
                       SizedBox(width: 12),
-                      Text('Self-Destruct Timer',
-                          style: TextStyle(color: Colors.white)),
-                      Spacer(),
+                      Expanded(
+                        child: Text(
+                          'Таймер самоуничтожения',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: isMobile ? 13 : 14,
+                          ),
+                        ),
+                      ),
                       DropdownButton<String>(
                         value: _selfDestructTimer,
                         dropdownColor: _cardColor,
-                        style: TextStyle(color: Colors.white, fontSize: 12),
+                        style: TextStyle(
+                            color: Colors.white, fontSize: isMobile ? 11 : 12),
                         onChanged: (value) {
                           setState(() => _selfDestructTimer = value!);
                           _saveSetting('selfDestructTimer', value);
@@ -400,8 +437,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 _buildSwitchRow(
-                  'Privacy Mode',
-                  'Hide typing status',
+                  'Режим приватности',
+                  'Скрыть статус набора',
                   _privacyMode,
                   (value) {
                     setState(() => _privacyMode = value);
@@ -409,8 +446,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
                 _buildSwitchRow(
-                  'Dark Theme',
-                  'Always stay dark',
+                  'Темная тема',
+                  'Всегда темная',
                   _darkTheme,
                   (value) {
                     setState(() => _darkTheme = value);
@@ -418,8 +455,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
                 _buildSwitchRow(
-                  'Notifications',
-                  'Message alerts',
+                  'Уведомления',
+                  'Оповещения о сообщениях',
                   _notifications,
                   (value) {
                     setState(() => _notifications = value);
@@ -428,17 +465,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-            SizedBox(height: 20),
+            SizedBox(height: isMobile ? 16 : 20),
             _buildInfoCard(
-              title: 'YOUR STATS',
+              title: 'ВАША СТАТИСТИКА',
               children: [
-                _buildStatRow('Chats Created', '12', Icons.chat),
-                _buildStatRow('Messages Sent', '47', Icons.message),
-                _buildStatRow('Self-Destructed', '23', Icons.auto_delete),
-                _buildStatRow('Privacy Score', '98%', Icons.security),
+                _buildStatRow('Чатов создано', '12', Icons.chat),
+                _buildStatRow('Сообщений отправлено', '47', Icons.message),
+                _buildStatRow('Самоуничтожено', '23', Icons.auto_delete),
+                _buildStatRow('Оценка приватности', '98%', Icons.security),
               ],
             ),
-            SizedBox(height: 30),
+            SizedBox(height: isMobile ? 20 : 30),
             Row(
               children: [
                 Expanded(
@@ -447,37 +484,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _mainColor,
                       foregroundColor: Colors.white,
+                      padding:
+                          EdgeInsets.symmetric(vertical: isMobile ? 12 : 16),
                     ),
-                    child: Text('CHANGE THEME'),
+                    child: Text(
+                      'ИЗМЕНИТЬ ТЕМУ',
+                      style: TextStyle(fontSize: isMobile ? 13 : 14),
+                    ),
                   ),
                 ),
-                SizedBox(width: 12),
+                SizedBox(width: isMobile ? 8 : 12),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: _logout,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
+                      padding:
+                          EdgeInsets.symmetric(vertical: isMobile ? 12 : 16),
                     ),
-                    child: Text('LOGOUT'),
+                    child: Text(
+                      'ВЫХОД',
+                      style: TextStyle(fontSize: isMobile ? 13 : 14),
+                    ),
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: _testBiometric,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueGrey[700],
-                foregroundColor: Colors.white,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.fingerprint, size: 20),
-                  SizedBox(width: 8),
-                  Text('TEST BIOMETRIC AUTH'),
-                ],
+            SizedBox(height: isMobile ? 10 : 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _testBiometric,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueGrey[700],
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: isMobile ? 12 : 16),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.fingerprint, size: isMobile ? 18 : 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'ТЕСТ БИОМЕТРИИ',
+                      style: TextStyle(fontSize: isMobile ? 13 : 14),
+                    ),
+                  ],
+                ),
               ),
             ),
             SizedBox(height: 20),
@@ -531,19 +585,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildSwitchRow(
       String title, String subtitle, bool value, Function(bool) onChanged) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: isMobile ? 6 : 8),
       child: Row(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: TextStyle(color: Colors.white, fontSize: 14)),
-              Text(subtitle,
-                  style: TextStyle(color: Colors.grey, fontSize: 12)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isMobile ? 13 : 14,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: isMobile ? 11 : 12,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
-          Spacer(),
+          SizedBox(width: 8),
           Switch(
             value: value,
             onChanged: onChanged,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/user_service.dart';
+import '../services/biometric_service.dart';
 import '../models/user_model.dart';
 import 'auth_screen.dart';
 import 'chat_screen.dart';
@@ -18,23 +20,57 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuthAndLoad() async {
-    // Небольшая задержка для показа splash screen
-    await Future.delayed(Duration(seconds: 2));
+    // Минимальная задержка для показа splash screen (оптимизация для мобилок)
+    await Future.delayed(Duration(milliseconds: 500));
 
     if (!mounted) return;
 
     final user = FirebaseAuth.instance.currentUser;
-    
+
     if (user != null) {
+      // Проверяем, включена ли биометрия
+      final prefs = await SharedPreferences.getInstance();
+      final useBiometric = prefs.getBool('useBiometric') ?? false;
+
+      if (useBiometric) {
+        // Проверяем доступность биометрии перед запросом
+        final canAuth = await BiometricService.canAuthenticate();
+
+        if (canAuth) {
+          // Показываем биометрическую аутентификацию
+          final authenticated = await BiometricService.authenticate();
+
+          if (!mounted) return;
+
+          if (!authenticated) {
+            // Если биометрия не прошла (отмена или ошибка), выходим из аккаунта
+            await FirebaseAuth.instance.signOut();
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (context) => AuthScreen()),
+              );
+            }
+            return;
+          }
+        } else {
+          // Биометрия недоступна - отключаем её и продолжаем
+          await prefs.setBool('useBiometric', false);
+        }
+      }
+
       // Пользователь авторизован - переходим на главный экран
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => ChatScreen()),
-      );
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => ChatScreen()),
+        );
+      }
     } else {
       // Пользователь не авторизован - переходим на экран авторизации
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => AuthScreen()),
-      );
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => AuthScreen()),
+        );
+      }
     }
   }
 
@@ -78,9 +114,9 @@ class _SplashScreenState extends State<SplashScreen> {
                       color: Colors.white,
                     ),
                   ),
-                
+
                 SizedBox(height: 30),
-                
+
                 // Название приложения
                 Text(
                   'DarkKick',
@@ -90,9 +126,9 @@ class _SplashScreenState extends State<SplashScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                
+
                 SizedBox(height: 8),
-                
+
                 Text(
                   'Messages that leave no trace',
                   style: TextStyle(
@@ -100,9 +136,9 @@ class _SplashScreenState extends State<SplashScreen> {
                     fontSize: 14,
                   ),
                 ),
-                
+
                 SizedBox(height: 40),
-                
+
                 // Индикатор загрузки
                 CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.deepPurple),
@@ -115,4 +151,3 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
-
