@@ -7,6 +7,9 @@ class Chat {
   final String lastMessage;
   final String lastMessageStatus;
   final DateTime lastMessageTime;
+  final bool isGroup;
+  final List<String> admins;
+  final String? groupName;
 
   Chat({
     required this.id,
@@ -15,6 +18,9 @@ class Chat {
     required this.lastMessage,
     required this.lastMessageStatus,
     required this.lastMessageTime,
+    this.isGroup = false,
+    this.admins = const [],
+    this.groupName,
   });
 
   factory Chat.fromFirestore(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
@@ -28,6 +34,9 @@ class Chat {
       lastMessageTime: data['lastMessageTime'] != null
           ? (data['lastMessageTime'] as Timestamp).toDate()
           : DateTime.now(),
+      isGroup: data['isGroup'] ?? false,
+      admins: List<String>.from(data['admins'] ?? const []),
+      groupName: data['groupName'],
     );
   }
 
@@ -45,6 +54,9 @@ class Chat {
       'lastMessage': lastMessage,
       'lastMessageStatus': lastMessageStatus,
       'lastMessageTime': lastMessageTime.toString(),
+      'isGroup': isGroup,
+      'admins': admins,
+      'groupName': groupName,
     };
   }
 }

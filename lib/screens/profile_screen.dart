@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/biometric_service.dart';
+import 'theme_preview_screen.dart';
+import 'premium_subscription_screen.dart';
+import 'user_search_screen.dart';
+import 'friends_screen.dart';
+import 'group_create_screen.dart';
+import 'notification_settings_screen.dart';
 import 'user_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -511,6 +517,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
+            SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => ThemePreviewScreen()),
+                  );
+                },
+                child: Text('ПРЕДПРОСМОТР ТЕМЫ'),
+              ),
+            ),
             SizedBox(height: isMobile ? 10 : 12),
             SizedBox(
               width: double.infinity,
@@ -533,6 +551,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
+            ),
+            SizedBox(height: 12),
+            Column(
+              children: [
+                Row(children: [
+                  Expanded(child: OutlinedButton(onPressed: (){
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_)=> PremiumSubscriptionScreen()));
+                  }, child: Text('ПРЕМИУМ'))),
+                  SizedBox(width: 8),
+                  Expanded(child: OutlinedButton(onPressed: (){
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_)=> UserSearchScreen()));
+                  }, child: Text('ПОИСК'))),
+                ]),
+                SizedBox(height: 8),
+                Row(children: [
+                  Expanded(child: OutlinedButton(onPressed: (){
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_)=> FriendsScreen()));
+                  }, child: Text('ДРУЗЬЯ'))),
+                  SizedBox(width: 8),
+                  Expanded(child: OutlinedButton(onPressed: (){
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_)=> GroupCreateScreen()));
+                  }, child: Text('СОЗДАТЬ ГРУППУ'))),
+                ]),
+                SizedBox(height: 8),
+                SizedBox(width: double.infinity, child: OutlinedButton(onPressed: (){
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_)=> NotificationSettingsScreen()));
+                }, child: Text('НАСТРОЙКИ УВЕДОМЛЕНИЙ'))),
+              ],
             ),
             SizedBox(height: 20),
             Text(
