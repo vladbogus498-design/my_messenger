@@ -46,6 +46,8 @@ class BiometricService {
                   ? 'Используйте сканер радужки для разблокировки DarkKick'
                   : 'Приложите палец для разблокировки DarkKick');
 
+      // Используем новый API с AuthenticationOptions (поддерживается с версии 2.0.0+)
+      // Если версия ниже, будет использован старый API
       final result = await _auth.authenticate(
         localizedReason: defaultReason,
         options: const AuthenticationOptions(

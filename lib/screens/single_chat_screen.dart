@@ -35,38 +35,15 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   List<String> _sendingPhotoUsers = [];
   List<String> _recordingVoiceUsers = [];
   String? _playingVoiceMessageId;
-  Chat? _chatData;
   Timer? _playbackCheckTimer;
 
   @override
   void initState() {
     super.initState();
     _loadMessages();
-    _loadChatData();
     _setupTypingListener();
     _setupTypingDetection();
     _markMessagesAsRead();
-  }
-
-  Future<void> _loadChatData() async {
-    try {
-      final chats = await ChatService.getUserChats();
-      _chatData = chats.firstWhere(
-        (chat) => chat.id == widget.chatId,
-        orElse: () => chats.isNotEmpty
-            ? chats.first
-            : Chat(
-                id: widget.chatId,
-                name: widget.chatName,
-                participants: [],
-                lastMessage: '',
-                lastMessageStatus: 'sent',
-                lastMessageTime: DateTime.now(),
-              ),
-      );
-    } catch (e) {
-      print('Error loading chat data: $e');
-    }
   }
 
   Future<void> _markMessagesAsRead() async {
