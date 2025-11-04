@@ -7,8 +7,6 @@ class UserModel {
   final String? tag; // уникальный тег пользователя (например @username)
   final String? username; // alias/username
   final bool premiumStatus; // премиум подписка активна
-  final List<String> friendsList; // список друзей
-  final List<String> friendRequests; // входящие запросы в друзья
   final DateTime? createdAt;
 
   UserModel({
@@ -20,8 +18,6 @@ class UserModel {
     this.tag,
     this.username,
     this.premiumStatus = false,
-    this.friendsList = const [],
-    this.friendRequests = const [],
     this.createdAt,
   });
 
@@ -35,8 +31,6 @@ class UserModel {
       tag: data['tag'],
       username: data['username'],
       premiumStatus: data['premiumStatus'] ?? false,
-      friendsList: List<String>.from(data['friendsList'] ?? const []),
-      friendRequests: List<String>.from(data['friendRequests'] ?? const []),
       createdAt:
           data['createdAt'] != null ? DateTime.parse(data['createdAt']) : null,
     );
@@ -52,8 +46,6 @@ class UserModel {
       'tag': tag,
       'username': username,
       'premiumStatus': premiumStatus,
-      'friendsList': friendsList,
-      'friendRequests': friendRequests,
       'createdAt': createdAt?.toIso8601String(),
     };
   }

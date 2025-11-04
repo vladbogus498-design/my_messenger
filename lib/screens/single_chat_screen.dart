@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import '../services/chat_service.dart';
@@ -639,6 +640,76 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     );
   }
 
+  Widget _buildMessageBubbleMap(Map<String, dynamic> m) {
+    final isMyMessage = (_currentUser?.uid ?? '') == (m['senderId'] ?? '');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color incomingBg = isDark ? Colors.grey[800]! : const Color(0xFFEFEFEF);
+    final Color outgoingBg = isDark ? Colors.deepPurple : const Color(0xFF1976D2);
+    final Color incomingText = isDark ? Colors.white : Colors.black;
+    final Color outgoingText = Colors.white;
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      child: Row(
+        mainAxisAlignment:
+            isMyMessage ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          Flexible(
+            child: Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isMyMessage ? outgoingBg : incomingBg,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if ((m['type'] ?? 'text') == 'image' && m['imageUrl'] != null)
+                    Column(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            m['imageUrl'],
+                            width: 200,
+                            height: 150,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                      ],
+                    ),
+                  if ((m['text'] ?? '').toString().isNotEmpty)
+                    Text(
+                      m['text'],
+                      style: TextStyle(color: isMyMessage ? outgoingText : incomingText),
+                    ),
+                  SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _formatTs(m['timestamp']),
+                        style: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTs(dynamic ts) {
+    if (ts is Timestamp) {
+      final d = ts.toDate();
+      return '${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+    }
+    return '';
+  }
+
   void _showMessageMenu(Message message) {
     showModalBottomSheet(
       context: context,
@@ -767,23 +838,34 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
             ],
           ),
         ),
-        backgroundColor: Colors.black,
+        // use theme default color
       ),
       body: Column(
         children: [
           Expanded(
-            child: _isLoading
-                ? Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                    controller: _scrollController,
-                    itemCount: _messages.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == _messages.length) {
-                        return _buildTypingIndicator();
-                      }
-                      return _buildMessageBubble(_messages[index]);
-                    },
-                  ),
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('chats')
+                  .doc(widget.chatId)
+                  .collection('messages')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                }
+                final docs = snapshot.data?.docs ?? [];
+                return ListView.builder(
+                  controller: _scrollController,
+                  reverse: true,
+                  itemCount: docs.length,
+                  itemBuilder: (_, i) {
+                    final m = docs[i].data();
+                    return _buildMessageBubbleMap(m);
+                  },
+                );
+              },
+            ),
           ),
 
           // Action preview (reply/forward)
