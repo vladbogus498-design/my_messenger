@@ -30,6 +30,7 @@ class ThemeService extends ChangeNotifier {
   String _currentKey = 'dark';
   ThemeData get theme => _themes[_currentKey] ?? ThemeData.dark();
   String get currentKey => _currentKey;
+  List<String> get availableKeys => _themes.keys.toList();
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
