@@ -201,7 +201,7 @@ lib/
 
 **DarkKick Team**
 
-- GitHub: [@yourusername](https://github.com/yourusername)
+- GitHub: @vladbogus498-design
 
 ## 🙏 Благодарности
 
