@@ -5,7 +5,7 @@ import 'screens/auth_screen.dart';
 import 'screens/main_screen.dart';
 import 'screens/splash_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:provider/provider.dart';
+import 'package:provider/provider.dart' as legacy_provider;
 import 'services/theme_service.dart';
 
 void main() async {
@@ -15,7 +15,7 @@ void main() async {
   await themeService.load();
   runApp(
     ProviderScope(
-      child: ChangeNotifierProvider.value(
+      child: legacy_provider.ChangeNotifierProvider.value(
         value: themeService,
         child: MyApp(),
       ),
@@ -26,7 +26,7 @@ void main() async {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final themeService = Provider.of<ThemeService>(context);
+    final themeService = legacy_provider.Provider.of<ThemeService>(context);
     return MaterialApp(
       title: 'DarkKick Messenger',
       theme: themeService.theme,

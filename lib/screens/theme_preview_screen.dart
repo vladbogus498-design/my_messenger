@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:provider/provider.dart' as legacy_provider;
 import '../services/theme_service.dart';
 
 class ThemePreviewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final themeService = Provider.of<ThemeService>(context);
+    final themeService = legacy_provider.Provider.of<ThemeService>(context);
     final keys = themeService.availableKeys;
 
     return Scaffold(

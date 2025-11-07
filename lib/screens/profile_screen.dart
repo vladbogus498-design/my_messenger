@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:provider/provider.dart';
+import 'package:provider/provider.dart' as legacy_provider;
 import '../services/theme_service.dart';
 import '../services/biometric_service.dart';
 import 'theme_preview_screen.dart';
@@ -469,7 +469,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => Provider.of<ThemeService>(context, listen: false).setThemeMode(ThemeMode.dark),
+                          onPressed: () => legacy_provider.Provider.of<ThemeService>(context, listen: false).setThemeMode(ThemeMode.dark),
                           icon: Icon(Icons.dark_mode),
                           label: Text('ТЁМНАЯ'),
                         ),
@@ -477,7 +477,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => Provider.of<ThemeService>(context, listen: false).setThemeMode(ThemeMode.light),
+                          onPressed: () => legacy_provider.Provider.of<ThemeService>(context, listen: false).setThemeMode(ThemeMode.light),
                           icon: Icon(Icons.light_mode),
                           label: Text('СВЕТЛАЯ'),
                         ),
@@ -485,7 +485,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => Provider.of<ThemeService>(context, listen: false).toggleTheme(),
+                          onPressed: () => legacy_provider.Provider.of<ThemeService>(context, listen: false).toggleTheme(),
                           icon: Icon(Icons.brightness_auto),
                           label: Text('ПЕРЕКЛЮЧИТЬ'),
                         ),
