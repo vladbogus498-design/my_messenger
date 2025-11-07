@@ -9,6 +9,9 @@ import '../models/chat.dart';
 import 'chat_input_panel.dart';
 import 'user_profile_screen.dart';
 import '../widgets/reaction_picker.dart';
+import '../widgets/message_status_icon.dart';
+import '../utils/time_formatter.dart';
+import '../utils/navigation_animations.dart';
 
 class SingleChatScreen extends StatefulWidget {
   final String chatId;
@@ -273,30 +276,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     return senderId == _currentUser?.uid;
   }
 
-  Widget _buildMessageStatusIcon(String status) {
-    IconData icon;
-    Color color;
-
-    switch (status) {
-      case 'sent':
-        icon = Icons.check;
-        color = Colors.grey[400]!;
-        break;
-      case 'delivered':
-        icon = Icons.done_all;
-        color = Colors.grey[400]!;
-        break;
-      case 'read':
-        icon = Icons.done_all;
-        color = Colors.blue;
-        break;
-      default:
-        icon = Icons.check;
-        color = Colors.grey[400]!;
-    }
-
-    return Icon(icon, size: 14, color: color);
-  }
+  // Удалено - используем виджет MessageStatusIcon
 
   Widget _buildReactions(Message message) {
     if (message.reactions.isEmpty) return SizedBox();
@@ -616,13 +596,16 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              '${message.timestamp.hour}:${message.timestamp.minute.toString().padLeft(2, '0')}',
+                              TimeFormatter.formatMessageTime(message.timestamp),
                               style: TextStyle(
                                   color: Colors.grey[400], fontSize: 12),
                             ),
                             if (isMyMessage) ...[
                               SizedBox(width: 4),
-                              _buildMessageStatusIcon(message.status),
+                              MessageStatusIcon(
+                                status: message.status,
+                                isOwnMessage: _isMyMessage(message.senderId),
+                              ),
                             ],
                           ],
                         ),

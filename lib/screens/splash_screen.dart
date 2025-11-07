@@ -5,7 +5,7 @@ import '../services/user_service.dart';
 import '../services/biometric_service.dart';
 import '../models/user_model.dart';
 import 'auth_screen.dart';
-import 'chat_screen.dart';
+import 'main_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   @override
@@ -58,17 +58,29 @@ class _SplashScreenState extends State<SplashScreen> {
         }
       }
 
-      // Пользователь авторизован - переходим на главный экран
+      // Пользователь авторизован - переходим на главный экран (c bottom navigation)
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => ChatScreen()),
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => MainScreen(),
+            transitionDuration: const Duration(milliseconds: 300),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          ),
         );
       }
     } else {
       // Пользователь не авторизован - переходим на экран авторизации
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => AuthScreen()),
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => AuthScreen(),
+            transitionDuration: const Duration(milliseconds: 300),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          ),
         );
       }
     }

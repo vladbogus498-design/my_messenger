@@ -2,47 +2,82 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeService extends ChangeNotifier {
-  static const String _prefKey = 'app_theme_key';
-  // Only two themes: light and dark, with high contrast colors
-  final Map<String, ThemeData> _themes = {
-    'dark': ThemeData(
-      brightness: Brightness.dark,
-      colorScheme: const ColorScheme.dark(
-        primary: Colors.deepPurple,
-        secondary: Colors.deepPurpleAccent,
-      ),
-      scaffoldBackgroundColor: Colors.black,
-      appBarTheme: const AppBarTheme(backgroundColor: Colors.black),
-      cardColor: const Color(0xFF1E1E1E),
-    ),
-    'light': ThemeData(
-      brightness: Brightness.light,
-      colorScheme: const ColorScheme.light(
-        primary: Colors.blue,
-        secondary: Colors.blueAccent,
-      ),
-      scaffoldBackgroundColor: Colors.white,
-      appBarTheme: const AppBarTheme(backgroundColor: Colors.white),
-      cardColor: const Color(0xFFF2F2F2),
-    ),
-  };
+  static const String _prefKey = 'app_theme_mode';
+  
+  ThemeMode _themeMode = ThemeMode.dark;
 
-  String _currentKey = 'dark';
-  ThemeData get theme => _themes[_currentKey] ?? ThemeData.dark();
-  String get currentKey => _currentKey;
-  List<String> get availableKeys => _themes.keys.toList();
+  // Светлая тема
+  ThemeData get lightTheme => ThemeData(
+    brightness: Brightness.light,
+    colorScheme: const ColorScheme.light(
+      primary: Colors.blue,
+      secondary: Colors.blueAccent,
+      surface: Colors.white,
+    ),
+    scaffoldBackgroundColor: Colors.white,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black,
+      elevation: 0,
+    ),
+    cardColor: const Color(0xFFF5F5F5),
+    primaryColor: Colors.blue,
+    useMaterial3: true,
+  );
+
+  // Тёмная тема
+  ThemeData get darkTheme => ThemeData(
+    brightness: Brightness.dark,
+    colorScheme: const ColorScheme.dark(
+      primary: Colors.deepPurple,
+      secondary: Colors.deepPurpleAccent,
+      surface: Color(0xFF1E1E1E),
+    ),
+    scaffoldBackgroundColor: Colors.black,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.black,
+      foregroundColor: Colors.white,
+      elevation: 0,
+    ),
+    cardColor: const Color(0xFF1E1E1E),
+    primaryColor: Colors.deepPurple,
+    useMaterial3: true,
+  );
+
+  // Текущая тема (для обратной совместимости)
+  ThemeData get theme => _themeMode == ThemeMode.light ? lightTheme : darkTheme;
+  ThemeMode get themeMode => _themeMode;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    _currentKey = prefs.getString(_prefKey) ?? 'dark';
+    final modeIndex = prefs.getInt(_prefKey) ?? ThemeMode.dark.index;
+    _themeMode = ThemeMode.values[modeIndex];
+    notifyListeners();
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_prefKey, mode.index);
     notifyListeners();
   }
 
   Future<void> setTheme(String key) async {
-    if (!_themes.containsKey(key)) return;
-    _currentKey = key;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefKey, key);
-    notifyListeners();
+    // Для обратной совместимости
+    if (key == 'light') {
+      await setThemeMode(ThemeMode.light);
+    } else if (key == 'dark') {
+      await setThemeMode(ThemeMode.dark);
+    } else {
+      await setThemeMode(ThemeMode.system);
+    }
+  }
+
+  void toggleTheme() {
+    if (_themeMode == ThemeMode.dark) {
+      setThemeMode(ThemeMode.light);
+    } else {
+      setThemeMode(ThemeMode.dark);
+    }
   }
 }

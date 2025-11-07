@@ -23,7 +23,13 @@ class _AuthScreenState extends State<AuthScreen> {
       if (user != null && mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => MainChatScreen()),
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => MainChatScreen(),
+            transitionDuration: const Duration(milliseconds: 300),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          ),
         );
       }
     });

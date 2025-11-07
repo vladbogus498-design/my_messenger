@@ -7,7 +7,6 @@ import '../services/biometric_service.dart';
 import 'theme_preview_screen.dart';
 import 'premium_subscription_screen.dart';
 import 'user_search_screen.dart';
-import 'friends_screen.dart';
 import 'group_create_screen.dart';
 import 'notification_settings_screen.dart';
 import 'user_profile_screen.dart';
@@ -90,6 +89,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _logout() async {
     try {
+      // Закрываем все слушатели перед выходом
+      // (слушатели будут закрыты автоматически при dispose провайдеров)
       await FirebaseAuth.instance.signOut();
     } catch (e) {
       print('Logout error: $e');
@@ -467,23 +468,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Provider.of<ThemeService>(context, listen: false).setTheme('dark'),
-                          child: Text('ТЁМНАЯ'),
+                        child: OutlinedButton.icon(
+                          onPressed: () => Provider.of<ThemeService>(context, listen: false).setThemeMode(ThemeMode.dark),
+                          icon: Icon(Icons.dark_mode),
+                          label: Text('ТЁМНАЯ'),
                         ),
                       ),
                       SizedBox(width: 8),
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Provider.of<ThemeService>(context, listen: false).setTheme('light'),
-                          child: Text('СВЕТЛАЯ'),
+                        child: OutlinedButton.icon(
+                          onPressed: () => Provider.of<ThemeService>(context, listen: false).setThemeMode(ThemeMode.light),
+                          icon: Icon(Icons.light_mode),
+                          label: Text('СВЕТЛАЯ'),
                         ),
                       ),
                       SizedBox(width: 8),
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Provider.of<ThemeService>(context, listen: false).setTheme('amoled'),
-                          child: Text('ЧЁРНАЯ'),
+                        child: OutlinedButton.icon(
+                          onPressed: () => Provider.of<ThemeService>(context, listen: false).toggleTheme(),
+                          icon: Icon(Icons.brightness_auto),
+                          label: Text('ПЕРЕКЛЮЧИТЬ'),
                         ),
                       ),
                     ],
@@ -595,10 +599,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ]),
                 SizedBox(height: 8),
                 Row(children: [
-                  Expanded(child: OutlinedButton(onPressed: (){
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_)=> FriendsScreen()));
-                  }, child: Text('ДРУЗЬЯ'))),
-                  SizedBox(width: 8),
                   Expanded(child: OutlinedButton(onPressed: (){
                     Navigator.of(context).push(MaterialPageRoute(builder: (_)=> GroupCreateScreen()));
                   }, child: Text('СОЗДАТЬ ГРУППУ'))),

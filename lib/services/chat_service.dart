@@ -112,7 +112,7 @@ class ChatService {
         'text': messageText,
         'type': type,
         'senderId': _auth.currentUser?.uid,
-        'timestamp': FieldValue.serverTimestamp(),
+        'timestamp': FieldValue.serverTimestamp(), // Firestore автоматически использует UTC
         if (imageUrl != null) 'imageUrl': imageUrl,
         if (voiceAudioBase64 != null) 'voiceAudioBase64': voiceAudioBase64,
         if (voiceDuration != null) 'voiceDuration': voiceDuration,
@@ -124,18 +124,32 @@ class ChatService {
         if (originalSender != null) 'originalSender': originalSender,
         'reactions': {},
         'isTyping': false,
-        'status': 'sent',
+        'status': 'sending', // Начинаем со статуса "отправляется"
       };
 
-      await _firestore
+      final messageRef = await _firestore
           .collection('chats')
           .doc(chatId)
           .collection('messages')
           .add(messageData);
 
+      // Обновляем статус на "отправлено" после успешной записи
+      await messageRef.update({'status': 'sent'});
+
+      // Обновляем последнее сообщение в чате
       await _firestore.collection('chats').doc(chatId).update({
         'lastMessage': text,
         'lastMessageTime': FieldValue.serverTimestamp(),
+      });
+
+      // Автоматически обновляем статус на "доставлено" через небольшую задержку
+      // (в реальном приложении это должно происходить при получении сообщения на устройстве получателя)
+      Future.delayed(const Duration(seconds: 1), () async {
+        try {
+          await messageRef.update({'status': 'delivered'});
+        } catch (e) {
+          print('❌ Error updating message status to delivered: $e');
+        }
       });
     } catch (e) {
       print('❌ Error sending message: $e');

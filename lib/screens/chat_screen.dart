@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'single_chat_screen.dart';
 import 'new_chat_screen.dart';
+import '../utils/navigation_animations.dart';
+import '../utils/time_formatter.dart';
 
 class ChatScreen extends StatelessWidget {
   @override
@@ -24,12 +27,12 @@ class ChatScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('DarkKick Chats'),
-        actions: [
+          actions: [
           IconButton(
             icon: Icon(Icons.add_comment),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => NewChatScreen()),
+              NavigationAnimations.slideFadeRoute(NewChatScreen()),
             ),
           ),
         ],
@@ -52,19 +55,64 @@ class ChatScreen extends StatelessWidget {
               final name = d['groupName'] ?? d['name'] ?? 'Chat';
               final last = d['lastMessage'] ?? '';
               final ts = (d['lastMessageTime'] as Timestamp?)?.toDate();
+              final avatarUrl = d['avatarUrl'];
               return ListTile(
-                leading:
-                    CircleAvatar(child: Text(name.isNotEmpty ? name[0] : '?')),
+                leading: Hero(
+                  tag: 'avatar_$chatId',
+                  child: avatarUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: avatarUrl,
+                          placeholder: (context, url) => CircleAvatar(
+                            child: CircularProgressIndicator(),
+                          ),
+                          errorWidget: (context, url, error) => CircleAvatar(
+                            child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?'),
+                          ),
+                          imageBuilder: (context, imageProvider) => CircleAvatar(
+                            backgroundImage: imageProvider,
+                          ),
+                        )
+                      : CircleAvatar(
+                          child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?'),
+                        ),
+                ),
                 title: Text(name),
-                subtitle: Text(last),
-                trailing: Text(ts != null
-                    ? '${ts.hour}:${ts.minute.toString().padLeft(2, '0')}'
-                    : ''),
+                subtitle: Text(
+                  last,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      ts != null ? TimeFormatter.formatChatTime(ts) : '',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    if (d['unreadCount'] != null && d['unreadCount'] > 0)
+                      Container(
+                        margin: EdgeInsets.only(top: 4),
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${d['unreadCount']}',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        SingleChatScreen(chatId: chatId, chatName: name),
+                  NavigationAnimations.slideFadeRoute(
+                    SingleChatScreen(chatId: chatId, chatName: name),
                   ),
                 ),
               );

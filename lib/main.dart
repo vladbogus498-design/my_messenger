@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/auth_screen.dart';
-import 'screens/chat_screen.dart';
+import 'screens/main_screen.dart';
 import 'screens/splash_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart';
 import 'services/theme_service.dart';
 
@@ -13,9 +14,11 @@ void main() async {
   final themeService = ThemeService();
   await themeService.load();
   runApp(
-    ChangeNotifierProvider.value(
-      value: themeService,
-      child: MyApp(),
+    ProviderScope(
+      child: ChangeNotifierProvider.value(
+        value: themeService,
+        child: MyApp(),
+      ),
     ),
   );
 }
@@ -25,8 +28,10 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeService = Provider.of<ThemeService>(context);
     return MaterialApp(
-      title: 'DarkKick',
+      title: 'DarkKick Messenger',
       theme: themeService.theme,
+      darkTheme: themeService.darkTheme,
+      themeMode: themeService.themeMode,
       home: SplashScreen(),
       debugShowCheckedModeBanner: false,
     );
@@ -47,7 +52,7 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (snapshot.hasData) {
-          return ChatScreen();
+          return MainScreen();
         }
 
         return AuthScreen();

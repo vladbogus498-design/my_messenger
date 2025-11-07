@@ -98,7 +98,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => MainChatScreen()),
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => MainChatScreen(),
+          transitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
       );
     } on FirebaseAuthException catch (e) {
       String errorMessage = texts['error']!;

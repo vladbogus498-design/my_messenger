@@ -35,8 +35,15 @@ class _NewChatScreenState extends State<NewChatScreen> {
           .limit(20)
           .get();
 
+      final byPhone = await fs
+          .collection('users')
+          .where('phone', isGreaterThanOrEqualTo: q)
+          .where('phone', isLessThan: q + '\uf8ff')
+          .limit(20)
+          .get();
+
       final seen = <String>{};
-      for (final d in [...byUsername.docs, ...byEmail.docs]) {
+      for (final d in [...byUsername.docs, ...byEmail.docs, ...byPhone.docs]) {
         if (seen.add(d.id) && d.id != uid) {
           merged.add(d);
         }
@@ -101,7 +108,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    decoration: InputDecoration(hintText: 'username'),
+                    decoration: InputDecoration(hintText: 'поиск: @username, email или телефон'),
                     onSubmitted: (_) => _search(),
                   ),
                 ),

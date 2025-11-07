@@ -4,7 +4,7 @@ import '../models/user_model.dart';
 class UserSearchService {
   static final FirebaseFirestore _fs = FirebaseFirestore.instance;
 
-  static Future<List<UserModel>> searchByUsernameOrEmail(String query) async {
+  static Future<List<UserModel>> searchUnified(String query) async {
     if (query.isEmpty) return [];
     final byName = await _fs
         .collection('users')
@@ -18,12 +18,21 @@ class UserSearchService {
         .where('email', isLessThan: query + '\uf8ff')
         .limit(20)
         .get();
+    final byPhone = await _fs
+        .collection('users')
+        .where('phone', isGreaterThanOrEqualTo: query)
+        .where('phone', isLessThan: query + '\uf8ff')
+        .limit(20)
+        .get();
 
     final all = <UserModel>[];
     for (final d in byName.docs) {
       all.add(UserModel.fromMap({...d.data(), 'uid': d.id}));
     }
     for (final d in byEmail.docs) {
+      all.add(UserModel.fromMap({...d.data(), 'uid': d.id}));
+    }
+    for (final d in byPhone.docs) {
       all.add(UserModel.fromMap({...d.data(), 'uid': d.id}));
     }
     // de-dup by uid
