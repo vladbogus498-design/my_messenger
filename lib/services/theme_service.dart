@@ -48,6 +48,21 @@ class ThemeService extends ChangeNotifier {
   ThemeData get theme => _themeMode == ThemeMode.light ? lightTheme : darkTheme;
   ThemeMode get themeMode => _themeMode;
 
+  // Совместимость со старым API
+  List<String> get availableKeys => const ['dark', 'light', 'system'];
+
+  String get currentKey {
+    switch (_themeMode) {
+      case ThemeMode.light:
+        return 'light';
+      case ThemeMode.dark:
+        return 'dark';
+      case ThemeMode.system:
+      default:
+        return 'system';
+    }
+  }
+
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     final modeIndex = prefs.getInt(_prefKey) ?? ThemeMode.dark.index;
