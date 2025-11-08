@@ -31,7 +31,7 @@ dependencies:
   permission_handler: ^11.0.1
   cached_network_image: ^3.3.0
   intl: ^0.18.1
-  google_fonts: ^6.1.0
+  google_fonts: ^4.0.4
   flutter_animate: ^4.2.0
   lottie: ^3.0.0
   rive: ^0.12.0
