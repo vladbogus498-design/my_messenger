@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/user_service.dart';
 import '../services/biometric_service.dart';
 import '../models/user_model.dart';
-import 'auth_screen.dart';
+import '../auth/auth_screen.dart';
 import 'main_screen.dart';
 
 class SplashScreen extends StatefulWidget {

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'single_chat_screen.dart';
 import 'new_chat_screen.dart';
+import 'group_create_screen.dart';
 import '../utils/navigation_animations.dart';
 import '../utils/time_formatter.dart';
 
@@ -26,16 +27,25 @@ class ChatScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('DarkKick Chats'),
-          actions: [
+        title: Text('Темные чаты'),
+        actions: [
           IconButton(
             icon: Icon(Icons.add_comment),
+            tooltip: 'Новый чат',
             onPressed: () => Navigator.push(
               context,
               NavigationAnimations.slideFadeRoute(NewChatScreen()),
             ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context,
+          NavigationAnimations.slideFadeRoute(GroupCreateScreen()),
+        ),
+        icon: const Icon(Icons.group_add_rounded),
+        label: const Text('Создать группу'),
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: chatsQuery,
@@ -44,7 +54,12 @@ class ChatScreen extends StatelessWidget {
             return Center(child: CircularProgressIndicator());
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(child: Text('Нет чатов'));
+            return _EmptyState(
+              onCreateGroup: () => Navigator.push(
+                context,
+                NavigationAnimations.slideFadeRoute(GroupCreateScreen()),
+              ),
+            );
           }
           final docs = snapshot.data!.docs;
           return ListView.builder(
@@ -119,6 +134,62 @@ class ChatScreen extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.onCreateGroup});
+
+  final VoidCallback onCreateGroup;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 64,
+              color: colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Здесь пока пусто',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Создайте первую группу, чтобы начать диалог.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: onCreateGroup,
+              icon: const Icon(Icons.group_add_outlined),
+              label: const Text('Создать группу'),
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

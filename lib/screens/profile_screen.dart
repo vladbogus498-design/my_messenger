@@ -5,7 +5,6 @@ import 'package:provider/provider.dart' as legacy_provider;
 import '../services/theme_service.dart';
 import '../services/biometric_service.dart';
 import 'theme_preview_screen.dart';
-import 'premium_subscription_screen.dart';
 import 'user_search_screen.dart';
 import 'group_create_screen.dart';
 import 'notification_settings_screen.dart';
@@ -237,6 +236,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final currentStatusColor = _getStatusColor(_userStatus);
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
+    final themeService = legacy_provider.Provider.of<ThemeService>(context);
+    final isDarkTheme = themeService.themeMode == ThemeMode.dark;
 
     return Scaffold(
       backgroundColor: _backgroundColor,
@@ -246,6 +247,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           children: [
             SizedBox(height: isMobile ? 20 : 40),
+            Align(
+              alignment: Alignment.topRight,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: IconButton(
+                    key: ValueKey(isDarkTheme),
+                    icon: Text(
+                      isDarkTheme ? '🌙' : '☀️',
+                      style: TextStyle(fontSize: isMobile ? 20 : 22),
+                    ),
+                    tooltip: isDarkTheme
+                        ? 'Включить светлую тему'
+                        : 'Включить тёмную тему',
+                    onPressed: () => themeService.toggleTheme(),
+                  ),
+                ),
+              ),
+            ),
             GestureDetector(
               onTap: _openMyProfile,
               child: Stack(
@@ -353,7 +377,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     'ID пользователя', _user?.uid.substring(0, 8) ?? 'Unknown'),
                 _buildInfoRow('Email подтвержден',
                     _user?.emailVerified == true ? 'Да' : 'Нет'),
-                _buildInfoRow('Тип аккаунта', 'PREMIUM 🚀'),
+                _buildInfoRow('Тип аккаунта', 'Стандартный'),
                 _buildInfoRow('Использовано хранилища', '15% из 1GB'),
                 _buildInfoRow('Текущий статус', _userStatus),
                 _buildInfoRow('Цвет темы', _selectedTheme.toUpperCase()),
@@ -586,27 +610,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             SizedBox(height: 12),
-            Column(
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              alignment: WrapAlignment.center,
               children: [
-                Row(children: [
-                  Expanded(child: OutlinedButton(onPressed: (){
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_)=> PremiumSubscriptionScreen()));
-                  }, child: Text('ПРЕМИУМ'))),
-                  SizedBox(width: 8),
-                  Expanded(child: OutlinedButton(onPressed: (){
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_)=> UserSearchScreen()));
-                  }, child: Text('ПОИСК'))),
-                ]),
-                SizedBox(height: 8),
-                Row(children: [
-                  Expanded(child: OutlinedButton(onPressed: (){
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_)=> GroupCreateScreen()));
-                  }, child: Text('СОЗДАТЬ ГРУППУ'))),
-                ]),
-                SizedBox(height: 8),
-                SizedBox(width: double.infinity, child: OutlinedButton(onPressed: (){
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_)=> NotificationSettingsScreen()));
-                }, child: Text('НАСТРОЙКИ УВЕДОМЛЕНИЙ'))),
+                _QuickActionButton(
+                  icon: Icons.search_rounded,
+                  label: 'Поиск',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => UserSearchScreen()),
+                  ),
+                ),
+                _QuickActionButton(
+                  icon: Icons.group_add_rounded,
+                  label: 'Создать группу',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => GroupCreateScreen()),
+                  ),
+                ),
+                _QuickActionButton(
+                  icon: Icons.palette_outlined,
+                  label: 'Темы',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => ThemePreviewScreen()),
+                  ),
+                ),
+                _QuickActionButton(
+                  icon: Icons.notifications_active_outlined,
+                  label: 'Уведомления',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => NotificationSettingsScreen()),
+                  ),
+                ),
               ],
             ),
             SizedBox(height: 20),
@@ -716,6 +753,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   fontSize: 14,
                   fontWeight: FontWeight.bold)),
         ],
+      ),
+    );
+  }
+}
+
+class _QuickActionButton extends StatelessWidget {
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: 170,
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          foregroundColor: Colors.white,
+          side: BorderSide(color: theme.colorScheme.primary),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ),
+        icon: Icon(icon),
+        label: Text(label),
       ),
     );
   }
