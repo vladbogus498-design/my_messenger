@@ -321,60 +321,67 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
             ),
           ],
           const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () async {
-              FocusScope.of(context).unfocus();
-              if (_validateInputs()) {
-                if (_isSignUp) {
-                  await authController.registerWithEmail(
-                    email: _emailController.text.trim(),
-                    password: _passwordController.text.trim(),
-                  );
-                } else {
-                  await authController.signInWithEmail(
-                    email: _emailController.text.trim(),
-                    password: _passwordController.text.trim(),
-                  );
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () async {
+                FocusScope.of(context).unfocus();
+                if (_validateInputs()) {
+                  if (_isSignUp) {
+                    await authController.registerWithEmail(
+                      email: _emailController.text.trim(),
+                      password: _passwordController.text.trim(),
+                    );
+                  } else {
+                    await authController.signInWithEmail(
+                      email: _emailController.text.trim(),
+                      password: _passwordController.text.trim(),
+                    );
+                  }
                 }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+              },
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
-            ),
-            child: Text(
-              _isSignUp ? 'Создать аккаунт' : 'Войти',
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
+              child: Text(
+                _isSignUp ? 'Создать аккаунт' : 'Войти',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
               ),
             ),
           ),
           const SizedBox(height: 12),
-          TextButton(
-            onPressed: () async {
-              authController.clearError();
-              final email = _emailController.text.trim();
-              if (email.isEmpty) {
-                setState(() {
-                  _localError = 'Введите email для восстановления пароля.';
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () async {
+                authController.clearError();
+                final email = _emailController.text.trim();
+                if (email.isEmpty) {
+                  setState(() {
+                    _localError = 'Введите email для восстановления пароля.';
+                  });
+                  return;
+                }
+                await ref
+                    .read(appAuthServiceProvider)
+                    .sendPasswordReset(email)
+                    .then((_) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Ссылка для сброса пароля отправлена.'),
+                    ),
+                  );
                 });
-                return;
-              }
-              await ref
-                  .read(appAuthServiceProvider)
-                  .sendPasswordReset(email)
-                  .then((_) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Ссылка для сброса пароля отправлена.'),
-                  ),
-                );
-              });
-            },
-            child: const Text('Забыли пароль?'),
+              },
+              child: const Text('Забыли пароль?'),
+            ),
           ),
         ],
       ),
@@ -520,17 +527,20 @@ class _PhoneAuthViewState extends ConsumerState<_PhoneAuthView> {
             onChanged: (_) => controller.clearError(),
           ),
           const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () async {
-              FocusScope.of(context).unfocus();
-              await controller.sendPhoneCode(_phoneController.text);
-            },
-            icon: const Icon(Icons.sms_outlined),
-            label: const Text('Отправить код'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                FocusScope.of(context).unfocus();
+                await controller.sendPhoneCode(_phoneController.text);
+              },
+              icon: const Icon(Icons.sms_outlined),
+              label: const Text('Отправить код'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
             ),
           ),
@@ -566,18 +576,22 @@ class _PhoneAuthViewState extends ConsumerState<_PhoneAuthView> {
               onChanged: (_) => controller.clearError(),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async {
-                FocusScope.of(context).unfocus();
-                await controller.verifySmsCode(_codeController.text);
-              },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  FocusScope.of(context).unfocus();
+                  await controller.verifySmsCode(_codeController.text);
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
                 ),
+                child: const Text('Подтвердить код'),
               ),
-              child: const Text('Подтвердить код'),
             ),
             TextButton(
               onPressed: controller.resetPhoneFlow,

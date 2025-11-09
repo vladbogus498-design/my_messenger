@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 
 class BiometricService {
@@ -11,7 +12,6 @@ class BiometricService {
 
       final canCheck = await _auth.canCheckBiometrics;
       final availableBiometrics = await _auth.getAvailableBiometrics();
-
       return canCheck && availableBiometrics.isNotEmpty;
     } catch (e) {
       print('Biometric check error: $e');
@@ -23,32 +23,23 @@ class BiometricService {
   /// Возвращает true при успехе, false при отмене или ошибке
   static Future<bool> authenticate({String? reason}) async {
     try {
-      // Проверяем доступность перед попыткой аутентификации
-      final canAuth = await canAuthenticate();
-      if (!canAuth) {
+      if (!await canAuthenticate()) {
         return false;
       }
-
       final availableBiometrics = await _auth.getAvailableBiometrics();
-
-      // Определяем тип биометрии для сообщения
       String biometricType = 'fingerprint';
       if (availableBiometrics.contains(BiometricType.face)) {
         biometricType = 'face';
       } else if (availableBiometrics.contains(BiometricType.iris)) {
         biometricType = 'iris';
       }
-
       final defaultReason = reason ??
           (biometricType == 'face'
-              ? 'Используйте Face ID для разблокировки DarkKick'
+              ? 'Используйте Face ID для входа'
               : biometricType == 'iris'
-                  ? 'Используйте сканер радужки для разблокировки DarkKick'
-                  : 'Приложите палец для разблокировки DarkKick');
-
-      // Используем новый API с AuthenticationOptions (поддерживается с версии 2.0.0+)
-      // Если версия ниже, будет использован старый API
-      final result = await _auth.authenticate(
+                  ? 'Используйте сканер радужки'
+                  : 'Приложите палец к сканеру');
+      return await _auth.authenticate(
         localizedReason: defaultReason,
         options: const AuthenticationOptions(
           biometricOnly: true,
@@ -56,8 +47,9 @@ class BiometricService {
           useErrorDialogs: true,
         ),
       );
-
-      return result;
+    } on PlatformException catch (e) {
+      print('Biometric auth platform error: $e');
+      return false;
     } catch (e) {
       print('Biometric auth error: $e');
       return false;

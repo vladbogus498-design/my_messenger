@@ -39,11 +39,6 @@ class ChatScreen extends StatelessWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateGroupSheet(context, uid),
-        icon: const Icon(Icons.group_add_rounded),
-        label: const Text('Создать группу'),
-      ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: chatsQuery,
         builder: (context, snapshot) {

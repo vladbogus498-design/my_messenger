@@ -28,20 +28,40 @@ class _BiometricUnlockScreenState extends State<BiometricUnlockScreen> {
       _error = null;
     });
 
-    final success = await BiometricService.authenticate(
-      reason: 'Войдите по отпечатку пальца',
-    );
-
+    bool canUse = await BiometricService.canAuthenticate();
     if (!mounted) return;
-    if (success) {
-      Navigator.pushReplacement(
-        context,
-        NavigationAnimations.slideFadeRoute(MainScreen()),
-      );
-    } else {
+    if (!canUse) {
       setState(() {
         _isAuthenticating = false;
-        _error = 'Не удалось подтвердить личность. Попробуйте снова.';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Биометрия недоступна')),
+      );
+      return;
+    }
+
+    try {
+      final success = await BiometricService.authenticate(
+        reason: 'Войдите по отпечатку пальца',
+      );
+
+      if (!mounted) return;
+      if (success) {
+        Navigator.pushReplacement(
+          context,
+          NavigationAnimations.slideFadeRoute(MainScreen()),
+        );
+      } else {
+        setState(() {
+          _isAuthenticating = false;
+          _error = 'Не удалось подтвердить личность. Попробуйте снова.';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isAuthenticating = false;
+        _error = 'Ошибка биометрии: $e';
       });
     }
   }
