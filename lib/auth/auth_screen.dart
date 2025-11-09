@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
@@ -94,12 +93,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
               ],
             ),
             if (authState.isLoading)
-              Container(
-                color: Colors.black.withOpacity(0.15),
-                child: const Center(
-                  child: CircularProgressIndicator(),
+              AnimatedOpacity(
+                opacity: authState.isLoading ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 250),
+                child: Container(
+                  color: Colors.black.withOpacity(0.15),
+                  child: const Center(
+                    child: CircularProgressIndicator(),
+                  ),
                 ),
-              ).animate().fadeIn(duration: 250.ms),
+              ),
           ],
         ),
       ),
@@ -156,7 +159,7 @@ class _AnimatedHeader extends StatelessWidget {
             key: ValueKey(tabIndex),
             repeat: true,
             frameRate: FrameRate.max,
-          ).animate().fadeIn(duration: 320.ms),
+          ),
         ),
       ),
     );
