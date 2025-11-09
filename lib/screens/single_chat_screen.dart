@@ -281,22 +281,23 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   Widget _buildReactions(Message message) {
     if (message.reactions.isEmpty) return SizedBox();
 
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      margin: EdgeInsets.only(top: 4),
+      margin: const EdgeInsets.only(top: 4),
       child: Wrap(
         spacing: 4,
         children: message.reactions.entries.map((entry) {
           return GestureDetector(
             onTap: () => _addReaction(message, entry.value),
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.grey[800],
+                color: colorScheme.secondaryContainer.withOpacity(0.6),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 entry.value,
-                style: TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 12),
               ),
             ),
           );
@@ -341,34 +342,43 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   Widget _buildReplyPreview(Message replyTo) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Container(
-      padding: EdgeInsets.all(8),
-      margin: EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.grey[800],
-        borderRadius: BorderRadius.circular(8),
+        color: colorScheme.surfaceVariant.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          Icon(Icons.reply, color: Colors.grey, size: 16),
-          SizedBox(width: 8),
+          Icon(Icons.reply, color: colorScheme.secondary, size: 16),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Ответ на сообщение',
-                    style: TextStyle(color: Colors.grey, fontSize: 12)),
                 Text(
-                  replyTo.text.length > 30
-                      ? '${replyTo.text.substring(0, 30)}...'
+                  'Ответ на сообщение',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  replyTo.text.length > 48
+                      ? '${replyTo.text.substring(0, 48)}…'
                       : replyTo.text,
-                  style: TextStyle(color: Colors.white, fontSize: 14),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
           ),
           IconButton(
-            icon: Icon(Icons.close, size: 16),
+            icon: Icon(Icons.close, size: 16, color: colorScheme.onSurface),
             onPressed: _cancelAction,
           ),
         ],
@@ -377,39 +387,48 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   Widget _buildForwardPreview(Message forwardMessage) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Container(
-      padding: EdgeInsets.all(8),
-      margin: EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.blue[800]!.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(8),
+        color: colorScheme.secondaryContainer.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          Icon(Icons.forward, color: Colors.blue, size: 16),
-          SizedBox(width: 8),
+          Icon(Icons.forward, color: colorScheme.secondary, size: 16),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Переслать сообщение',
-                    style: TextStyle(color: Colors.blue, fontSize: 12)),
                 Text(
-                  forwardMessage.text.length > 30
-                      ? '${forwardMessage.text.substring(0, 30)}...'
+                  'Переслать сообщение',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSecondaryContainer,
+                  ),
+                ),
+                Text(
+                  forwardMessage.text.length > 48
+                      ? '${forwardMessage.text.substring(0, 48)}…'
                       : forwardMessage.text,
-                  style: TextStyle(color: Colors.white, fontSize: 14),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSecondaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
           ),
           IconButton(
-            icon: Icon(Icons.close, size: 16),
+            icon: Icon(Icons.close, size: 16, color: colorScheme.onSurface),
             onPressed: _cancelAction,
           ),
           ElevatedButton(
             onPressed: _forwardMessage,
-            child: Text('Отправить'),
+            child: const Text('Отправить'),
           ),
         ],
       ),
@@ -417,24 +436,60 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   Widget _buildTypingIndicator() {
-    if (_typingUsers.isEmpty) return SizedBox();
+    if (_typingUsers.isEmpty) return const SizedBox();
 
-    return Container(
-      padding: EdgeInsets.all(8),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.all(8),
       child: Row(
         children: [
           Text(
             'Печатает...',
-            style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontStyle: FontStyle.italic,
+            ),
           ),
-          SizedBox(width: 8),
-          CircularProgressIndicator(strokeWidth: 2, value: null),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor:
+                  AlwaysStoppedAnimation<Color>(colorScheme.secondary),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildMessageBubble(Message message) {
+    if (message.type == 'system') {
+      final theme = Theme.of(context);
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              message.text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final isMyMessage = _isMyMessage(message.senderId);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -482,7 +537,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                   child: Container(
                     padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isMyMessage ? Colors.deepPurple : Colors.grey[800],
+                      color: bubbleColor,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
@@ -542,14 +597,15 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                                       child: Container(
                                         padding: EdgeInsets.all(4),
                                         decoration: BoxDecoration(
-                                          color: Colors.black54,
+                                          color: colorScheme.scrim
+                                              .withOpacity(0.35),
                                           borderRadius:
                                               BorderRadius.circular(4),
                                         ),
                                         child: Icon(
                                           Icons.photo,
                                           size: 16,
-                                          color: Colors.white,
+                                          color: colorScheme.onSurface,
                                         ),
                                       ),
                                     ),
@@ -658,6 +714,27 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     final metaColor = isMyMessage
         ? colorScheme.onPrimary.withOpacity(0.8)
         : colorScheme.onSurfaceVariant;
+
+    if ((m['type'] ?? 'text') == 'system') {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceVariant.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              (m['text'] ?? '') as String,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Container(
       margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -819,40 +896,19 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
             children: [
               Text(widget.chatName),
               if (_recordingVoiceUsers.isNotEmpty)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.mic, size: 12, color: Colors.grey),
-                    SizedBox(width: 4),
-                    Text(
-                      'Записывает голосовое...',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
+                _AnimatedStatusRow(
+                  icon: Icons.mic,
+                  text: 'Записывает голосовое...',
                 )
               else if (_sendingPhotoUsers.isNotEmpty)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.photo, size: 12, color: Colors.grey),
-                    SizedBox(width: 4),
-                    Text(
-                      'Отправляет фото...',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
+                _AnimatedStatusRow(
+                  icon: Icons.photo,
+                  text: 'Отправляет фото...',
                 )
               else if (_typingUsers.isNotEmpty)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.edit, size: 12, color: Colors.grey),
-                    SizedBox(width: 4),
-                    Text(
-                      'Печатает...',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
+                _AnimatedStatusRow(
+                  icon: Icons.edit,
+                  text: 'Печатает...',
                 ),
             ],
           ),
@@ -912,5 +968,34 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     _typingController.dispose();
     ChatService.setTypingStatus(widget.chatId, false);
     super.dispose();
+  }
+}
+
+class _AnimatedStatusRow extends StatelessWidget {
+  const _AnimatedStatusRow({
+    required this.icon,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: colorScheme.onSurfaceVariant),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 12,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
   }
 }

@@ -1,164 +1,126 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/user_service.dart';
-import '../services/biometric_service.dart';
-import '../models/user_model.dart';
 import '../auth/auth_screen.dart';
+import '../auth/biometric_unlock_screen.dart';
+import '../utils/navigation_animations.dart';
 import 'main_screen.dart';
 
 class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
   @override
-  _SplashScreenState createState() => _SplashScreenState();
+  State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fadeAnimation;
+
   @override
   void initState() {
     super.initState();
-    _checkAuthAndLoad();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    );
+    _fadeAnimation =
+        CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    _controller.forward();
+    _navigateNext();
   }
 
-  Future<void> _checkAuthAndLoad() async {
-    // Минимальная задержка для показа splash screen (оптимизация для мобилок)
-    await Future.delayed(Duration(milliseconds: 500));
+  Future<void> _navigateNext() async {
+    await Future.wait([
+      _controller.forward(),
+      Future.delayed(const Duration(seconds: 3)),
+    ]);
 
     if (!mounted) return;
 
     final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      Navigator.pushReplacement(
+        context,
+        NavigationAnimations.slideFadeRoute(const AuthScreen()),
+      );
+      return;
+    }
 
-    if (user != null) {
-      // Проверяем, включена ли биометрия
-      final prefs = await SharedPreferences.getInstance();
-      final useBiometric = prefs.getBool('useBiometric') ?? false;
+    final prefs = await SharedPreferences.getInstance();
+    final useBiometric = prefs.getBool('useBiometric') ?? false;
+    if (!mounted) return;
 
-      if (useBiometric) {
-        // Проверяем доступность биометрии перед запросом
-        final canAuth = await BiometricService.canAuthenticate();
-
-        if (canAuth) {
-          // Показываем биометрическую аутентификацию
-          final authenticated = await BiometricService.authenticate();
-
-          if (!mounted) return;
-
-          if (!authenticated) {
-            // Если биометрия не прошла (отмена или ошибка), выходим из аккаунта
-            await FirebaseAuth.instance.signOut();
-            if (mounted) {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => AuthScreen()),
-              );
-            }
-            return;
-          }
-        } else {
-          // Биометрия недоступна - отключаем её и продолжаем
-          await prefs.setBool('useBiometric', false);
-        }
-      }
-
-      // Пользователь авторизован - переходим на главный экран (c bottom navigation)
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => MainScreen(),
-            transitionDuration: const Duration(milliseconds: 300),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-          ),
-        );
-      }
+    if (useBiometric) {
+      Navigator.pushReplacement(
+        context,
+        NavigationAnimations.slideFadeRoute(const BiometricUnlockScreen()),
+      );
     } else {
-      // Пользователь не авторизован - переходим на экран авторизации
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => AuthScreen(),
-            transitionDuration: const Duration(milliseconds: 300),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-          ),
-        );
-      }
+      Navigator.pushReplacement(
+        context,
+        NavigationAnimations.slideFadeRoute(MainScreen()),
+      );
     }
   }
 
-  Future<UserModel?> _loadUserAvatar() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        return await UserService.getUserData(user.uid);
-      }
-    } catch (e) {
-      print('Error loading user avatar: $e');
-    }
-    return null;
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: FutureBuilder<UserModel?>(
-        future: _loadUserAvatar(),
-        builder: (context, snapshot) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Аватар или логотип
-                if (snapshot.hasData && snapshot.data?.photoURL != null)
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Colors.deepPurple,
-                    backgroundImage: NetworkImage(snapshot.data!.photoURL!),
-                  )
-                else
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Colors.deepPurple,
-                    child: Icon(
-                      Icons.chat_bubble_outline,
-                      size: 60,
-                      color: Colors.white,
+      backgroundColor: colorScheme.background,
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(32),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.primary.withOpacity(0.35),
+                      blurRadius: 32,
+                      offset: const Offset(0, 18),
                     ),
-                  ),
-
-                SizedBox(height: 30),
-
-                // Название приложения
-                Text(
-                  'DarkKick',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  ],
                 ),
-
-                SizedBox(height: 8),
-
-                Text(
-                  'Messages that leave no trace',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 14,
-                  ),
+                child: Icon(
+                  Icons.bolt_rounded,
+                  color: colorScheme.primary,
+                  size: 72,
                 ),
-
-                SizedBox(height: 40),
-
-                // Индикатор загрузки
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.deepPurple),
+              ),
+              const SizedBox(height: 32),
+              Text(
+                'DarkKick',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  color: colorScheme.onBackground,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-            ),
-          );
-        },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Encrypted messenger with instant access',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

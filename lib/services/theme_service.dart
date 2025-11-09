@@ -1,52 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/app_theme.dart';
 
 class ThemeService extends ChangeNotifier {
   static const String _prefKey = 'app_theme_mode';
   
   ThemeMode _themeMode = ThemeMode.dark;
 
-  // Светлая тема
-  ThemeData get lightTheme => ThemeData(
-    brightness: Brightness.light,
-    colorScheme: const ColorScheme.light(
-      primary: Colors.blue,
-      secondary: Colors.blueAccent,
-      surface: Colors.white,
-    ),
-    scaffoldBackgroundColor: Colors.white,
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black,
-      elevation: 0,
-    ),
-    cardColor: const Color(0xFFF5F5F5),
-    primaryColor: Colors.blue,
-    useMaterial3: true,
-  );
-
-  // Тёмная тема
-  ThemeData get darkTheme => ThemeData(
-    brightness: Brightness.dark,
-    colorScheme: const ColorScheme.dark(
-      primary: Colors.deepPurple,
-      secondary: Colors.deepPurpleAccent,
-      surface: Color(0xFF1E1E1E),
-    ),
-    scaffoldBackgroundColor: Colors.black,
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.black,
-      foregroundColor: Colors.white,
-      elevation: 0,
-    ),
-    cardColor: const Color(0xFF1E1E1E),
-    primaryColor: Colors.deepPurple,
-    useMaterial3: true,
-  );
-
-  // Текущая тема (для обратной совместимости)
-  ThemeData get theme => _themeMode == ThemeMode.light ? lightTheme : darkTheme;
+  ThemeData get lightTheme => AppTheme.light();
+  ThemeData get darkTheme => AppTheme.dark();
+  ThemeData get theme =>
+      _themeMode == ThemeMode.light ? lightTheme : darkTheme;
   ThemeMode get themeMode => _themeMode;
+  bool get isSystem => _themeMode == ThemeMode.system;
 
   // Совместимость со старым API
   List<String> get availableKeys => const ['dark', 'light', 'system'];

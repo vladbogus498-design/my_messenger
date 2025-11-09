@@ -63,10 +63,10 @@ class AuthController extends StateNotifier<AuthFlowState> {
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final credential =
-          await _service.signInWithEmail(email: email, password: password);
+      await _service.signInWithEmail(email: email, password: password);
+      await _service.instance.currentUser?.reload();
       await _ensureUserProfile(
-        credential.user,
+        _service.instance.currentUser,
         fallbackName: email.split('@').first,
       );
       state = state.copyWith(isLoading: false);
@@ -89,10 +89,10 @@ class AuthController extends StateNotifier<AuthFlowState> {
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final credential =
-          await _service.registerWithEmail(email: email, password: password);
+      await _service.registerWithEmail(email: email, password: password);
+      await _service.instance.currentUser?.reload();
       await _ensureUserProfile(
-        credential.user,
+        _service.instance.currentUser,
         fallbackName: email.split('@').first,
       );
       state = state.copyWith(isLoading: false);
@@ -117,11 +117,11 @@ class AuthController extends StateNotifier<AuthFlowState> {
         phoneNumber: normalized,
         forceResendingToken: state.resendToken,
         verificationCompleted: (credential) async {
-          final result =
-              await _service.instance.signInWithCredential(credential);
+          await _service.instance.signInWithCredential(credential);
+          await _service.instance.currentUser?.reload();
           await _ensureUserProfile(
-            result.user,
-            fallbackName: result.user?.phoneNumber,
+            _service.instance.currentUser,
+            fallbackName: _service.instance.currentUser?.phoneNumber,
           );
           state = state.copyWith(isLoading: false, isPhoneVerified: true);
         },
@@ -164,13 +164,14 @@ class AuthController extends StateNotifier<AuthFlowState> {
     }
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final credential = await _service.verifySmsCode(
+      await _service.verifySmsCode(
         verificationId: verificationId,
         smsCode: smsCode.trim(),
       );
+      await _service.instance.currentUser?.reload();
       await _ensureUserProfile(
-        credential.user,
-        fallbackName: credential.user?.phoneNumber,
+        _service.instance.currentUser,
+        fallbackName: _service.instance.currentUser?.phoneNumber,
       );
       state = state.copyWith(
         isLoading: false,
