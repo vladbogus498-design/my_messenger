@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/auth_service.dart';
+import '../services/user_service.dart';
 
 final appAuthServiceProvider = Provider<AppAuthService>((ref) {
   return AppAuthService(FirebaseAuth.instance);
@@ -62,7 +63,12 @@ class AuthController extends StateNotifier<AuthFlowState> {
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      await _service.signInWithEmail(email: email, password: password);
+      final credential =
+          await _service.signInWithEmail(email: email, password: password);
+      await _ensureUserProfile(
+        credential.user,
+        fallbackName: email.split('@').first,
+      );
       state = state.copyWith(isLoading: false);
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(
@@ -83,7 +89,12 @@ class AuthController extends StateNotifier<AuthFlowState> {
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      await _service.registerWithEmail(email: email, password: password);
+      final credential =
+          await _service.registerWithEmail(email: email, password: password);
+      await _ensureUserProfile(
+        credential.user,
+        fallbackName: email.split('@').first,
+      );
       state = state.copyWith(isLoading: false);
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(
@@ -106,7 +117,12 @@ class AuthController extends StateNotifier<AuthFlowState> {
         phoneNumber: normalized,
         forceResendingToken: state.resendToken,
         verificationCompleted: (credential) async {
-          await _service.instance.signInWithCredential(credential);
+          final result =
+              await _service.instance.signInWithCredential(credential);
+          await _ensureUserProfile(
+            result.user,
+            fallbackName: result.user?.phoneNumber,
+          );
           state = state.copyWith(isLoading: false, isPhoneVerified: true);
         },
         verificationFailed: (error) {
@@ -148,9 +164,13 @@ class AuthController extends StateNotifier<AuthFlowState> {
     }
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      await _service.verifySmsCode(
+      final credential = await _service.verifySmsCode(
         verificationId: verificationId,
         smsCode: smsCode.trim(),
+      );
+      await _ensureUserProfile(
+        credential.user,
+        fallbackName: credential.user?.phoneNumber,
       );
       state = state.copyWith(
         isLoading: false,
@@ -184,6 +204,18 @@ class AuthController extends StateNotifier<AuthFlowState> {
     if (state.errorMessage != null) {
       state = state.copyWith(errorMessage: null);
     }
+  }
+
+
+  Future<void> _ensureUserProfile(
+    User? user, {
+    String? fallbackName,
+  }) async {
+    if (user == null) return;
+    await UserService.ensureUserProfile(
+      user: user,
+      fallbackName: fallbackName,
+    );
   }
 
   String _mapFirebaseAuthError(FirebaseAuthException exception) {

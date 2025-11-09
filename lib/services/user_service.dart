@@ -82,7 +82,8 @@ class UserService {
   }
 
   // Создать/обновить профиль пользователя при регистрации
-  static Future<void> createUserProfile(String uid, String email, String name) async {
+  static Future<void> createUserProfile(
+      String uid, String email, String name) async {
     try {
       await _firestore.collection('users').doc(uid).set({
         'uid': uid,
@@ -95,5 +96,35 @@ class UserService {
       throw e;
     }
   }
-}
 
+  static Future<void> ensureUserProfile({
+    required User user,
+    String? fallbackName,
+  }) async {
+    try {
+      final docRef = _firestore.collection('users').doc(user.uid);
+      final doc = await docRef.get();
+      if (doc.exists) return;
+
+      final email = user.email ?? '';
+      final phone = user.phoneNumber ?? '';
+      final generatedName = user.displayName ??
+          fallbackName ??
+          (email.isNotEmpty
+              ? email.split('@').first
+              : phone.isNotEmpty
+                  ? phone
+                  : 'Пользователь');
+
+      await docRef.set({
+        'uid': user.uid,
+        'email': email,
+        'phone': phone,
+        'name': generatedName,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('❌ Error ensuring user profile: $e');
+    }
+  }
+}

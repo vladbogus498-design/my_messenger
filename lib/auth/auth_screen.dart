@@ -57,53 +57,78 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     final authState = ref.watch(authControllerProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
+    final gradient = LinearGradient(
+      colors: [
+        colorScheme.primary.withOpacity(0.12),
+        colorScheme.surface,
+      ],
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+    );
+
     return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 12),
-                _AnimatedHeader(tabIndex: _tabController.index),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    'DarkKick Messenger',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w600,
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(gradient: gradient),
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 24),
+                  _AnimatedHeader(tabIndex: _tabController.index),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Добро пожаловать',
+                          style: GoogleFonts.poppins(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Войдите по номеру телефона, как в Telegram, или используйте email.',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildTabBar(context),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      physics: const BouncingScrollPhysics(),
+                      children: const [
+                        _PhoneAuthView(),
+                        _EmailAuthView(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (authState.isLoading)
+                AnimatedOpacity(
+                  opacity: authState.isLoading ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 220),
+                  child: Container(
+                    color: Colors.black.withOpacity(0.18),
+                    child: const Center(
+                      child: CircularProgressIndicator(),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                _buildTabBar(context),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    physics: const BouncingScrollPhysics(),
-                    children: const [
-                      _EmailAuthView(),
-                      _PhoneAuthView(),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (authState.isLoading)
-              AnimatedOpacity(
-                opacity: authState.isLoading ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 250),
-                child: Container(
-                  color: Colors.black.withOpacity(0.15),
-                  child: const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -128,8 +153,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
           unselectedLabelColor: colorScheme.onSurfaceVariant,
           labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
           tabs: const [
-            Tab(text: 'Email'),
             Tab(text: 'Телефон'),
+            Tab(text: 'Email'),
           ],
         ),
       ),
@@ -143,8 +168,8 @@ class _AnimatedHeader extends StatelessWidget {
   final int tabIndex;
 
   static const _lottieScenes = [
-    'https://assets9.lottiefiles.com/packages/lf20_m3ixidnq.json',
-    'https://assets4.lottiefiles.com/private_files/lf30_obidsi0t.json',
+    'https://assets9.lottiefiles.com/packages/lf20_kyu6j0i3.json',
+    'https://assets7.lottiefiles.com/packages/lf20_u4jjb9bd.json',
   ];
 
   @override
@@ -153,7 +178,7 @@ class _AnimatedHeader extends StatelessWidget {
       height: 220,
       child: Center(
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 400),
+          duration: const Duration(milliseconds: 420),
           child: Lottie.network(
             _lottieScenes[tabIndex % _lottieScenes.length],
             key: ValueKey(tabIndex),
@@ -193,6 +218,7 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final authController = ref.read(authControllerProvider.notifier);
+    final authState = ref.watch(authControllerProvider);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -210,14 +236,24 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
                   child: _SegmentButton(
                     isActive: !_isSignUp,
                     label: 'Войти',
-                    onTap: () => setState(() => _isSignUp = false),
+                      onTap: () {
+                        if (_isSignUp) {
+                          setState(() => _isSignUp = false);
+                          authController.clearError();
+                        }
+                      },
                   ),
                 ),
                 Expanded(
                   child: _SegmentButton(
                     isActive: _isSignUp,
                     label: 'Регистрация',
-                    onTap: () => setState(() => _isSignUp = true),
+                      onTap: () {
+                        if (!_isSignUp) {
+                          setState(() => _isSignUp = true);
+                          authController.clearError();
+                        }
+                      },
                   ),
                 ),
               ],
@@ -233,7 +269,10 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
               border:
                   OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
             ),
-            onChanged: (_) => _clearLocalError(),
+            onChanged: (_) {
+              _clearLocalError();
+              authController.clearError();
+            },
           ),
           const SizedBox(height: 16),
           TextField(
@@ -245,7 +284,10 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
               border:
                   OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
             ),
-            onChanged: (_) => _clearLocalError(),
+            onChanged: (_) {
+              _clearLocalError();
+              authController.clearError();
+            },
           ),
           if (_isSignUp) ...[
             const SizedBox(height: 16),
@@ -258,13 +300,23 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
               ),
-              onChanged: (_) => _clearLocalError(),
+              onChanged: (_) {
+                _clearLocalError();
+                authController.clearError();
+              },
             ),
           ],
           if (_localError != null) ...[
             const SizedBox(height: 16),
             Text(
               _localError!,
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
+          ],
+          if (authState.errorMessage != null && _localError == null) ...[
+            const SizedBox(height: 12),
+            Text(
+              authState.errorMessage!,
               style: TextStyle(color: theme.colorScheme.error),
             ),
           ],
@@ -303,6 +355,7 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
           const SizedBox(height: 12),
           TextButton(
             onPressed: () async {
+              authController.clearError();
               final email = _emailController.text.trim();
               if (email.isEmpty) {
                 setState(() {
@@ -415,23 +468,56 @@ class _PhoneAuthViewState extends ConsumerState<_PhoneAuthView> {
     final state = ref.watch(authControllerProvider);
     final controller = ref.read(authControllerProvider.notifier);
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isCodeStep = state.codeSent;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Введите номер телефона',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Мы отправим SMS с кодом подтверждения. Это займёт пару секунд.',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           TextField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+]'))],
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9 +()]'))
+            ],
             decoration: InputDecoration(
               labelText: 'Номер телефона',
               prefixIcon: const Icon(Icons.phone_rounded),
-              hintText: '+7...',
+              hintText: '+7 900 000-00-00',
               border:
                   OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
             ),
+            onChanged: (_) => controller.clearError(),
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
@@ -448,20 +534,36 @@ class _PhoneAuthViewState extends ConsumerState<_PhoneAuthView> {
               ),
             ),
           ),
-          if (state.codeSent) ...[
-            const SizedBox(height: 24),
+          if (state.errorMessage != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              state.errorMessage!,
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
+          ],
+          if (isCodeStep) ...[
+            const SizedBox(height: 28),
+            Text(
+              'Введите код из SMS',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _codeController,
               keyboardType: TextInputType.number,
               maxLength: 6,
               decoration: InputDecoration(
-                labelText: 'Код из SMS',
+                labelText: 'Код подтверждения',
                 counterText: '',
-                prefixIcon: const Icon(Icons.verified),
+                prefixIcon: const Icon(Icons.verified_rounded),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(18),
                 ),
               ),
+              onChanged: (_) => controller.clearError(),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
@@ -475,7 +577,7 @@ class _PhoneAuthViewState extends ConsumerState<_PhoneAuthView> {
                   borderRadius: BorderRadius.circular(18),
                 ),
               ),
-              child: const Text('Подтвердить'),
+              child: const Text('Подтвердить код'),
             ),
             TextButton(
               onPressed: controller.resetPhoneFlow,
@@ -485,13 +587,19 @@ class _PhoneAuthViewState extends ConsumerState<_PhoneAuthView> {
           if (state.isPhoneVerified)
             Padding(
               padding: const EdgeInsets.only(top: 16),
-              child: Text(
-                'Телефон успешно подтверждён!',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Телефон подтверждён. Добро пожаловать!',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
