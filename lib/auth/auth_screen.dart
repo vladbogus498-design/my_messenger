@@ -93,7 +93,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Войдите по номеру телефона, как в Telegram, или используйте email.',
+                          'Войдите с помощью номера телефона или электронной почты — выберите удобный способ.',
                           style: GoogleFonts.inter(
                             fontSize: 14,
                             color: colorScheme.onSurfaceVariant,

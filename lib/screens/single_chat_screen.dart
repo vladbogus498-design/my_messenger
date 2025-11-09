@@ -436,6 +436,18 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   Widget _buildMessageBubble(Message message) {
     final isMyMessage = _isMyMessage(message.senderId);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final bubbleColor = isMyMessage
+        ? colorScheme.primary
+        : (theme.brightness == Brightness.dark
+            ? colorScheme.surfaceVariant
+            : colorScheme.surfaceVariant.withOpacity(0.8));
+    final textColor =
+        isMyMessage ? colorScheme.onPrimary : colorScheme.onSurface;
+    final metaTextColor = isMyMessage
+        ? colorScheme.onPrimary.withOpacity(0.8)
+        : colorScheme.onSurfaceVariant;
 
     return Container(
       margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -455,11 +467,11 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                     padding: EdgeInsets.only(bottom: 4),
                     child: Row(
                       children: [
-                        Icon(Icons.forward, size: 12, color: Colors.grey),
+                        Icon(Icons.forward, size: 12, color: metaTextColor),
                         SizedBox(width: 4),
                         Text(
                           'Переслано',
-                          style: TextStyle(color: Colors.grey, fontSize: 10),
+                          style: TextStyle(color: metaTextColor, fontSize: 10),
                         ),
                       ],
                     ),
@@ -482,16 +494,25 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                             padding: EdgeInsets.all(8),
                             margin: EdgeInsets.only(bottom: 8),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.3),
+                              color: isMyMessage
+                                  ? colorScheme.primaryContainer
+                                      .withOpacity(0.35)
+                                  : colorScheme.surface.withOpacity(
+                                      theme.brightness == Brightness.dark
+                                          ? 0.3
+                                          : 0.6),
                               borderRadius: BorderRadius.circular(8),
                               border: Border(
-                                left: BorderSide(color: Colors.blue, width: 3),
+                                left: BorderSide(
+                                  color: colorScheme.secondary,
+                                  width: 3,
+                                ),
                               ),
                             ),
                             child: Text(
                               message.replyToText!,
                               style: TextStyle(
-                                color: Colors.grey[300],
+                                color: textColor.withOpacity(0.85),
                                 fontSize: 12,
                                 fontStyle: FontStyle.italic,
                               ),
@@ -547,7 +568,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                             child: Container(
                               padding: EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.grey[700],
+                                color: bubbleColor.withOpacity(0.9),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
@@ -559,18 +580,17 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                                                 .isPlayingMessage(message.id)
                                         ? Icons.pause
                                         : Icons.play_arrow,
-                                    color: Colors.white,
+                                    color: textColor,
                                     size: 24,
                                   ),
                                   SizedBox(width: 12),
                                   Text(
                                     '${(message.voiceDuration ?? 0) ~/ 60}:${((message.voiceDuration ?? 0) % 60).toString().padLeft(2, '0')}',
                                     style: TextStyle(
-                                        color: Colors.white, fontSize: 16),
+                                        color: textColor, fontSize: 16),
                                   ),
                                   SizedBox(width: 8),
-                                  Icon(Icons.mic,
-                                      color: Colors.white, size: 16),
+                                  Icon(Icons.mic, color: textColor, size: 16),
                                 ],
                               ),
                             ),
@@ -587,7 +607,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                             message.type != 'sticker')
                           Text(
                             message.text,
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(color: textColor, fontSize: 15),
                           ),
 
                         // Timestamp and status
@@ -596,9 +616,10 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              TimeFormatter.formatMessageTime(message.timestamp),
+                              TimeFormatter.formatMessageTime(
+                                  message.timestamp),
                               style: TextStyle(
-                                  color: Colors.grey[400], fontSize: 12),
+                                  color: metaTextColor, fontSize: 12),
                             ),
                             if (isMyMessage) ...[
                               SizedBox(width: 4),
@@ -625,11 +646,19 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   Widget _buildMessageBubbleMap(Map<String, dynamic> m) {
     final isMyMessage = (_currentUser?.uid ?? '') == (m['senderId'] ?? '');
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color incomingBg = isDark ? Colors.grey[800]! : const Color(0xFFEFEFEF);
-    final Color outgoingBg = isDark ? Colors.deepPurple : const Color(0xFF1976D2);
-    final Color incomingText = isDark ? Colors.white : Colors.black;
-    final Color outgoingText = Colors.white;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final bubbleColor = isMyMessage
+        ? colorScheme.primary
+        : (theme.brightness == Brightness.dark
+            ? colorScheme.surfaceVariant
+            : colorScheme.surfaceVariant.withOpacity(0.8));
+    final textColor =
+        isMyMessage ? colorScheme.onPrimary : colorScheme.onSurface;
+    final metaColor = isMyMessage
+        ? colorScheme.onPrimary.withOpacity(0.8)
+        : colorScheme.onSurfaceVariant;
+
     return Container(
       margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: Row(
@@ -640,7 +669,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
             child: Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isMyMessage ? outgoingBg : incomingBg,
+                color: bubbleColor,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -664,7 +693,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                   if ((m['text'] ?? '').toString().isNotEmpty)
                     Text(
                       m['text'],
-                      style: TextStyle(color: isMyMessage ? outgoingText : incomingText),
+                      style: TextStyle(color: textColor, fontSize: 15),
                     ),
                   SizedBox(height: 4),
                   Row(
@@ -672,8 +701,15 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                     children: [
                       Text(
                         _formatTs(m['timestamp']),
-                        style: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54, fontSize: 12),
+                        style: TextStyle(color: metaColor, fontSize: 12),
                       ),
+                      if (isMyMessage) ...[
+                        SizedBox(width: 4),
+                        MessageStatusIcon(
+                          status: m['status'] ?? 'sent',
+                          isOwnMessage: true,
+                        ),
+                      ],
                     ],
                   ),
                 ],

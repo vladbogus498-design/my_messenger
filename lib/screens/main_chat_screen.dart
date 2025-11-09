@@ -42,14 +42,25 @@ class _MainChatScreenState extends State<MainChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final background = Theme.of(context).bottomAppBarTheme.color ??
+        (isDark ? colorScheme.surfaceVariant : colorScheme.surface);
+    final selected = Theme.of(context).bottomNavigationBarTheme.selectedItemColor ??
+        colorScheme.primary;
+    final unselected =
+        Theme.of(context).bottomNavigationBarTheme.unselectedItemColor ??
+            colorScheme.onSurfaceVariant;
+
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: _onItemTapped,
-        backgroundColor: Colors.black,
-        selectedItemColor: Colors.deepPurple,
-        unselectedItemColor: Colors.grey,
+        backgroundColor: background,
+        selectedItemColor: selected,
+        unselectedItemColor: unselected,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.chat),
