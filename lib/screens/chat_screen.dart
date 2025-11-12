@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'single_chat_screen.dart';
 import 'new_chat_screen.dart';
+import 'group_create_screen.dart';
 import '../utils/navigation_animations.dart';
 import '../utils/time_formatter.dart';
 import '../services/group_chat_service.dart';
@@ -129,90 +130,20 @@ class ChatScreen extends StatelessWidget {
 
   void _showCreateGroupSheet(BuildContext context, String? uid) {
     if (uid == null) return;
-    final theme = Theme.of(context);
-    final controller = TextEditingController();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-            top: 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Создать группу',
-                style: theme.textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: 'Название группы',
-                  hintText: 'Например, \"Команда 🔥\"',
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () async {
-                  final name = controller.text.trim();
-                  if (name.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Введите название группы'),
-                      ),
-                    );
-                    return;
-                  }
-                  Navigator.of(ctx).pop();
-                  await _createGroup(context, uid, name);
-                },
-                child: const Text('Создать'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Отмена'),
-              ),
-            ],
+    // Navigate to full group creation screen with user selection
+    Navigator.push(
+      context,
+      NavigationAnimations.slideFadeRoute(GroupCreateScreen()),
+    ).then((groupId) {
+      if (groupId != null && mounted) {
+        Navigator.push(
+          context,
+          NavigationAnimations.slideFadeRoute(
+            SingleChatScreen(chatId: groupId, chatName: ''),
           ),
         );
-      },
-    );
-  }
-
-  Future<void> _createGroup(
-      BuildContext context, String uid, String name) async {
-    try {
-      final groupId = await GroupChatService.createGroup(
-        name: name,
-        participantIds: [uid],
-        creatorId: uid,
-      );
-      // ignore: use_build_context_synchronously
-      Navigator.push(
-        context,
-        NavigationAnimations.slideFadeRoute(
-          SingleChatScreen(chatId: groupId, chatName: name),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Не удалось создать группу: $e'),
-        ),
-      );
-    }
+      }
+    });
   }
 }
 
@@ -246,7 +177,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Создайте первую группу, чтобы начать диалог.',
+              'Создай первую группу 🔥',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,

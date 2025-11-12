@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/biometric_service.dart';
 import '../utils/navigation_animations.dart';
-import '../screens/main_screen.dart';
+import '../screens/main_chat_screen.dart';
 import 'auth_screen.dart';
 
 class BiometricUnlockScreen extends StatefulWidget {
@@ -49,7 +49,7 @@ class _BiometricUnlockScreenState extends State<BiometricUnlockScreen> {
       if (success) {
         Navigator.pushReplacement(
           context,
-          NavigationAnimations.slideFadeRoute(MainScreen()),
+          NavigationAnimations.slideFadeRoute(MainChatScreen()),
         );
       } else {
         setState(() {

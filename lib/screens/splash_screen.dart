@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/auth_screen.dart';
 import '../auth/biometric_unlock_screen.dart';
 import '../utils/navigation_animations.dart';
-import 'main_screen.dart';
+import 'main_chat_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -60,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen>
     } else {
       Navigator.pushReplacement(
         context,
-        NavigationAnimations.slideFadeRoute(MainScreen()),
+        NavigationAnimations.slideFadeRoute(MainChatScreen()),
       );
     }
   }

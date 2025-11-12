@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'auth/auth_screen.dart';
-import 'screens/main_screen.dart';
+import 'screens/main_chat_screen.dart';
 import 'screens/splash_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as legacy_provider;
@@ -52,7 +52,7 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (snapshot.hasData) {
-          return MainScreen();
+          return MainChatScreen();
         }
 
         return AuthScreen();
