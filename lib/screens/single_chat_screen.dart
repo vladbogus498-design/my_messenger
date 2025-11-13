@@ -16,11 +16,13 @@ import '../utils/navigation_animations.dart';
 class SingleChatScreen extends StatefulWidget {
   final String chatId;
   final String chatName;
+  final String? otherUserId; // ID получателя для нового чата
 
   const SingleChatScreen({
     Key? key,
     required this.chatId,
     required this.chatName,
+    this.otherUserId,
   }) : super(key: key);
 
   @override
@@ -52,10 +54,16 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   Future<void> _markMessagesAsRead() async {
     // Отмечаем все сообщения как прочитанные при открытии чата
-    await ChatService.markAllMessagesAsRead(widget.chatId);
+    final chatId = _actualChatId ?? widget.chatId;
+    if (chatId.isNotEmpty) {
+      await ChatService.markAllMessagesAsRead(chatId);
+    }
   }
 
   void _setupTypingListener() {
+    // Слушатели работают только для существующих чатов
+    if (widget.chatId.isEmpty) return;
+    
     ChatService.getTypingUsers(widget.chatId).listen((typingUsers) {
       if (mounted) {
         setState(() {
@@ -89,13 +97,29 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   void _setupTypingDetection() {
     _typingController.addListener(() {
       final isTyping = _typingController.text.isNotEmpty;
-      ChatService.setTypingStatus(widget.chatId, isTyping);
+      final chatId = _actualChatId ?? widget.chatId;
+      if (chatId.isNotEmpty) {
+        ChatService.setTypingStatus(chatId, isTyping);
+      }
     });
   }
+
+  String? _actualChatId; // Реальный ID чата (может быть создан при отправке)
 
   Future<void> _loadMessages() async {
     setState(() => _isLoading = true);
     try {
+      // Если чат еще не создан (пустой chatId), просто показываем пустой список
+      if (widget.chatId.isEmpty) {
+        setState(() {
+          _messages = [];
+          _isLoading = false;
+          _actualChatId = null;
+        });
+        return;
+      }
+      
+      _actualChatId = widget.chatId;
       final messages = await ChatService.getChatMessages(widget.chatId);
       setState(() {
         _messages = messages;
@@ -138,11 +162,67 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     });
   }
 
+  Future<String> _ensureChatExists() async {
+    // Если чат уже существует, возвращаем его ID
+    if (_actualChatId != null && _actualChatId!.isNotEmpty) {
+      return _actualChatId!;
+    }
+    
+    // Если это новый чат и есть получатель, создаем чат
+    if (widget.chatId.isEmpty && widget.otherUserId != null) {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) throw Exception('User not authenticated');
+      
+      final fs = FirebaseFirestore.instance;
+      
+      // Проверяем, не создан ли уже чат другим пользователем
+      final existing = await fs
+          .collection('chats')
+          .where('isGroup', isEqualTo: false)
+          .where('participants', arrayContains: uid)
+          .get();
+      
+      for (final d in existing.docs) {
+        final parts = List<String>.from(d['participants'] ?? []);
+        if (parts.toSet().containsAll({uid, widget.otherUserId!}) && parts.length == 2) {
+          _actualChatId = d.id;
+          return _actualChatId!;
+        }
+      }
+      
+      // Создаем новый чат только при отправке первого сообщения
+      final doc = await fs.collection('chats').add({
+        'name': widget.chatName,
+        'isGroup': false,
+        'participants': [uid, widget.otherUserId!],
+        'admins': [],
+        'lastMessage': '',
+        'lastMessageStatus': 'sent',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      
+      _actualChatId = doc.id;
+      return _actualChatId!;
+    }
+    
+    // Если chatId был передан, используем его
+    if (widget.chatId.isNotEmpty) {
+      _actualChatId = widget.chatId;
+      return _actualChatId!;
+    }
+    
+    throw Exception('Cannot create chat: missing otherUserId');
+  }
+
   Future<void> _sendTextMessage(String text, String type) async {
     if (text.trim().isEmpty) return;
     try {
+      // Создаем чат при отправке первого сообщения, если его еще нет
+      final chatId = await _ensureChatExists();
+      
       await ChatService.sendMessage(
-        chatId: widget.chatId,
+        chatId: chatId,
         text: text,
         type: type,
         replyToId: _replyingTo?.id,
@@ -151,36 +231,50 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       setState(() => _replyingTo = null);
       _loadMessages();
     } catch (e) {
-      print('Error: $e');
+      print('Error sending message: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка отправки: $e')),
+        );
+      }
     }
   }
 
   Future<void> _sendImageMessage(String imageUrl) async {
     try {
+      final chatId = await _ensureChatExists();
       await ChatService.sendMessage(
-        chatId: widget.chatId,
+        chatId: chatId,
         text: '[Photo]',
         type: 'image',
         imageUrl: imageUrl,
         replyToId: _replyingTo?.id,
         replyToText: _replyingTo?.text,
-        encrypt: false, // Можно добавить опцию шифрования
+        encrypt: false,
       );
 
-      await ChatService.setSendingPhotoStatus(widget.chatId, false);
+      await ChatService.setSendingPhotoStatus(chatId, false);
       setState(() => _replyingTo = null);
       _loadMessages();
     } catch (e) {
-      print('Error: $e');
-      await ChatService.setSendingPhotoStatus(widget.chatId, false);
+      print('Error sending image: $e');
+      if (_actualChatId != null) {
+        await ChatService.setSendingPhotoStatus(_actualChatId!, false);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка отправки фото: $e')),
+        );
+      }
     }
   }
 
   Future<void> _sendVoiceMessage(
       String base64Audio, int durationSeconds) async {
     try {
+      final chatId = await _ensureChatExists();
       await ChatService.sendMessage(
-        chatId: widget.chatId,
+        chatId: chatId,
         text: '🎤 Голосовое сообщение',
         type: 'voice',
         voiceAudioBase64: base64Audio,
@@ -193,13 +287,19 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       _loadMessages();
     } catch (e) {
       print('Error sending voice message: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка отправки голосового: $e')),
+        );
+      }
     }
   }
 
   Future<void> _sendSticker(String stickerId) async {
     try {
+      final chatId = await _ensureChatExists();
       await ChatService.sendMessage(
-        chatId: widget.chatId,
+        chatId: chatId,
         text: '',
         type: 'sticker',
         stickerId: stickerId,
@@ -208,6 +308,11 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       _loadMessages();
     } catch (e) {
       print('Error sending sticker: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка отправки стикера: $e')),
+        );
+      }
     }
   }
 
@@ -259,16 +364,24 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     if (_forwardingMessage == null) return;
 
     try {
-      await ChatService.forwardMessage(_forwardingMessage!, widget.chatId);
+      final chatId = await _ensureChatExists();
+      await ChatService.forwardMessage(_forwardingMessage!, chatId);
       setState(() => _forwardingMessage = null);
       _loadMessages();
     } catch (e) {
       print('Error forwarding: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка пересылки: $e')),
+        );
+      }
     }
   }
 
   Future<void> _addReaction(Message message, String emoji) async {
-    await ChatService.addReaction(widget.chatId, message.id, emoji);
+    final chatId = _actualChatId ?? widget.chatId;
+    if (chatId.isEmpty) return;
+    await ChatService.addReaction(chatId, message.id, emoji);
     _loadMessages();
   }
 
@@ -853,27 +966,41 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   void _showUserProfile() async {
-    // Получаем ID другого пользователя из чата
-    // Для простоты берем первого участника, который не является текущим пользователем
-    // В реальном приложении нужно получить список участников чата
-    final chat = await ChatService.getUserChats();
-    final currentChat =
-        chat.firstWhere((c) => c.id == widget.chatId, orElse: () => chat.first);
+    // Используем otherUserId если он передан, иначе получаем из чата
+    String? otherUserId = widget.otherUserId;
+    
+    if (otherUserId == null) {
+      // Получаем ID другого пользователя из существующего чата
+      final chatId = _actualChatId ?? widget.chatId;
+      if (chatId.isNotEmpty) {
+        final chat = await ChatService.getUserChats();
+        final currentChat = chat.firstWhere(
+          (c) => c.id == chatId,
+          orElse: () => chat.isNotEmpty ? chat.first : Chat(
+            id: '',
+            name: '',
+            participants: [],
+            lastMessage: '',
+            lastMessageTime: DateTime.now(),
+            isGroup: false,
+          ),
+        );
 
-    String otherUserId = '';
-    if (currentChat.participants.isNotEmpty) {
-      otherUserId = currentChat.participants.firstWhere(
-        (id) => id != _currentUser?.uid,
-        orElse: () => currentChat.participants.first,
-      );
+        if (currentChat.participants.isNotEmpty) {
+          otherUserId = currentChat.participants.firstWhere(
+            (id) => id != _currentUser?.uid,
+            orElse: () => currentChat.participants.first,
+          );
+        }
+      }
     }
 
-    if (otherUserId.isNotEmpty) {
+    if (otherUserId != null && otherUserId.isNotEmpty) {
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => UserProfileScreen(
-            userId: otherUserId,
+            userId: otherUserId!,
             isMyProfile: false,
           ),
         ),
@@ -918,36 +1045,43 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance
-                  .collection('chats')
-                  .doc(widget.chatId)
-                  .collection('messages')
-                  .orderBy('timestamp', descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                }
-                final docs = snapshot.data?.docs ?? [];
-                return ListView.builder(
-                  controller: _scrollController,
-                  reverse: true,
-                  itemCount: docs.length,
-                  itemBuilder: (_, i) {
-                    final m = docs[i].data();
-                    return _buildMessageBubbleMap(m);
-                  },
-                );
-              },
-            ),
+            child: _actualChatId != null && _actualChatId!.isNotEmpty
+                ? StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: FirebaseFirestore.instance
+                        .collection('chats')
+                        .doc(_actualChatId)
+                        .collection('messages')
+                        .orderBy('timestamp', descending: true)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(child: CircularProgressIndicator());
+                      }
+                      final docs = snapshot.data?.docs ?? [];
+                      return ListView.builder(
+                        controller: _scrollController,
+                        reverse: true,
+                        itemCount: docs.length,
+                        itemBuilder: (_, i) {
+                          final m = docs[i].data();
+                          return _buildMessageBubbleMap(m);
+                        },
+                      );
+                    },
+                  )
+                : Center(
+                    child: Text(
+                      'Начните диалог, отправив сообщение',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ),
           ),
 
           // Action preview (reply/forward)
           _buildActionPreview(),
 
           ChatInputPanel(
-            chatId: widget.chatId,
+            chatId: _actualChatId ?? widget.chatId,
             currentUserId: _currentUser?.uid ?? '',
             onSendMessage: _sendTextMessage,
             onImageUpload: _sendImageMessage,
@@ -966,7 +1100,10 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     VoiceMessageService.stopPlaying();
     _scrollController.dispose();
     _typingController.dispose();
-    ChatService.setTypingStatus(widget.chatId, false);
+    final chatId = _actualChatId ?? widget.chatId;
+    if (chatId.isNotEmpty) {
+      ChatService.setTypingStatus(chatId, false);
+    }
     super.dispose();
   }
 }

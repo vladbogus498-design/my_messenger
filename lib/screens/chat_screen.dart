@@ -114,12 +114,23 @@ class ChatScreen extends StatelessWidget {
                       ),
                   ],
                 ),
-                onTap: () => Navigator.push(
-                  context,
-                  NavigationAnimations.slideFadeRoute(
-                    SingleChatScreen(chatId: chatId, chatName: name),
-                  ),
-                ),
+                onTap: () {
+                  // Защита от дублирования - проверяем, не открыт ли уже этот чат
+                  final navigator = Navigator.of(context);
+                  if (navigator.canPop()) {
+                    final currentRoute = ModalRoute.of(context);
+                    if (currentRoute?.settings.arguments == chatId) {
+                      return; // Уже открыт этот чат
+                    }
+                  }
+                  
+                  Navigator.push(
+                    context,
+                    NavigationAnimations.slideFadeRoute(
+                      SingleChatScreen(chatId: chatId, chatName: name),
+                    ),
+                  );
+                },
               );
             },
           );

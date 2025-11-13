@@ -17,6 +17,7 @@ class AuthScreen extends ConsumerStatefulWidget {
 class _AuthScreenState extends ConsumerState<AuthScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  bool _isNavigating = false; // Защита от множественных навигаций
 
   @override
   void initState() {
@@ -26,16 +27,25 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
 
     ref.listen(authStateProvider, (previous, next) {
       next.whenData((user) async {
-        if (user != null && mounted) {
-          // Ensure user profile exists before navigation
-          await UserService.ensureUserProfile(
-            user: user,
-            fallbackName: user.email?.split('@').first ?? user.phoneNumber,
-          );
-          if (mounted) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => MainChatScreen()),
+        if (user != null && mounted && !_isNavigating) {
+          _isNavigating = true;
+          try {
+            // Ensure user profile exists before navigation
+            await UserService.ensureUserProfile(
+              user: user,
+              fallbackName: user.email?.split('@').first ?? user.phoneNumber,
             );
+            if (mounted) {
+              // Используем pushReplacement для замены экрана авторизации
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => MainChatScreen()),
+              );
+            }
+          } catch (e) {
+            print('Error during auto-login navigation: $e');
+            if (mounted) {
+              _isNavigating = false;
+            }
           }
         }
       });

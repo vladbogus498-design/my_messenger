@@ -11,7 +11,9 @@ class MainChatScreen extends StatefulWidget {
 
 class _MainChatScreenState extends State<MainChatScreen> {
   int _currentIndex = 0;
+  bool _isLoadingIndex = true;
 
+  // Используем IndexedStack для сохранения состояния экранов
   final List<Widget> _screens = [
     ChatScreen(),
     ContactsScreen(),
@@ -25,23 +27,51 @@ class _MainChatScreenState extends State<MainChatScreen> {
   }
 
   void _loadSavedIndex() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _currentIndex = prefs.getInt('currentIndex') ?? 0;
-    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedIndex = prefs.getInt('currentIndex') ?? 0;
+      if (mounted) {
+        setState(() {
+          _currentIndex = savedIndex;
+          _isLoadingIndex = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _currentIndex = 0;
+          _isLoadingIndex = false;
+        });
+      }
+    }
   }
 
   void _onItemTapped(int index) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('currentIndex', index);
+    // Предотвращаем повторное нажатие на ту же вкладку
+    if (index == _currentIndex) return;
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('currentIndex', index);
 
-    setState(() {
-      _currentIndex = index;
-    });
+      if (mounted) {
+        setState(() {
+          _currentIndex = index;
+        });
+      }
+    } catch (e) {
+      print('Error saving index: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingIndex) {
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final background = Theme.of(context).bottomAppBarTheme.color ??
@@ -53,7 +83,11 @@ class _MainChatScreenState extends State<MainChatScreen> {
             colorScheme.onSurfaceVariant;
 
     return Scaffold(
-      body: _screens[_currentIndex],
+      // IndexedStack сохраняет состояние экранов при переключении
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: _onItemTapped,

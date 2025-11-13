@@ -59,13 +59,24 @@ class _NewChatScreenState extends State<NewChatScreen> {
   Future<void> _openOrCreateChat(String otherUserId, String otherName) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
+    
+    // Проверяем, не открыт ли уже этот чат
+    if (Navigator.canPop(context)) {
+      final currentRoute = ModalRoute.of(context);
+      if (currentRoute?.settings.arguments != null) {
+        // Уже открыт чат, не открываем повторно
+        return;
+      }
+    }
+    
     final fs = FirebaseFirestore.instance;
-    // найти существующий приватный чат
+    // Ищем существующий приватный чат
     final existing = await fs
         .collection('chats')
         .where('isGroup', isEqualTo: false)
         .where('participants', arrayContains: uid)
         .get();
+    
     String? chatId;
     for (final d in existing.docs) {
       final parts = List<String>.from(d['participants'] ?? []);
@@ -74,24 +85,20 @@ class _NewChatScreenState extends State<NewChatScreen> {
         break;
       }
     }
-    if (chatId == null) {
-      final doc = await fs.collection('chats').add({
-        'name': otherName,
-        'isGroup': false,
-        'participants': [uid, otherUserId],
-        'admins': [],
-        'lastMessage': '',
-        'lastMessageStatus': 'sent',
-        'lastMessageTime': FieldValue.serverTimestamp(),
-      });
-      chatId = doc.id;
-    }
+    
+    // НЕ создаем чат сразу - создадим только при отправке первого сообщения
+    // Передаем информацию о получателе в SingleChatScreen
     if (!mounted) return;
-    Navigator.pushReplacement(
+    
+    Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (_) =>
-              SingleChatScreen(chatId: chatId!, chatName: otherName)),
+        builder: (_) => SingleChatScreen(
+          chatId: chatId ?? '', // Пустой ID означает новый чат
+          chatName: otherName,
+          otherUserId: otherUserId, // Передаем ID получателя для создания чата при отправке
+        ),
+      ),
     );
   }
 
