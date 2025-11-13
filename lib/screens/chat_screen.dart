@@ -135,11 +135,11 @@ class ChatScreen extends StatelessWidget {
       context,
       NavigationAnimations.slideFadeRoute(GroupCreateScreen()),
     ).then((groupId) {
-      if (groupId != null && mounted) {
+      if (groupId != null && groupId is String) {
         Navigator.push(
           context,
           NavigationAnimations.slideFadeRoute(
-            SingleChatScreen(chatId: groupId, chatName: ''),
+            SingleChatScreen(chatId: groupId as String, chatName: ''),
           ),
         );
       }
