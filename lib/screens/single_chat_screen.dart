@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../services/chat_service.dart';
 import '../services/voice_message_service.dart';
 import '../models/message.dart';
@@ -12,6 +13,7 @@ import '../widgets/reaction_picker.dart';
 import '../widgets/message_status_icon.dart';
 import '../utils/time_formatter.dart';
 import '../utils/navigation_animations.dart';
+import '../models/typing_status.dart';
 
 class SingleChatScreen extends StatefulWidget {
   final String chatId;
@@ -30,26 +32,27 @@ class SingleChatScreen extends StatefulWidget {
 }
 
 class _SingleChatScreenState extends State<SingleChatScreen> {
-  List<Message> _messages = [];
-  bool _isLoading = true;
   final _scrollController = ScrollController();
   final User? _currentUser = FirebaseAuth.instance.currentUser;
   Message? _replyingTo;
   Message? _forwardingMessage;
   final TextEditingController _typingController = TextEditingController();
-  List<String> _typingUsers = [];
-  List<String> _sendingPhotoUsers = [];
-  List<String> _recordingVoiceUsers = [];
+  TypingStatus _typingStatus = TypingStatus(
+    typingUsers: [],
+    sendingPhotoUsers: [],
+    recordingVoiceUsers: [],
+  );
   String? _playingVoiceMessageId;
-  Timer? _playbackCheckTimer;
+  StreamSubscription? _playbackCompleteSubscription;
+  StreamSubscription? _typingStatusSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
     _setupTypingListener();
     _setupTypingDetection();
     _markMessagesAsRead();
+    _setupVoicePlaybackListener();
   }
 
   Future<void> _markMessagesAsRead() async {
@@ -64,31 +67,22 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     // Слушатели работают только для существующих чатов
     if (widget.chatId.isEmpty) return;
     
-    ChatService.getTypingUsers(widget.chatId).listen((typingUsers) {
+    // Используем единый поток для всех статусов
+    _typingStatusSubscription = ChatService.getTypingStatus(widget.chatId)
+        .listen((status) {
       if (mounted) {
         setState(() {
-          _typingUsers =
-              typingUsers.where((id) => id != _currentUser?.uid).toList();
-        });
-      }
-    });
-
-    ChatService.getSendingPhotoUsers(widget.chatId).listen((sendingPhotoUsers) {
-      if (mounted) {
-        setState(() {
-          _sendingPhotoUsers =
-              sendingPhotoUsers.where((id) => id != _currentUser?.uid).toList();
-        });
-      }
-    });
-
-    ChatService.getRecordingVoiceUsers(widget.chatId)
-        .listen((recordingVoiceUsers) {
-      if (mounted) {
-        setState(() {
-          _recordingVoiceUsers = recordingVoiceUsers
-              .where((id) => id != _currentUser?.uid)
-              .toList();
+          _typingStatus = TypingStatus(
+            typingUsers: status.typingUsers
+                .where((id) => id != _currentUser?.uid)
+                .toList(),
+            sendingPhotoUsers: status.sendingPhotoUsers
+                .where((id) => id != _currentUser?.uid)
+                .toList(),
+            recordingVoiceUsers: status.recordingVoiceUsers
+                .where((id) => id != _currentUser?.uid)
+                .toList(),
+          );
         });
       }
     });
@@ -106,29 +100,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   String? _actualChatId; // Реальный ID чата (может быть создан при отправке)
 
-  Future<void> _loadMessages() async {
-    setState(() => _isLoading = true);
-    try {
-      // Если чат еще не создан (пустой chatId), просто показываем пустой список
-      if (widget.chatId.isEmpty) {
-        setState(() {
-          _messages = [];
-          _isLoading = false;
-          _actualChatId = null;
-        });
-        return;
-      }
-      
-      _actualChatId = widget.chatId;
-      final messages = await ChatService.getChatMessages(widget.chatId);
-      setState(() {
-        _messages = messages;
-        _isLoading = false;
-      });
-      _scrollToBottom();
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
+  void _setupVoicePlaybackListener() {
+    // Voice playback completion is handled via VoiceMessageService callback
+    // No need for Timer.periodic polling
   }
 
   void _scrollToBottom() {
@@ -160,6 +134,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       _replyingTo = null;
       _forwardingMessage = null;
     });
+    // Animation handled by AnimatedSize in _buildActionPreview
   }
 
   Future<String> _ensureChatExists() async {
@@ -228,8 +203,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         replyToId: _replyingTo?.id,
         replyToText: _replyingTo?.text,
       );
-      setState(() => _replyingTo = null);
-      _loadMessages();
+      _cancelAction(); // Clear preview immediately
+      _scrollToBottom();
     } catch (e) {
       print('Error sending message: $e');
       if (mounted) {
@@ -254,8 +229,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       );
 
       await ChatService.setSendingPhotoStatus(chatId, false);
-      setState(() => _replyingTo = null);
-      _loadMessages();
+      _cancelAction(); // Clear preview immediately
+      _scrollToBottom();
     } catch (e) {
       print('Error sending image: $e');
       if (_actualChatId != null) {
@@ -283,8 +258,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         replyToText: _replyingTo?.text,
       );
 
-      setState(() => _replyingTo = null);
-      _loadMessages();
+      _cancelAction(); // Clear preview immediately
+      _scrollToBottom();
     } catch (e) {
       print('Error sending voice message: $e');
       if (mounted) {
@@ -305,9 +280,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         stickerId: stickerId,
       );
 
-      _loadMessages();
+      _scrollToBottom();
     } catch (e) {
-      print('Error sending sticker: $e');
+      print('❌ Error sending sticker: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка отправки стикера: $e')),
@@ -334,30 +309,29 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       await VoiceMessageService.stopPlaying();
     }
 
+    // Отменяем предыдущую подписку
+    await _playbackCompleteSubscription?.cancel();
+
     setState(() => _playingVoiceMessageId = messageId);
+    
+    // Play voice message and listen for completion
     await VoiceMessageService.playVoiceMessage(
         message.voiceAudioBase64!, messageId);
-
-    // Обновляем состояние после завершения воспроизведения
-    // Слушаем изменения статуса через периодическую проверку
-    _playbackCheckTimer?.cancel();
-    _playbackCheckTimer = Timer.periodic(Duration(milliseconds: 500), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (!VoiceMessageService.isPlayingMessage(messageId)) {
-        timer.cancel();
-        _playbackCheckTimer = null;
-        if (mounted) {
+    
+    // Listen for playback completion via VoiceMessageService callback
+    // The service already handles completion internally, we just need to update UI
+    final completionStream = VoiceMessageService.onPlaybackComplete;
+    if (completionStream != null) {
+      _playbackCompleteSubscription = completionStream.listen((completedMessageId) {
+        if (mounted && completedMessageId == messageId) {
           setState(() {
             if (_playingVoiceMessageId == messageId) {
               _playingVoiceMessageId = null;
             }
           });
         }
-      }
-    });
+      });
+    }
   }
 
   Future<void> _forwardMessage() async {
@@ -366,8 +340,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     try {
       final chatId = await _ensureChatExists();
       await ChatService.forwardMessage(_forwardingMessage!, chatId);
-      setState(() => _forwardingMessage = null);
-      _loadMessages();
+      _cancelAction(); // Clear preview immediately with animation
+      _scrollToBottom();
     } catch (e) {
       print('Error forwarding: $e');
       if (mounted) {
@@ -382,7 +356,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     final chatId = _actualChatId ?? widget.chatId;
     if (chatId.isEmpty) return;
     await ChatService.addReaction(chatId, message.id, emoji);
-    _loadMessages();
+    // StreamBuilder will automatically update
   }
 
   bool _isMyMessage(String senderId) {
@@ -446,12 +420,15 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   Widget _buildActionPreview() {
-    if (_replyingTo != null) {
-      return _buildReplyPreview(_replyingTo!);
-    } else if (_forwardingMessage != null) {
-      return _buildForwardPreview(_forwardingMessage!);
-    }
-    return SizedBox();
+    return AnimatedSize(
+      duration: Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      child: _replyingTo != null
+          ? _buildReplyPreview(_replyingTo!)
+          : _forwardingMessage != null
+              ? _buildForwardPreview(_forwardingMessage!)
+              : SizedBox(),
+    );
   }
 
   Widget _buildReplyPreview(Message replyTo) {
@@ -549,7 +526,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   Widget _buildTypingIndicator() {
-    if (_typingUsers.isEmpty) return const SizedBox();
+    if (_typingStatus.typingUsers.isEmpty) return const SizedBox();
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -698,11 +675,23 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                                 borderRadius: BorderRadius.circular(8),
                                 child: Stack(
                                   children: [
-                                    Image.network(
-                                      message.imageUrl!,
+                                    CachedNetworkImage(
+                                      imageUrl: message.imageUrl!,
                                       width: 200,
                                       height: 150,
                                       fit: BoxFit.cover,
+                                      placeholder: (context, url) => Container(
+                                        width: 200,
+                                        height: 150,
+                                        color: colorScheme.surfaceVariant,
+                                        child: Center(child: CircularProgressIndicator()),
+                                      ),
+                                      errorWidget: (context, url, error) => Container(
+                                        width: 200,
+                                        height: 150,
+                                        color: colorScheme.errorContainer,
+                                        child: Icon(Icons.error, color: colorScheme.onErrorContainer),
+                                      ),
                                     ),
                                     Positioned(
                                       top: 4,
@@ -813,111 +802,6 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     );
   }
 
-  Widget _buildMessageBubbleMap(Map<String, dynamic> m) {
-    final isMyMessage = (_currentUser?.uid ?? '') == (m['senderId'] ?? '');
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final bubbleColor = isMyMessage
-        ? colorScheme.primary
-        : (theme.brightness == Brightness.dark
-            ? colorScheme.surfaceVariant
-            : colorScheme.surfaceVariant.withOpacity(0.8));
-    final textColor =
-        isMyMessage ? colorScheme.onPrimary : colorScheme.onSurface;
-    final metaColor = isMyMessage
-        ? colorScheme.onPrimary.withOpacity(0.8)
-        : colorScheme.onSurfaceVariant;
-
-    if ((m['type'] ?? 'text') == 'system') {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceVariant.withOpacity(0.4),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              (m['text'] ?? '') as String,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      child: Row(
-        mainAxisAlignment:
-            isMyMessage ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          Flexible(
-            child: Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if ((m['type'] ?? 'text') == 'image' && m['imageUrl'] != null)
-                    Column(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            m['imageUrl'],
-                            width: 200,
-                            height: 150,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                      ],
-                    ),
-                  if ((m['text'] ?? '').toString().isNotEmpty)
-                    Text(
-                      m['text'],
-                      style: TextStyle(color: textColor, fontSize: 15),
-                    ),
-                  SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _formatTs(m['timestamp']),
-                        style: TextStyle(color: metaColor, fontSize: 12),
-                      ),
-                      if (isMyMessage) ...[
-                        SizedBox(width: 4),
-                        MessageStatusIcon(
-                          status: m['status'] ?? 'sent',
-                          isOwnMessage: true,
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatTs(dynamic ts) {
-    if (ts is Timestamp) {
-      final d = ts.toDate();
-      return '${d.hour}:${d.minute.toString().padLeft(2, '0')}';
-    }
-    return '';
-  }
 
   void _showMessageMenu(Message message) {
     showModalBottomSheet(
@@ -966,32 +850,33 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   void _showUserProfile() async {
-    // Используем otherUserId если он передан, иначе получаем из чата
+    // Используем otherUserId если он передан, иначе получаем из участников чата напрямую
     String? otherUserId = widget.otherUserId;
     
     if (otherUserId == null) {
-      // Получаем ID другого пользователя из существующего чата
+      // Получаем ID другого пользователя из участников чата напрямую через Firestore
       final chatId = _actualChatId ?? widget.chatId;
       if (chatId.isNotEmpty) {
-        final chat = await ChatService.getUserChats();
-        final currentChat = chat.firstWhere(
-          (c) => c.id == chatId,
-          orElse: () => chat.isNotEmpty ? chat.first : Chat(
-            id: '',
-            name: '',
-            participants: [],
-            lastMessage: '',
-            lastMessageStatus: 'sent',
-            lastMessageTime: DateTime.now(),
-            isGroup: false,
-          ),
-        );
-
-        if (currentChat.participants.isNotEmpty) {
-          otherUserId = currentChat.participants.firstWhere(
-            (id) => id != _currentUser?.uid,
-            orElse: () => currentChat.participants.first,
-          );
+        try {
+          final chatDoc = await FirebaseFirestore.instance
+              .collection('chats')
+              .doc(chatId)
+              .get();
+          
+          if (chatDoc.exists) {
+            final participants = List<String>.from(
+              chatDoc.data()?['participants'] ?? []
+            );
+            
+            if (participants.isNotEmpty) {
+              otherUserId = participants.firstWhere(
+                (id) => id != _currentUser?.uid,
+                orElse: () => participants.first,
+              );
+            }
+          }
+        } catch (e) {
+          print('❌ Error getting chat participants: $e');
         }
       }
     }
@@ -1023,17 +908,17 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(widget.chatName),
-              if (_recordingVoiceUsers.isNotEmpty)
+              if (_typingStatus.recordingVoiceUsers.isNotEmpty)
                 _AnimatedStatusRow(
                   icon: Icons.mic,
                   text: 'Записывает голосовое...',
                 )
-              else if (_sendingPhotoUsers.isNotEmpty)
+              else if (_typingStatus.sendingPhotoUsers.isNotEmpty)
                 _AnimatedStatusRow(
                   icon: Icons.photo,
                   text: 'Отправляет фото...',
                 )
-              else if (_typingUsers.isNotEmpty)
+              else if (_typingStatus.typingUsers.isNotEmpty)
                 _AnimatedStatusRow(
                   icon: Icons.edit,
                   text: 'Печатает...',
@@ -1058,14 +943,32 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return Center(child: CircularProgressIndicator());
                       }
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Text('Ошибка загрузки сообщений: ${snapshot.error}'),
+                        );
+                      }
                       final docs = snapshot.data?.docs ?? [];
+                      if (docs.isEmpty) {
+                        return Center(
+                          child: Text(
+                            'Начните диалог, отправив сообщение',
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        );
+                      }
                       return ListView.builder(
                         controller: _scrollController,
                         reverse: true,
                         itemCount: docs.length,
+                        key: ValueKey('messages_list_${_actualChatId}'),
                         itemBuilder: (_, i) {
-                          final m = docs[i].data();
-                          return _buildMessageBubbleMap(m);
+                          final doc = docs[i];
+                          final message = Message.fromMap(doc.data(), doc.id);
+                          return RepaintBoundary(
+                            key: ValueKey('message_${message.id}'),
+                            child: _buildMessageBubble(message),
+                          );
                         },
                       );
                     },
@@ -1097,7 +1000,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   @override
   void dispose() {
-    _playbackCheckTimer?.cancel();
+    _playbackCompleteSubscription?.cancel();
+    _typingStatusSubscription?.cancel();
     VoiceMessageService.stopPlaying();
     _scrollController.dispose();
     _typingController.dispose();

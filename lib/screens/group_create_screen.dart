@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/group_chat_service.dart';
+import '../models/chat.dart';
+import 'single_chat_screen.dart';
 
 class GroupCreateScreen extends StatefulWidget {
   @override
@@ -146,13 +148,13 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
                           }
                           setState(() => _isCreating = true);
                           try {
-                            final chatId = await GroupChatService.createGroup(
+                            final chat = await GroupChatService.createGroup(
                               name: name,
                               participantIds: [creator, ..._selected],
                               creatorId: creator,
                             );
                             if (!mounted) return;
-                            Navigator.pop(context, chatId);
+                            Navigator.pop(context, chat);
                           } catch (e) {
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(

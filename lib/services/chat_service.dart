@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/message.dart';
 import '../models/chat.dart';
+import '../models/typing_status.dart';
 import 'e2e_encryption_service.dart';
 
 class ChatService {
@@ -108,6 +109,12 @@ class ChatService {
         }
       }
 
+      // Validate sticker type
+      if (type == 'sticker' && (stickerId == null || stickerId.isEmpty)) {
+        print('❌ Error: sticker type requires stickerId');
+        throw Exception('Sticker type requires stickerId');
+      }
+
       final messageData = {
         'text': messageText,
         'type': type,
@@ -165,6 +172,9 @@ class ChatService {
       text: message.text,
       type: message.type,
       imageUrl: message.imageUrl,
+      voiceAudioBase64: message.voiceAudioBase64,
+      voiceDuration: message.voiceDuration,
+      stickerId: message.stickerId,
       isForwarded: true,
       originalSender: message.senderId,
     );
@@ -288,6 +298,29 @@ class ChatService {
       final recordingVoiceUsers =
           data?['recordingVoiceUsers'] as List<dynamic>?;
       return recordingVoiceUsers?.cast<String>() ?? [];
+    });
+  }
+
+  // 📊 Получение всех статусов активности в одном потоке
+  static Stream<TypingStatus> getTypingStatus(String chatId) {
+    return _firestore
+        .collection('chats')
+        .doc(chatId)
+        .snapshots()
+        .map((snapshot) {
+      final data = snapshot.data();
+      return TypingStatus(
+        typingUsers: (data?['typingUsers'] as List<dynamic>?)
+                ?.cast<String>() ??
+            [],
+        sendingPhotoUsers: (data?['sendingPhotoUsers'] as List<dynamic>?)
+                ?.cast<String>() ??
+            [],
+        recordingVoiceUsers:
+            (data?['recordingVoiceUsers'] as List<dynamic>?)
+                    ?.cast<String>() ??
+                [],
+      );
     });
   }
 

@@ -64,6 +64,31 @@ class Message {
     );
   }
 
+  factory Message.fromMap(Map<String, dynamic> data, String id) {
+    return Message(
+      id: id,
+      chatId: data['chatId'] ?? '',
+      senderId: data['senderId'] ?? '',
+      text: data['text'] ?? '',
+      type: data['type'] ?? 'text',
+      imageUrl: data['imageUrl'],
+      voiceAudioBase64: data['voiceAudioBase64'],
+      voiceDuration: data['voiceDuration'],
+      stickerId: data['stickerId'],
+      isEncrypted: data['isEncrypted'] ?? false,
+      timestamp: data['timestamp'] is Timestamp
+          ? (data['timestamp'] as Timestamp).toDate()
+          : (data['timestamp'] as DateTime? ?? DateTime.now()),
+      replyToId: data['replyToId'],
+      replyToText: data['replyToText'],
+      isForwarded: data['isForwarded'] ?? false,
+      originalSender: data['originalSender'],
+      reactions: Map<String, String>.from(data['reactions'] ?? {}),
+      isTyping: data['isTyping'] ?? false,
+      status: data['status'] ?? 'sent',
+    );
+  }
+
   Map<String, dynamic> toFirestore() {
     return {
       'chatId': chatId,

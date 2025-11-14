@@ -8,6 +8,7 @@ import 'group_create_screen.dart';
 import '../utils/navigation_animations.dart';
 import '../utils/time_formatter.dart';
 import '../services/group_chat_service.dart';
+import '../models/chat.dart';
 
 class ChatScreen extends StatelessWidget {
   @override
@@ -145,12 +146,16 @@ class ChatScreen extends StatelessWidget {
     Navigator.push(
       context,
       NavigationAnimations.slideFadeRoute(GroupCreateScreen()),
-    ).then((groupId) {
-      if (groupId != null && groupId is String) {
+    ).then((result) {
+      if (result != null && result is Chat) {
+        // Navigate immediately to the new group
         Navigator.push(
           context,
           NavigationAnimations.slideFadeRoute(
-            SingleChatScreen(chatId: groupId as String, chatName: ''),
+            SingleChatScreen(
+              chatId: result.id,
+              chatName: result.groupName ?? result.name,
+            ),
           ),
         );
       }

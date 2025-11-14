@@ -1,57 +1,20 @@
-import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+/// Сервис для работы с биометрической аутентификацией
+/// Пока только структура, полная интеграция будет позже
 class BiometricService {
-  static final LocalAuthentication _auth = LocalAuthentication();
+  static final LocalAuthentication _localAuth = LocalAuthentication();
+  static const String _useBiometricsKey = 'useBiometrics';
 
-  /// Проверяет доступность биометрии на устройстве
-  static Future<bool> canAuthenticate() async {
+  /// Проверяет, доступна ли биометрическая аутентификация
+  static Future<bool> isAvailable() async {
     try {
-      final isAvailable = await _auth.isDeviceSupported();
-      if (!isAvailable) return false;
-
-      final canCheck = await _auth.canCheckBiometrics;
-      final availableBiometrics = await _auth.getAvailableBiometrics();
-      return canCheck && availableBiometrics.isNotEmpty;
+      final isAvailable = await _localAuth.canCheckBiometrics;
+      final isDeviceSupported = await _localAuth.isDeviceSupported();
+      return isAvailable || isDeviceSupported;
     } catch (e) {
-      print('Biometric check error: $e');
-      return false;
-    }
-  }
-
-  /// Выполняет аутентификацию через биометрию
-  /// Возвращает true при успехе, false при отмене или ошибке
-  static Future<bool> authenticate({String? reason}) async {
-    try {
-      if (!await canAuthenticate()) {
-        return false;
-      }
-      final availableBiometrics = await _auth.getAvailableBiometrics();
-      String biometricType = 'fingerprint';
-      if (availableBiometrics.contains(BiometricType.face)) {
-        biometricType = 'face';
-      } else if (availableBiometrics.contains(BiometricType.iris)) {
-        biometricType = 'iris';
-      }
-      final defaultReason = reason ??
-          (biometricType == 'face'
-              ? 'Используйте Face ID для входа'
-              : biometricType == 'iris'
-                  ? 'Используйте сканер радужки'
-                  : 'Приложите палец к сканеру');
-      return await _auth.authenticate(
-        localizedReason: defaultReason,
-        options: const AuthenticationOptions(
-          biometricOnly: true,
-          stickyAuth: true,
-          useErrorDialogs: true,
-        ),
-      );
-    } on PlatformException catch (e) {
-      print('Biometric auth platform error: $e');
-      return false;
-    } catch (e) {
-      print('Biometric auth error: $e');
+      print('❌ Error checking biometric availability: $e');
       return false;
     }
   }
@@ -59,34 +22,55 @@ class BiometricService {
   /// Получает список доступных типов биометрии
   static Future<List<BiometricType>> getAvailableBiometrics() async {
     try {
-      return await _auth.getAvailableBiometrics();
+      return await _localAuth.getAvailableBiometrics();
     } catch (e) {
-      print('Get biometrics error: $e');
+      print('❌ Error getting available biometrics: $e');
       return [];
     }
   }
 
-  /// Получает название типа биометрии для отображения
-  static Future<String> getBiometricTypeName() async {
+  /// Аутентификация с помощью биометрии
+  static Future<bool> authenticate({
+    String reason = 'Пожалуйста, подтвердите вашу личность',
+  }) async {
     try {
-      final availableBiometrics = await getAvailableBiometrics();
-
-      if (availableBiometrics.contains(BiometricType.face)) {
-        return 'Face ID';
-      } else if (availableBiometrics.contains(BiometricType.iris)) {
-        return 'Сканер радужки';
-      } else if (availableBiometrics.contains(BiometricType.fingerprint)) {
-        return 'Отпечаток пальца';
+      final isAvailable = await BiometricService.isAvailable();
+      if (!isAvailable) {
+        print('❌ Biometric authentication not available');
+        return false;
       }
 
-      // Если есть любой другой тип биометрии
-      if (availableBiometrics.isNotEmpty) {
-        return 'Биометрия';
-      }
-
-      return 'Биометрическая аутентификация';
+      return await _localAuth.authenticate(
+        localizedReason: reason,
+        options: const AuthenticationOptions(
+          biometricOnly: true,
+          stickyAuth: true,
+        ),
+      );
     } catch (e) {
-      return 'Биометрия';
+      print('❌ Error during biometric authentication: $e');
+      return false;
+    }
+  }
+
+  /// Сохраняет настройку использования биометрии
+  static Future<void> setUseBiometrics(bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_useBiometricsKey, value);
+    } catch (e) {
+      print('❌ Error saving biometric preference: $e');
+    }
+  }
+
+  /// Получает настройку использования биометрии
+  static Future<bool> getUseBiometrics() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_useBiometricsKey) ?? false;
+    } catch (e) {
+      print('❌ Error getting biometric preference: $e');
+      return false;
     }
   }
 }

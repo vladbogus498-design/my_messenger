@@ -14,6 +14,10 @@ class VoiceMessageService {
   static bool _isPlaying = false;
   static String? _currentPlayingId;
   static StreamSubscription? _playerCompleteSubscription;
+  static final _playbackCompleteController = StreamController<String>.broadcast();
+  
+  /// Stream для отслеживания завершения воспроизведения
+  static Stream<String>? get onPlaybackComplete => _playbackCompleteController.stream;
 
   // Запрос разрешения на запись
   static Future<bool> requestPermission() async {
@@ -152,12 +156,20 @@ class VoiceMessageService {
 
       // Слушаем завершение воспроизведения
       _playerCompleteSubscription = _audioPlayer.onPlayerComplete.listen((_) {
+        final completedId = _currentPlayingId;
         _isPlaying = false;
         _currentPlayingId = null;
+        if (completedId != null) {
+          _playbackCompleteController.add(completedId);
+        }
       }, onError: (error) {
         print('❌ Error during playback: $error');
+        final completedId = _currentPlayingId;
         _isPlaying = false;
         _currentPlayingId = null;
+        if (completedId != null) {
+          _playbackCompleteController.add(completedId);
+        }
       });
     } catch (e) {
       print('❌ Error playing voice: $e');
