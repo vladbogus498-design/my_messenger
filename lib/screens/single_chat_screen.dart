@@ -981,6 +981,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
             name: '',
             participants: [],
             lastMessage: '',
+            lastMessageStatus: 'sent',
             lastMessageTime: DateTime.now(),
             isGroup: false,
           ),
