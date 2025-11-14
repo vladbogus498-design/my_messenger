@@ -19,6 +19,11 @@ class BiometricService {
     }
   }
 
+  /// Алиас для isAvailable() для совместимости со старым кодом
+  static Future<bool> canAuthenticate() async {
+    return await isAvailable();
+  }
+
   /// Получает список доступных типов биометрии
   static Future<List<BiometricType>> getAvailableBiometrics() async {
     try {
