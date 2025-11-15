@@ -69,7 +69,7 @@ class ChatScreen extends StatelessWidget {
                     onCreateGroup: () => _showCreateGroupSheet(context, uid),
                   );
                 }
-                return _buildChatList(fallbackSnapshot.data!.docs, uid);
+                return _buildChatList(context, fallbackSnapshot.data!.docs, uid);
               },
             );
           }
@@ -80,13 +80,13 @@ class ChatScreen extends StatelessWidget {
             );
           }
           
-          return _buildChatList(snapshot.data!.docs, uid);
+          return _buildChatList(context, snapshot.data!.docs, uid);
         },
       ),
     );
   }
 
-  Widget _buildChatList(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, String uid) {
+  Widget _buildChatList(BuildContext context, List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, String uid) {
     return ListView.builder(
       itemCount: docs.length,
       itemBuilder: (_, i) {
