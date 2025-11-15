@@ -17,12 +17,24 @@ class ChatService {
       final snapshot = await _firestore
           .collection('chats')
           .where('participants', arrayContains: userId)
+          .orderBy('lastMessage.timestamp', descending: true)
           .get();
 
       return snapshot.docs.map<Chat>((doc) => Chat.fromFirestore(doc)).toList();
     } catch (e) {
-      print('❌ Error loading chats: $e');
-      return [];
+      // Если запрос с lastMessage.timestamp не работает, пробуем fallback
+      print('⚠️ Error loading chats with lastMessage.timestamp, trying fallback: $e');
+      try {
+        final snapshot = await _firestore
+            .collection('chats')
+            .where('participants', arrayContains: userId)
+            .orderBy('lastMessageTime', descending: true)
+            .get();
+        return snapshot.docs.map<Chat>((doc) => Chat.fromFirestore(doc)).toList();
+      } catch (e2) {
+        print('❌ Error loading chats: $e2');
+        return [];
+      }
     }
   }
 
@@ -144,9 +156,13 @@ class ChatService {
       await messageRef.update({'status': 'sent'});
 
       // Обновляем последнее сообщение в чате
+      final now = FieldValue.serverTimestamp();
       await _firestore.collection('chats').doc(chatId).update({
-        'lastMessage': text,
-        'lastMessageTime': FieldValue.serverTimestamp(),
+        'lastMessage': {
+          'text': text,
+          'timestamp': now,
+        },
+        'lastMessageTime': now, // Для обратной совместимости
       });
 
       // Автоматически обновляем статус на "доставлено" через небольшую задержку

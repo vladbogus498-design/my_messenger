@@ -15,11 +15,14 @@ class GroupChatService {
       'groupName': name,
       'type': 'group',
       'isGroup': true,
-      'participants': participantIds,
+      'participants': participantIds, // Все участники добавлены
       'admins': [creatorId],
-      'lastMessage': 'Группа создана',
+      'lastMessage': {
+        'text': 'Группа создана',
+        'timestamp': now,
+      },
       'lastMessageStatus': 'sent',
-      'lastMessageTime': now,
+      'lastMessageTime': now, // Для обратной совместимости
       'createdAt': now,
       'createdBy': creatorId,
       'avatarUrl': null,

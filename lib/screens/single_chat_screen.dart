@@ -166,15 +166,19 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       }
       
       // Создаем новый чат только при отправке первого сообщения
+      final now = FieldValue.serverTimestamp();
       final doc = await fs.collection('chats').add({
         'name': widget.chatName,
         'isGroup': false,
-        'participants': [uid, widget.otherUserId!],
+        'participants': [uid, widget.otherUserId!], // Оба участника добавлены
         'admins': [],
-        'lastMessage': '',
+        'lastMessage': {
+          'text': '',
+          'timestamp': now,
+        },
         'lastMessageStatus': 'sent',
-        'lastMessageTime': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
+        'lastMessageTime': now, // Для обратной совместимости
+        'createdAt': now,
       });
       
       _actualChatId = doc.id;

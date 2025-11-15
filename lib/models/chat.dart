@@ -25,15 +25,39 @@ class Chat {
 
   factory Chat.fromFirestore(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
+    
+    // Обработка lastMessage: может быть объектом {text: '', timestamp: Timestamp} или строкой
+    String lastMessageText = '';
+    DateTime lastMessageTime;
+    
+    if (data['lastMessage'] is Map) {
+      // Новая структура: lastMessage = {text: '', timestamp: Timestamp}
+      final lastMsg = data['lastMessage'] as Map<String, dynamic>;
+      lastMessageText = lastMsg['text'] ?? '';
+      final lastMsgTs = lastMsg['timestamp'];
+      if (lastMsgTs != null && lastMsgTs is Timestamp) {
+        lastMessageTime = lastMsgTs.toDate();
+      } else {
+        // Fallback если timestamp null
+        lastMessageTime = data['lastMessageTime'] != null
+            ? (data['lastMessageTime'] as Timestamp).toDate()
+            : DateTime.now().subtract(Duration(days: 365));
+      }
+    } else {
+      // Старая структура: lastMessage = строка, lastMessageTime = Timestamp
+      lastMessageText = data['lastMessage'] ?? '';
+      lastMessageTime = data['lastMessageTime'] != null
+          ? (data['lastMessageTime'] as Timestamp).toDate()
+          : DateTime.now().subtract(Duration(days: 365)); // Fallback для null
+    }
+    
     return Chat(
       id: doc.id,
       name: data['name'] ?? 'Chat',
       participants: List<String>.from(data['participants'] ?? []),
-      lastMessage: data['lastMessage'] ?? '',
+      lastMessage: lastMessageText,
       lastMessageStatus: data['lastMessageStatus'] ?? 'sent',
-      lastMessageTime: data['lastMessageTime'] != null
-          ? (data['lastMessageTime'] as Timestamp).toDate()
-          : DateTime.now(),
+      lastMessageTime: lastMessageTime,
       isGroup: data['isGroup'] ?? false,
       admins: List<String>.from(data['admins'] ?? const []),
       groupName: data['groupName'],
