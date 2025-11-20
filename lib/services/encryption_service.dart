@@ -3,6 +3,7 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:math';
+import '../utils/logger.dart';
 
 /// Сервис для шифрования и дешифрования сообщений
 class EncryptionService {
@@ -31,7 +32,7 @@ class EncryptionService {
       // Возвращаем IV + зашифрованный текст (разделенные :)
       return '${iv.base64}:${encrypted.base64}';
     } catch (e) {
-      print('❌ Encryption error: $e');
+      appLogger.e('Encryption error', error: e);
       return plainText; // В случае ошибки возвращаем оригинальный текст
     }
   }
@@ -54,7 +55,7 @@ class EncryptionService {
       final decrypted = encrypter.decrypt(encrypted, iv: iv);
       return decrypted;
     } catch (e) {
-      print('❌ Decryption error: $e');
+      appLogger.e('Decryption error', error: e);
       return encryptedText; // В случае ошибки возвращаем зашифрованный текст
     }
   }

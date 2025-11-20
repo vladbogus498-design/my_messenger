@@ -7,6 +7,7 @@ import 'new_chat_screen.dart';
 import 'group_create_screen.dart';
 import '../utils/navigation_animations.dart';
 import '../utils/time_formatter.dart';
+import '../utils/logger.dart';
 import '../services/group_chat_service.dart';
 import '../models/chat.dart';
 
@@ -52,7 +53,7 @@ class ChatScreen extends StatelessWidget {
           
           // Обработка ошибок запроса (например, отсутствие индекса)
           if (snapshot.hasError) {
-            print('⚠️ Error loading chats: ${snapshot.error}');
+            appLogger.w('Error loading chats, using fallback', error: snapshot.error);
             // Fallback на запрос с lastMessageTime
             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance

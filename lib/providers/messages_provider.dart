@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 import '../models/message.dart';
 import '../services/e2e_encryption_service.dart';
+import '../utils/logger.dart';
 
 /// Провайдер для получения сообщений чата
 final messagesProvider = StreamProvider.family<List<Message>, String>((ref, chatId) {
@@ -26,8 +27,8 @@ final messagesProvider = StreamProvider.family<List<Message>, String>((ref, chat
         try {
           messageText = await E2EEncryptionService.decryptMessage(messageText);
         } catch (e) {
-          print('❌ Error decrypting message: $e');
-        }
+            appLogger.e('Error decrypting message in chat: $chatId', error: e);
+          }
       }
 
       messages.add(Message(
@@ -55,94 +56,6 @@ final messagesProvider = StreamProvider.family<List<Message>, String>((ref, chat
   });
 });
 
-/// Провайдер для управления отправкой сообщений с повторной попыткой
-class MessageSenderNotifier extends StateNotifier<AsyncValue<void>> {
-  MessageSenderNotifier() : super(const AsyncValue.data(null));
-
-  /// Отправить сообщение с повторной попыткой при ошибке
-  Future<void> sendMessage({
-    required String chatId,
-    required String text,
-    required String type,
-    String? imageUrl,
-    String? voiceAudioBase64,
-    int? voiceDuration,
-    String? stickerId,
-    String? replyToId,
-    String? replyToText,
-    bool isForwarded = false,
-    String? originalSender,
-    bool encrypt = false,
-    List<String>? recipientIds,
-    int maxRetries = 3,
-  }) async {
-    state = const AsyncValue.loading();
-
-    for (int attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        var messageText = text;
-        var isEncrypted = false;
-
-        // Шифруем сообщение, если требуется
-        if (encrypt && messageText.isNotEmpty && recipientIds != null && recipientIds.isNotEmpty) {
-          try {
-            messageText = await E2EEncryptionService.encryptMessage(messageText, recipientIds[0]);
-            isEncrypted = true;
-          } catch (e) {
-            print('❌ Error encrypting message: $e');
-          }
-        }
-
-        final messageData = {
-          'text': messageText,
-          'type': type,
-          'senderId': FirebaseAuth.instance.currentUser?.uid,
-          'timestamp': FieldValue.serverTimestamp(),
-          if (imageUrl != null) 'imageUrl': imageUrl,
-          if (voiceAudioBase64 != null) 'voiceAudioBase64': voiceAudioBase64,
-          if (voiceDuration != null) 'voiceDuration': voiceDuration,
-          if (stickerId != null) 'stickerId': stickerId,
-          'isEncrypted': isEncrypted,
-          if (replyToId != null) 'replyToId': replyToId,
-          if (replyToText != null) 'replyToText': replyToText,
-          'isForwarded': isForwarded,
-          if (originalSender != null) 'originalSender': originalSender,
-          'reactions': {},
-          'isTyping': false,
-          'status': 'sent', // Начинаем со статуса "отправляется"
-        };
-
-        final firestore = FirebaseFirestore.instance;
-        await firestore
-            .collection('chats')
-            .doc(chatId)
-            .collection('messages')
-            .add(messageData);
-
-        // Обновляем последнее сообщение в чате
-        await firestore.collection('chats').doc(chatId).update({
-          'lastMessage': text,
-          'lastMessageTime': FieldValue.serverTimestamp(),
-        });
-
-        // Успешно отправлено
-        state = const AsyncValue.data(null);
-        return;
-      } catch (e, stack) {
-        if (attempt == maxRetries) {
-          // Последняя попытка не удалась
-          state = AsyncValue.error(e, stack);
-          rethrow;
-        }
-        // Ждем перед повторной попыткой
-        await Future.delayed(Duration(seconds: attempt));
-      }
-    }
-  }
-}
-
-final messageSenderProvider =
-    StateNotifierProvider<MessageSenderNotifier, AsyncValue<void>>((ref) {
-  return MessageSenderNotifier();
-});
+// Примечание: Логика отправки сообщений унифицирована в ChatService.sendMessage
+// Этот провайдер используется только для получения сообщений
 

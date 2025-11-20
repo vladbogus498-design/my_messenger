@@ -4,6 +4,7 @@ import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:pointycastle/export.dart';
 import 'package:pointycastle/asymmetric/api.dart';
 import '../services/rsa_key_service.dart';
+import '../utils/logger.dart';
 
 /// Сервис для End-to-End шифрования с использованием RSA + AES
 class E2EEncryptionService {
@@ -30,7 +31,7 @@ class E2EEncryptionService {
       // Формат: RSA_encrypted_AES_key:IV:encrypted_message (все в base64)
       return '${base64Encode(encryptedAESKey)}:${iv.base64}:${encrypted.base64}';
     } catch (e) {
-      print('❌ E2E Encryption error: $e');
+      appLogger.e('E2E Encryption error for recipient: $recipientUserId', error: e);
       // В случае ошибки возвращаем оригинальный текст (для обратной совместимости)
       return plainText;
     }
@@ -66,7 +67,7 @@ class E2EEncryptionService {
 
       return decrypted;
     } catch (e) {
-      print('❌ E2E Decryption error: $e');
+      appLogger.e('E2E Decryption error', error: e);
       // В случае ошибки возвращаем зашифрованный текст
       return encryptedMessage;
     }
@@ -145,7 +146,7 @@ class E2EEncryptionService {
         final encrypted = await encryptMessage(plainText, recipientId);
         encryptedMessages[recipientId] = encrypted;
       } catch (e) {
-        print('❌ Error encrypting for $recipientId: $e');
+        appLogger.e('Error encrypting for recipient: $recipientId', error: e);
       }
     }
 

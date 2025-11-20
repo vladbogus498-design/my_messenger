@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../utils/logger.dart';
+import '../utils/input_validator.dart';
+import '../utils/rate_limiter.dart';
 
 class StorageService {
   static final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -12,6 +15,23 @@ class StorageService {
       final userId = _auth.currentUser?.uid;
       if (userId == null) throw Exception('User not authenticated');
 
+      // Rate limiting: проверка лимита на загрузку файлов
+      if (!AppRateLimiters.uploadLimiter.tryRequest('upload_file_$userId')) {
+        throw Exception('Превышен лимит загрузки файлов. Попробуйте позже.');
+      }
+
+      // Валидация размера файла
+      final fileSize = await imageFile.length();
+      final sizeError = InputValidator.validateFileSize(fileSize, isImage: true);
+      if (sizeError != null) {
+        throw Exception(sizeError);
+      }
+
+      // Валидация chatId
+      if (!InputValidator.isValidChatId(chatId)) {
+        throw Exception('Invalid chatId');
+      }
+
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'chat_$chatId/${userId}_$timestamp.jpg';
       final ref = _storage.ref().child(fileName);
@@ -20,7 +40,7 @@ class StorageService {
       final downloadUrl = await ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      print('❌ Ошибка загрузки изображения чата: $e');
+      appLogger.e('Error uploading chat image for chatId: $chatId', error: e);
       rethrow;
     }
   }
@@ -31,6 +51,18 @@ class StorageService {
       final userId = _auth.currentUser?.uid;
       if (userId == null) throw Exception('User not authenticated');
 
+      // Rate limiting: проверка лимита на загрузку файлов
+      if (!AppRateLimiters.uploadLimiter.tryRequest('upload_avatar_$userId')) {
+        throw Exception('Превышен лимит загрузки файлов. Попробуйте позже.');
+      }
+
+      // Валидация размера файла
+      final fileSize = await imageFile.length();
+      final sizeError = InputValidator.validateFileSize(fileSize, isImage: true);
+      if (sizeError != null) {
+        throw Exception(sizeError);
+      }
+
       final fileName = 'avatars/$userId.jpg';
       final ref = _storage.ref().child(fileName);
 
@@ -38,7 +70,7 @@ class StorageService {
       final downloadUrl = await ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      print('❌ Ошибка загрузки аватара: $e');
+      appLogger.e('Error uploading avatar for userId: $userId', error: e);
       rethrow;
     }
   }
@@ -53,7 +85,7 @@ class StorageService {
       final ref = _storage.ref().child(fileName);
       await ref.delete();
     } catch (e) {
-      print('❌ Ошибка удаления аватара: $e');
+      appLogger.e('Error deleting avatar for userId: $userId', error: e);
     }
   }
 }

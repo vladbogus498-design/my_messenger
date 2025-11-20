@@ -1,22 +1,41 @@
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../utils/logger.dart';
 
-class LanguageProvider with ChangeNotifier {
-  String _currentLanguage = 'ru';
+/// Состояние языка приложения
+class LanguageState {
+  final String currentLanguage;
 
-  String get currentLanguage => _currentLanguage;
+  const LanguageState({this.currentLanguage = 'ru'});
+
+  LanguageState copyWith({String? currentLanguage}) {
+    return LanguageState(
+      currentLanguage: currentLanguage ?? this.currentLanguage,
+    );
+  }
+}
+
+/// Провайдер для управления языком приложения
+class LanguageNotifier extends StateNotifier<LanguageState> {
+  LanguageNotifier() : super(const LanguageState());
 
   void setLanguage(String language) {
-    _currentLanguage = language;
-    notifyListeners();
+    state = state.copyWith(currentLanguage: language);
+    appLogger.d('Language changed to: $language');
   }
 
-  String get loginButtonText => _currentLanguage == 'ru' ? 'ВОЙТИ' : 'LOGIN';
+  String get loginButtonText => state.currentLanguage == 'ru' ? 'ВОЙТИ' : 'LOGIN';
   String get registerButtonText =>
-      _currentLanguage == 'ru' ? 'СОЗДАТЬ АККАУНТ' : 'CREATE ACCOUNT';
-  String get loginTabText => _currentLanguage == 'ru' ? 'Вход' : 'Login';
+      state.currentLanguage == 'ru' ? 'СОЗДАТЬ АККАУНТ' : 'CREATE ACCOUNT';
+  String get loginTabText => state.currentLanguage == 'ru' ? 'Вход' : 'Login';
   String get registerTabText =>
-      _currentLanguage == 'ru' ? 'Регистрация' : 'Register';
+      state.currentLanguage == 'ru' ? 'Регистрация' : 'Register';
   String get emailLabel => 'Email';
-  String get passwordLabel => _currentLanguage == 'ru' ? 'Пароль' : 'Password';
+  String get passwordLabel => state.currentLanguage == 'ru' ? 'Пароль' : 'Password';
   String get appTitle => 'DARKKICK';
 }
+
+/// Провайдер для доступа к LanguageNotifier
+final languageNotifierProvider =
+    StateNotifierProvider<LanguageNotifier, LanguageState>((ref) {
+  return LanguageNotifier();
+});

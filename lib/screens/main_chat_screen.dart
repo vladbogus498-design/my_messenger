@@ -60,7 +60,7 @@ class _MainChatScreenState extends State<MainChatScreen> {
         });
       }
     } catch (e) {
-      print('Error saving index: $e');
+      // Ошибка сохранения индекса не критична, можно игнорировать
     }
   }
 

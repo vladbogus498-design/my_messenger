@@ -2,14 +2,23 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:math';
 import 'package:pointycastle/export.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/logger.dart';
 
 /// Сервис для генерации, хранения и обмена RSA ключами
 class RSAKeyService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+    ),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
+  );
 
   // Генерация RSA ключевой пары (2048 бит)
   static AsymmetricKeyPair<RSAPublicKey, RSAPrivateKey> generateKeyPair() {
@@ -38,31 +47,48 @@ class RSAKeyService {
     );
   }
 
-  // Сохранение приватного ключа локально (в SharedPreferences)
+  // Сохранение приватного ключа локально (в безопасном хранилище)
   static Future<void> savePrivateKey(RSAPrivateKey privateKey) async {
-    final prefs = await SharedPreferences.getInstance();
     final userId = _auth.currentUser?.uid;
-    if (userId == null) throw Exception('User not authenticated');
-
-    // Конвертируем приватный ключ в PEM формат
-    final keyBytes = _encodeRSAPrivateKeyToPEM(privateKey);
-    await prefs.setString('rsa_private_key_$userId', keyBytes);
-    print('✅ Private key saved locally');
-  }
-
-  // Загрузка приватного ключа из локального хранилища
-  static Future<RSAPrivateKey?> loadPrivateKey() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = _auth.currentUser?.uid;
-    if (userId == null) return null;
-
-    final keyString = prefs.getString('rsa_private_key_$userId');
-    if (keyString == null) return null;
+    if (userId == null) {
+      appLogger.e('Cannot save private key: user not authenticated');
+      throw Exception('User not authenticated');
+    }
 
     try {
-      return _decodeRSAPrivateKeyFromPEM(keyString);
+      // Конвертируем приватный ключ в PEM формат
+      final keyBytes = _encodeRSAPrivateKeyToPEM(privateKey);
+      await _secureStorage.write(
+        key: 'rsa_private_key_$userId',
+        value: keyBytes,
+      );
+      appLogger.i('Private key saved securely for user: $userId');
     } catch (e) {
-      print('❌ Error loading private key: $e');
+      appLogger.e('Error saving private key', error: e);
+      rethrow;
+    }
+  }
+
+  // Загрузка приватного ключа из безопасного хранилища
+  static Future<RSAPrivateKey?> loadPrivateKey() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      appLogger.w('Cannot load private key: user not authenticated');
+      return null;
+    }
+
+    try {
+      final keyString = await _secureStorage.read(key: 'rsa_private_key_$userId');
+      if (keyString == null) {
+        appLogger.d('No private key found for user: $userId');
+        return null;
+      }
+
+      final key = _decodeRSAPrivateKeyFromPEM(keyString);
+      appLogger.d('Private key loaded successfully for user: $userId');
+      return key;
+    } catch (e) {
+      appLogger.e('Error loading private key', error: e);
       return null;
     }
   }
@@ -87,7 +113,7 @@ class RSAKeyService {
         'publicKeyUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     }
-    print('✅ Public key published to Firestore');
+    appLogger.i('Public key published to Firestore for user: $userId');
   }
 
   // Получение публичного ключа пользователя из Firestore
@@ -101,7 +127,7 @@ class RSAKeyService {
 
       return _decodeRSAPublicKeyFromPEM(publicKeyPEM);
     } catch (e) {
-      print('❌ Error getting public key: $e');
+      appLogger.e('Error getting public key for user: $userId', error: e);
       return null;
     }
   }
@@ -114,11 +140,12 @@ class RSAKeyService {
     // Проверяем, есть ли уже ключи
     final existingPrivateKey = await loadPrivateKey();
     if (existingPrivateKey != null) {
-      print('✅ Keys already initialized');
+      appLogger.i('RSA keys already initialized for user: $userId');
       return;
     }
 
     // Генерируем новую пару ключей
+    appLogger.d('Generating new RSA key pair for user: $userId');
     final keyPair = generateKeyPair();
 
     // Сохраняем приватный ключ локально
@@ -127,7 +154,7 @@ class RSAKeyService {
     // Публикуем публичный ключ
     await publishPublicKey(keyPair.publicKey);
 
-    print('✅ RSA keys initialized and saved');
+    appLogger.i('RSA keys initialized and saved for user: $userId');
   }
 
   // Кодирование приватного ключа в простой формат (JSON-like base64)

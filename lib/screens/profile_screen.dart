@@ -1,18 +1,18 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/biometric_service.dart';
-import '../services/theme_service.dart';
+import '../providers/theme_provider.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final User? _user = FirebaseAuth.instance.currentUser;
   bool _biometricEnabled = false;
   String _selfDestructTimer = '5 минут';
@@ -156,7 +156,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeService = context.watch<ThemeService>();
+    final themeNotifier = ref.read(themeNotifierProvider.notifier);
+    final themeMode = ref.watch(themeModeProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final user = _user;
@@ -171,12 +172,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _HeaderSection(
                   user: user,
                   onThemeSwitch: () {
-                    final nextMode = themeService.themeMode == ThemeMode.dark
-                        ? ThemeMode.light
-                        : ThemeMode.dark;
-                    themeService.setThemeMode(nextMode);
+                    themeNotifier.toggleTheme();
                   },
-                  themeMode: themeService.themeMode,
+                  themeMode: themeMode,
                 ),
                 const SizedBox(height: 32),
                 _SectionCard(
@@ -200,10 +198,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           icon: Icon(Icons.auto_mode),
                         ),
                       ],
-                      selected: <ThemeMode>{themeService.themeMode},
+                      selected: <ThemeMode>{themeMode},
                       onSelectionChanged: (values) {
                         final mode = values.first;
-                        themeService.setThemeMode(mode);
+                        themeNotifier.setThemeMode(mode);
                       },
                       style: ButtonStyle(
                         backgroundColor: MaterialStateProperty.resolveWith(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/biometric_service.dart';
 import '../services/encryption_service.dart';
+import '../utils/logger.dart';
 
 class SecuritySettingsScreen extends StatefulWidget {
   @override
@@ -51,7 +52,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
     } else if (value is String) {
       await prefs.setString(key, value);
     }
-    print('✅ Security setting saved: $key = $value');
+    appLogger.d('Security setting saved: $key = $value');
   }
 
   void _showMessage(String message, {bool isError = false}) {
@@ -104,11 +105,11 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
 
     // Шифрование
     final encrypted = EncryptionService.encryptText(testMessage, password);
-    print('Encrypted: $encrypted');
+    appLogger.d('Encryption test - Encrypted: ${encrypted.substring(0, encrypted.length > 50 ? 50 : encrypted.length)}...');
 
     // Дешифрование
     final decrypted = EncryptionService.decryptText(encrypted, password);
-    print('Decrypted: $decrypted');
+    appLogger.d('Encryption test - Decrypted successfully: ${decrypted == testMessage}');
 
     if (decrypted == testMessage) {
       _showMessage('✅ Encryption test successful!\nOriginal: $testMessage');

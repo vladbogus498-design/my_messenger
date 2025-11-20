@@ -1,34 +1,37 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart' as legacy_provider;
-import '../services/theme_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/theme_provider.dart';
 
-class ThemePreviewScreen extends StatelessWidget {
+class ThemePreviewScreen extends ConsumerWidget {
+  const ThemePreviewScreen({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    final themeService = legacy_provider.Provider.of<ThemeService>(context);
-    final keys = themeService.availableKeys;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeNotifier = ref.read(themeNotifierProvider.notifier);
+    final keys = themeNotifier.availableKeys;
+    final currentKey = themeNotifier.currentKey;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Предпросмотр темы')),
+      appBar: AppBar(title: const Text('Предпросмотр темы')),
       body: Column(
         children: [
-          Expanded(
+          const Expanded(
             child: _ChatPreview(),
           ),
           Container(
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: Theme.of(context).cardColor),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: keys.map((k) {
-                  final selected = k == themeService.currentKey;
+                  final selected = k == currentKey;
                   return Padding(
-                    padding: EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
                       selected: selected,
                       label: Text(k),
-                      onSelected: (_) => themeService.setTheme(k),
+                      onSelected: (_) => themeNotifier.setTheme(k),
                     ),
                   );
                 }).toList(),

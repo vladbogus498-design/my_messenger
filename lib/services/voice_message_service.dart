@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../utils/logger.dart';
 
 /// Сервис для записи и воспроизведения голосовых сообщений
 class VoiceMessageService {
@@ -31,13 +32,13 @@ class VoiceMessageService {
     required void Function(List<double> waveform) onWaveformUpdate,
   }) async {
     if (_isRecording) {
-      print('⚠️ Already recording');
+      appLogger.w('Voice recording already in progress');
       return null;
     }
 
     final hasPermission = await requestPermission();
     if (!hasPermission) {
-      print('❌ Microphone permission denied');
+      appLogger.w('Microphone permission denied');
       return null;
     }
 
@@ -68,7 +69,7 @@ class VoiceMessageService {
       // Для демонстрации возвращаем путь к файлу
       return filePath;
     } catch (e) {
-      print('❌ Error recording voice: $e');
+      appLogger.e('Error recording voice', error: e);
       _isRecording = false;
       return null;
     }
@@ -101,7 +102,7 @@ class VoiceMessageService {
       final bytes = await file.readAsBytes();
       return base64Encode(bytes);
     } catch (e) {
-      print('❌ Error encoding audio: $e');
+      appLogger.e('Error encoding audio to base64', error: e);
       rethrow;
     }
   }
@@ -120,7 +121,7 @@ class VoiceMessageService {
 
       return filePath;
     } catch (e) {
-      print('❌ Error decoding audio: $e');
+      appLogger.e('Error decoding audio from base64', error: e);
       rethrow;
     }
   }
@@ -163,7 +164,7 @@ class VoiceMessageService {
           _playbackCompleteController.add(completedId);
         }
       }, onError: (error) {
-        print('❌ Error during playback: $error');
+        appLogger.e('Error during voice playback', error: error);
         final completedId = _currentPlayingId;
         _isPlaying = false;
         _currentPlayingId = null;
@@ -172,7 +173,7 @@ class VoiceMessageService {
         }
       });
     } catch (e) {
-      print('❌ Error playing voice: $e');
+      appLogger.e('Error playing voice message', error: e);
       _isPlaying = false;
       _currentPlayingId = null;
     }
@@ -187,7 +188,7 @@ class VoiceMessageService {
       _isPlaying = false;
       _currentPlayingId = null;
     } catch (e) {
-      print('❌ Error stopping playback: $e');
+      appLogger.e('Error stopping voice playback', error: e);
     }
   }
 

@@ -1,13 +1,40 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Вспомогательные функции для валидации
+    function isValidString(value, maxLength) {
+      return value is string 
+        && value.size() > 0 
+        && value.size() <= maxLength;
+    }
+    
+    function isValidEmail(email) {
+      return email is string 
+        && email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+
     // Правила для пользователей
     match /users/{userId} {
       // Пользователь может читать свой профиль
       allow read: if request.auth != null && request.auth.uid == userId;
+      
       // Пользователь может создавать и обновлять только свой профиль
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null 
+        && request.auth.uid == userId
+        && isValidString(request.resource.data.name, 100)
+        && isValidEmail(request.resource.data.email);
+        
+      allow update: if request.auth != null 
+        && request.auth.uid == userId
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'email']) || 
+             request.resource.data.uid == resource.data.uid && 
+             request.resource.data.email == resource.data.email)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['name']) || 
+             isValidString(request.resource.data.name, 100))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['bio']) || 
+             !('bio' in request.resource.data) || 
+             isValidString(request.resource.data.bio, 500));
+      
       // Пользователь не может удалять свой профиль напрямую
       allow delete: if false;
     }
@@ -39,12 +66,16 @@ service cloud.firestore {
         // Пользователь может создавать сообщения только если он участник чата
         allow create: if request.auth != null 
           && request.auth.uid == request.resource.data.senderId
-          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          && isValidString(request.resource.data.text, 10000)
+          && request.resource.data.type in ['text', 'image', 'voice', 'sticker'];
         
         // Пользователь может обновлять только свои сообщения (например, статус)
         allow update: if request.auth != null 
           && request.auth.uid == resource.data.senderId
-          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['text']) || 
+               isValidString(request.resource.data.text, 10000));
         
         // Пользователь может удалять только свои сообщения
         allow delete: if request.auth != null 

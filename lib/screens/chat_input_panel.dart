@@ -6,6 +6,7 @@ import '../services/storage_service.dart';
 import '../services/chat_service.dart';
 import '../services/voice_message_service.dart';
 import '../widgets/sticker_picker.dart';
+import '../utils/logger.dart';
 
 class ChatInputPanel extends StatefulWidget {
   final String chatId;
@@ -67,7 +68,7 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
           widget.onImageUpload(imageUrl);
           _showSnackBar('Фото отправлено! 📸');
         } catch (e) {
-          print('❌ Ошибка загрузки фото: $e');
+          appLogger.e('Error uploading photo in chat: ${widget.chatId}', error: e);
           _showSnackBar('Ошибка загрузки фото');
           rethrow;
         } finally {
@@ -76,7 +77,7 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
         }
       }
     } catch (e) {
-      print('❌ Ошибка выбора фото: $e');
+      appLogger.e('Error picking photo', error: e);
       _showSnackBar('Ошибка выбора фото');
     }
   }
@@ -114,7 +115,7 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
         throw Exception('Failed to start recording');
       }
     } catch (e) {
-      print('❌ Ошибка записи голосового: $e');
+      appLogger.e('Error starting voice recording in chat: ${widget.chatId}', error: e);
       setState(() {
         _isRecording = false;
       });
@@ -154,7 +155,7 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
         _recordingFilePath = null;
       });
     } catch (e) {
-      print('❌ Ошибка остановки записи: $e');
+      appLogger.e('Error stopping voice recording in chat: ${widget.chatId}', error: e);
       _showSnackBar('Ошибка отправки голосового');
     }
   }

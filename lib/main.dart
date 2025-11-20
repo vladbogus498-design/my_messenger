@@ -5,58 +5,39 @@ import 'auth/auth_screen.dart';
 import 'screens/main_chat_screen.dart';
 import 'screens/splash_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:provider/provider.dart' as legacy_provider;
-import 'services/theme_service.dart';
+import 'providers/theme_provider.dart';
+import 'utils/rate_limiter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  final themeService = ThemeService();
-  await themeService.load();
+  
+  // Запуск периодической очистки rate limiters
+  AppRateLimiters.startCleanup();
+  
   runApp(
-    ProviderScope(
-      child: legacy_provider.ChangeNotifierProvider.value(
-        value: themeService,
-        child: MyApp(),
-      ),
+    const ProviderScope(
+      child: MyApp(),
     ),
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
+  const MyApp({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    final themeService = legacy_provider.Provider.of<ThemeService>(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lightTheme = ref.watch(lightThemeProvider);
+    final darkTheme = ref.watch(darkThemeProvider);
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
       title: 'DarkKick Messenger',
-      theme: themeService.theme,
-      darkTheme: themeService.darkTheme,
-      themeMode: themeService.themeMode,
-      home: SplashScreen(),
+      theme: lightTheme,
+      darkTheme: darkTheme,
+      themeMode: themeMode,
+      home: const SplashScreen(),
       debugShowCheckedModeBanner: false,
-    );
-  }
-}
-
-class AuthWrapper extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            backgroundColor: Colors.black,
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        if (snapshot.hasData) {
-          return MainChatScreen();
-        }
-
-        return AuthScreen();
-      },
     );
   }
 }

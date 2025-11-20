@@ -13,6 +13,7 @@ import '../widgets/reaction_picker.dart';
 import '../widgets/message_status_icon.dart';
 import '../utils/time_formatter.dart';
 import '../utils/navigation_animations.dart';
+import '../utils/logger.dart';
 import '../models/typing_status.dart';
 
 class SingleChatScreen extends StatefulWidget {
@@ -210,7 +211,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       _cancelAction(); // Clear preview immediately
       _scrollToBottom();
     } catch (e) {
-      print('Error sending message: $e');
+      appLogger.e('Error sending message in chat: ${widget.chatId}', error: e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка отправки: $e')),
@@ -236,7 +237,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       _cancelAction(); // Clear preview immediately
       _scrollToBottom();
     } catch (e) {
-      print('Error sending image: $e');
+      appLogger.e('Error sending image in chat: ${_actualChatId}', error: e);
       if (_actualChatId != null) {
         await ChatService.setSendingPhotoStatus(_actualChatId!, false);
       }
@@ -265,7 +266,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       _cancelAction(); // Clear preview immediately
       _scrollToBottom();
     } catch (e) {
-      print('Error sending voice message: $e');
+      appLogger.e('Error sending voice message in chat: ${widget.chatId}', error: e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка отправки голосового: $e')),
@@ -286,7 +287,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
       _scrollToBottom();
     } catch (e) {
-      print('❌ Error sending sticker: $e');
+      appLogger.e('Error sending sticker in chat: ${widget.chatId}', error: e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка отправки стикера: $e')),
@@ -347,7 +348,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       _cancelAction(); // Clear preview immediately with animation
       _scrollToBottom();
     } catch (e) {
-      print('Error forwarding: $e');
+      appLogger.e('Error forwarding message in chat: ${widget.chatId}', error: e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка пересылки: $e')),
@@ -880,7 +881,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
             }
           }
         } catch (e) {
-          print('❌ Error getting chat participants: $e');
+          appLogger.e('Error getting chat participants for chat: ${widget.chatId}', error: e);
         }
       }
     }

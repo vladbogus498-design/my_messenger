@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'single_chat_screen.dart';
+import '../utils/input_validator.dart';
 
 class NewChatScreen extends StatefulWidget {
   @override
@@ -16,29 +17,33 @@ class _NewChatScreenState extends State<NewChatScreen> {
   Future<void> _search() async {
     setState(() => _loading = true);
     final q = _controller.text.trim();
+    
+    // Санитизация поискового запроса (защита от NoSQL injection)
+    final sanitizedQuery = InputValidator.sanitizeSearchQuery(q);
+    
     final fs = FirebaseFirestore.instance;
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final List<QueryDocumentSnapshot<Map<String, dynamic>>> merged = [];
 
-    if (q.isNotEmpty) {
+    if (sanitizedQuery.isNotEmpty) {
       final byUsername = await fs
           .collection('users')
-          .where('username', isGreaterThanOrEqualTo: q)
-          .where('username', isLessThan: q + '\uf8ff')
+          .where('username', isGreaterThanOrEqualTo: sanitizedQuery)
+          .where('username', isLessThan: sanitizedQuery + '\uf8ff')
           .limit(20)
           .get();
 
       final byEmail = await fs
           .collection('users')
-          .where('email', isGreaterThanOrEqualTo: q)
-          .where('email', isLessThan: q + '\uf8ff')
+          .where('email', isGreaterThanOrEqualTo: sanitizedQuery)
+          .where('email', isLessThan: sanitizedQuery + '\uf8ff')
           .limit(20)
           .get();
 
       final byPhone = await fs
           .collection('users')
-          .where('phone', isGreaterThanOrEqualTo: q)
-          .where('phone', isLessThan: q + '\uf8ff')
+          .where('phone', isGreaterThanOrEqualTo: sanitizedQuery)
+          .where('phone', isLessThan: sanitizedQuery + '\uf8ff')
           .limit(20)
           .get();
 

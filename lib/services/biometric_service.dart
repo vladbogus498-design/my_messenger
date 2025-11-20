@@ -1,5 +1,6 @@
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/logger.dart';
 
 /// Сервис для работы с биометрической аутентификацией
 /// Пока только структура, полная интеграция будет позже
@@ -14,7 +15,7 @@ class BiometricService {
       final isDeviceSupported = await _localAuth.isDeviceSupported();
       return isAvailable || isDeviceSupported;
     } catch (e) {
-      print('❌ Error checking biometric availability: $e');
+      appLogger.e('Error checking biometric availability', error: e);
       return false;
     }
   }
@@ -29,7 +30,7 @@ class BiometricService {
     try {
       return await _localAuth.getAvailableBiometrics();
     } catch (e) {
-      print('❌ Error getting available biometrics: $e');
+      appLogger.e('Error getting available biometrics', error: e);
       return [];
     }
   }
@@ -41,7 +42,7 @@ class BiometricService {
     try {
       final isAvailable = await BiometricService.isAvailable();
       if (!isAvailable) {
-        print('❌ Biometric authentication not available');
+        appLogger.w('Biometric authentication not available');
         return false;
       }
 
@@ -53,7 +54,7 @@ class BiometricService {
         ),
       );
     } catch (e) {
-      print('❌ Error during biometric authentication: $e');
+      appLogger.e('Error during biometric authentication', error: e);
       return false;
     }
   }
@@ -63,8 +64,9 @@ class BiometricService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_useBiometricsKey, value);
+      appLogger.d('Biometric preference saved: $value');
     } catch (e) {
-      print('❌ Error saving biometric preference: $e');
+      appLogger.e('Error saving biometric preference', error: e);
     }
   }
 
@@ -74,7 +76,7 @@ class BiometricService {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getBool(_useBiometricsKey) ?? false;
     } catch (e) {
-      print('❌ Error getting biometric preference: $e');
+      appLogger.e('Error getting biometric preference', error: e);
       return false;
     }
   }

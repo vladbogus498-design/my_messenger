@@ -42,7 +42,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
               );
             }
           } catch (e) {
-            print('Error during auto-login navigation: $e');
+            // Логирование через logger будет добавлено позже, если нужно
             if (mounted) {
               _isNavigating = false;
             }

@@ -37,7 +37,8 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> {
     setState(() => _isAuthenticating = false);
 
     if (success && mounted) {
-      // TODO: Navigate to main app or unlock
+      // Возвращаем результат разблокировки родительскому виджету
+      // Если экран используется как модальный, можно заменить на pushReplacement
       Navigator.of(context).pop(true);
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -41,29 +41,6 @@ class Message {
     this.status = 'sent',
   });
 
-  factory Message.fromFirestore(Map<String, dynamic> data, String id) {
-    return Message(
-      id: id,
-      chatId: data['chatId'] ?? '',
-      senderId: data['senderId'] ?? '',
-      text: data['text'] ?? '',
-      type: data['type'] ?? 'text',
-      imageUrl: data['imageUrl'],
-      voiceAudioBase64: data['voiceAudioBase64'],
-      voiceDuration: data['voiceDuration'],
-      stickerId: data['stickerId'],
-      isEncrypted: data['isEncrypted'] ?? false,
-      timestamp: (data['timestamp'] as Timestamp).toDate(),
-      replyToId: data['replyToId'],
-      replyToText: data['replyToText'],
-      isForwarded: data['isForwarded'] ?? false,
-      originalSender: data['originalSender'],
-      reactions: Map<String, String>.from(data['reactions'] ?? {}),
-      isTyping: data['isTyping'] ?? false,
-      status: data['status'] ?? 'sent',
-    );
-  }
-
   factory Message.fromMap(Map<String, dynamic> data, String id) {
     return Message(
       id: id,

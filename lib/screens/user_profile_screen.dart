@@ -5,6 +5,7 @@ import 'dart:io';
 import '../models/user_model.dart';
 import '../services/user_service.dart';
 import '../services/storage_service.dart';
+import '../utils/logger.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -50,7 +51,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         });
       }
     } catch (e) {
-      print('Error loading user data: $e');
+      appLogger.e('Error loading user data for userId: ${widget.userId}', error: e);
     } finally {
       setState(() => _isLoading = false);
     }

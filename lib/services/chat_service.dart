@@ -1,9 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/message.dart';
+import '../models/message_type.dart';
 import '../models/chat.dart';
 import '../models/typing_status.dart';
 import 'e2e_encryption_service.dart';
+import '../utils/logger.dart';
+import '../utils/input_validator.dart';
+import '../utils/rate_limiter.dart';
 
 class ChatService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -23,7 +27,7 @@ class ChatService {
       return snapshot.docs.map<Chat>((doc) => Chat.fromFirestore(doc)).toList();
     } catch (e) {
       // Если запрос с lastMessage.timestamp не работает, пробуем fallback
-      print('⚠️ Error loading chats with lastMessage.timestamp, trying fallback: $e');
+      appLogger.w('Error loading chats with lastMessage.timestamp, trying fallback', error: e);
       try {
         final snapshot = await _firestore
             .collection('chats')
@@ -32,7 +36,7 @@ class ChatService {
             .get();
         return snapshot.docs.map<Chat>((doc) => Chat.fromFirestore(doc)).toList();
       } catch (e2) {
-        print('❌ Error loading chats: $e2');
+        appLogger.e('Error loading chats (fallback failed)', error: e2);
         return [];
       }
     }
@@ -57,7 +61,7 @@ class ChatService {
           try {
             messageText = await E2EEncryptionService.decryptMessage(messageText);
           } catch (e) {
-            print('❌ Error decrypting message: $e');
+            appLogger.e('Error decrypting message in chat: $chatId', error: e);
           }
         }
 
@@ -85,7 +89,7 @@ class ChatService {
 
       return messages;
     } catch (e) {
-      print('❌ Error loading messages: $e');
+      appLogger.e('Error loading messages for chat: $chatId', error: e);
       return [];
     }
   }
@@ -106,7 +110,28 @@ class ChatService {
     List<String>? recipientIds,
   }) async {
     try {
-      var messageText = text;
+      // Rate limiting: проверка лимита на отправку сообщений
+      final userId = _auth.currentUser?.uid ?? 'anonymous';
+      if (!AppRateLimiters.messageLimiter.tryRequest('send_message_$userId')) {
+        throw Exception('Превышен лимит отправки сообщений. Попробуйте позже.');
+      }
+
+      // Валидация типа сообщения
+      if (!MessageType.isValid(type)) {
+        throw Exception('Invalid message type: $type');
+      }
+
+      // Валидация входных данных
+      if (!InputValidator.isValidChatId(chatId)) {
+        throw Exception('Invalid chatId');
+      }
+
+      // Валидация и санитизация текста сообщения
+      final validationError = InputValidator.validateMessage(text);
+      if (validationError != null) {
+        throw Exception(validationError);
+      }
+      var messageText = InputValidator.sanitizeMessage(text);
       var isEncrypted = false;
 
       // Шифруем сообщение, если требуется
@@ -116,15 +141,40 @@ class ChatService {
           messageText = await E2EEncryptionService.encryptMessage(messageText, recipientIds[0]);
           isEncrypted = true;
         } catch (e) {
-          print('❌ Error encrypting message: $e');
+          appLogger.e('Error encrypting message for chat: $chatId', error: e);
           // Продолжаем с незашифрованным сообщением
         }
       }
 
       // Validate sticker type
       if (type == 'sticker' && (stickerId == null || stickerId.isEmpty)) {
-        print('❌ Error: sticker type requires stickerId');
+        appLogger.e('Sticker type requires stickerId');
         throw Exception('Sticker type requires stickerId');
+      }
+
+      // Валидация голосового сообщения
+      if (type == 'voice' && voiceAudioBase64 != null) {
+        // Примерная проверка размера base64 (реальный размер будет меньше)
+        final base64Size = voiceAudioBase64.length * 3 ~/ 4; // Примерный размер в байтах
+        final sizeError = InputValidator.validateFileSize(base64Size, isVoice: true);
+        if (sizeError != null) {
+          throw Exception(sizeError);
+        }
+      }
+
+      // Валидация replyToId
+      if (replyToId != null && !InputValidator.isValidChatId(replyToId)) {
+        appLogger.w('Invalid replyToId: $replyToId');
+        replyToId = null; // Игнорируем невалидный ID
+      }
+
+      // Валидация recipientIds
+      if (recipientIds != null) {
+        recipientIds = recipientIds.where((id) => InputValidator.isValidUserId(id)).toList();
+        if (recipientIds.isEmpty && encrypt) {
+          appLogger.w('No valid recipient IDs for encryption');
+          encrypt = false;
+        }
       }
 
       final messageData = {
@@ -171,11 +221,12 @@ class ChatService {
         try {
           await messageRef.update({'status': 'delivered'});
         } catch (e) {
-          print('❌ Error updating message status to delivered: $e');
+          appLogger.e('Error updating message status to delivered', error: e);
         }
       });
+      appLogger.d('Message sent successfully to chat: $chatId');
     } catch (e) {
-      print('❌ Error sending message: $e');
+      appLogger.e('Error sending message to chat: $chatId', error: e);
       throw e;
     }
   }
@@ -221,9 +272,10 @@ class ChatService {
         }
 
         await messageRef.update({'reactions': reactions});
+        appLogger.d('Reaction added: $emoji to message: $messageId');
       }
     } catch (e) {
-      print('❌ Error adding reaction: $e');
+      appLogger.e('Error adding reaction to message: $messageId', error: e);
     }
   }
 
@@ -239,7 +291,7 @@ class ChatService {
             : FieldValue.arrayRemove([userId])
       });
     } catch (e) {
-      print('❌ Error setting typing status: $e');
+      appLogger.e('Error setting typing status for chat: $chatId', error: e);
     }
   }
 
@@ -256,7 +308,7 @@ class ChatService {
             : FieldValue.arrayRemove([userId])
       });
     } catch (e) {
-      print('❌ Error setting photo status: $e');
+      appLogger.e('Error setting photo status for chat: $chatId', error: e);
     }
   }
 
@@ -273,7 +325,7 @@ class ChatService {
             : FieldValue.arrayRemove([userId])
       });
     } catch (e) {
-      print('❌ Error setting voice status: $e');
+      appLogger.e('Error setting voice status for chat: $chatId', error: e);
     }
   }
 
@@ -341,7 +393,7 @@ class ChatService {
   }
 
   static void createTestChat() {
-    print('Creating test chat...');
+    appLogger.d('Creating test chat...');
   }
 
   // ✅ Отметить сообщение как прочитанное
@@ -353,8 +405,9 @@ class ChatService {
           .collection('messages')
           .doc(messageId)
           .update({'status': 'read'});
+      appLogger.d('Message marked as read: $messageId');
     } catch (e) {
-      print('❌ Error marking message as read: $e');
+      appLogger.e('Error marking message as read: $messageId', error: e);
     }
   }
 
@@ -377,8 +430,9 @@ class ChatService {
         batch.update(doc.reference, {'status': 'read'});
       }
       await batch.commit();
+      appLogger.d('All messages marked as read in chat: $chatId');
     } catch (e) {
-      print('❌ Error marking all messages as read: $e');
+      appLogger.e('Error marking all messages as read in chat: $chatId', error: e);
     }
   }
 
@@ -392,8 +446,9 @@ class ChatService {
           .collection('messages')
           .doc(messageId)
           .update({'status': 'delivered'});
+      appLogger.d('Message marked as delivered: $messageId');
     } catch (e) {
-      print('❌ Error marking message as delivered: $e');
+      appLogger.e('Error marking message as delivered: $messageId', error: e);
     }
   }
 }
