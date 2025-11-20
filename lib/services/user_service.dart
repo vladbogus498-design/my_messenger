@@ -67,7 +67,8 @@ class UserService {
       }
       if (photoURL != null) {
         // Валидация URL
-        if (!Uri.tryParse(photoURL)?.hasAbsolutePath ?? false) {
+        final uri = Uri.tryParse(photoURL);
+        if (uri == null || !uri.hasAbsolutePath) {
           throw Exception('Invalid photoURL format');
         }
         updates['photoURL'] = photoURL;

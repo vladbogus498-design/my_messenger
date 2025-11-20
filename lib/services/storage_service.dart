@@ -47,10 +47,10 @@ class StorageService {
 
   // Загрузка аватара пользователя
   static Future<String> uploadUserAvatar(File imageFile) async {
-    try {
-      final userId = _auth.currentUser?.uid;
-      if (userId == null) throw Exception('User not authenticated');
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('User not authenticated');
 
+    try {
       // Rate limiting: проверка лимита на загрузку файлов
       if (!AppRateLimiters.uploadLimiter.tryRequest('upload_avatar_$userId')) {
         throw Exception('Превышен лимит загрузки файлов. Попробуйте позже.');
@@ -77,10 +77,10 @@ class StorageService {
 
   // Удаление аватара
   static Future<void> deleteUserAvatar() async {
-    try {
-      final userId = _auth.currentUser?.uid;
-      if (userId == null) return;
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
 
+    try {
       final fileName = 'avatars/$userId.jpg';
       final ref = _storage.ref().child(fileName);
       await ref.delete();

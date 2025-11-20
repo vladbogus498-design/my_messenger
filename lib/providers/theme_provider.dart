@@ -10,7 +10,7 @@ class ThemeState {
   final ThemeData lightTheme;
   final ThemeData darkTheme;
 
-  const ThemeState({
+  ThemeState({
     this.themeMode = ThemeMode.dark,
     ThemeData? lightTheme,
     ThemeData? darkTheme,
@@ -35,7 +35,7 @@ class ThemeState {
 
 /// Провайдер для управления темой приложения
 class ThemeNotifier extends StateNotifier<ThemeState> {
-  ThemeNotifier() : super(const ThemeState()) {
+  ThemeNotifier() : super(ThemeState()) {
     _loadTheme();
   }
 
@@ -93,7 +93,6 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
       case ThemeMode.dark:
         return 'dark';
       case ThemeMode.system:
-      default:
         return 'system';
     }
   }
