@@ -392,6 +392,111 @@ class ChatService {
     });
   }
 
+  /// Создание нового приватного чата между двумя пользователями
+  /// Возвращает ID созданного чата или существующего, если чат уже есть
+  static Future<String> createChat({
+    required String otherUserId,
+    String? chatName,
+  }) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      appLogger.w('Cannot create chat: user not authenticated');
+      throw Exception('User not authenticated');
+    }
+
+    // Валидация входных данных
+    if (!InputValidator.isValidUserId(otherUserId)) {
+      appLogger.w('Invalid otherUserId: $otherUserId');
+      throw Exception('Invalid otherUserId');
+    }
+
+    if (userId == otherUserId) {
+      appLogger.w('Cannot create chat with yourself');
+      throw Exception('Cannot create chat with yourself');
+    }
+
+    try {
+      // Rate limiting: проверка лимита на создание чатов
+      if (!AppRateLimiters.chatCreationLimiter.tryRequest('create_chat_$userId')) {
+        throw Exception('Превышен лимит создания чатов. Попробуйте позже.');
+      }
+
+      // Проверяем, существует ли уже чат между этими пользователями
+      final existingChats = await _firestore
+          .collection('chats')
+          .where('isGroup', isEqualTo: false)
+          .where('participants', arrayContains: userId)
+          .get();
+
+      for (final doc in existingChats.docs) {
+        final participants = List<String>.from(doc.data()['participants'] ?? []);
+        if (participants.toSet().containsAll({userId, otherUserId}) && 
+            participants.length == 2) {
+          appLogger.d('Chat already exists: ${doc.id}');
+          return doc.id;
+        }
+      }
+
+      // Создаем новый чат
+      final now = FieldValue.serverTimestamp();
+      final participants = [userId, otherUserId];
+      
+      final chatDoc = await _firestore.collection('chats').add({
+        'name': chatName ?? 'Chat',
+        'isGroup': false,
+        'participants': participants,
+        'admins': [],
+        'lastMessage': {
+          'text': '',
+          'timestamp': now,
+        },
+        'lastMessageStatus': 'sent',
+        'lastMessageTime': now, // Для обратной совместимости
+        'createdAt': now,
+        'createdBy': userId,
+      });
+
+      final chatId = chatDoc.id;
+      appLogger.d('Chat created successfully: $chatId');
+
+      // Создаем записи в подколлекциях пользователей (опционально, для быстрого доступа)
+      try {
+        final batch = _firestore.batch();
+        
+        // Добавляем чат в список чатов первого пользователя
+        batch.set(
+          _firestore.collection('users').doc(userId).collection('chats').doc(chatId),
+          {
+            'chatId': chatId,
+            'addedAt': now,
+          },
+          SetOptions(merge: true),
+        );
+        
+        // Добавляем чат в список чатов второго пользователя
+        batch.set(
+          _firestore.collection('users').doc(otherUserId).collection('chats').doc(chatId),
+          {
+            'chatId': chatId,
+            'addedAt': now,
+          },
+          SetOptions(merge: true),
+        );
+        
+        await batch.commit();
+        appLogger.d('User chat references created for chat: $chatId');
+      } catch (e) {
+        // Не критично, если не удалось создать ссылки
+        appLogger.w('Failed to create user chat references', error: e);
+      }
+
+      return chatId;
+    } catch (e) {
+      appLogger.e('Error creating chat with user: $otherUserId', error: e);
+      throw e;
+    }
+  }
+
   static void createTestChat() {
     appLogger.d('Creating test chat...');
   }

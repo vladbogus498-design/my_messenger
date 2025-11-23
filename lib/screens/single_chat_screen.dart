@@ -144,46 +144,20 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       return _actualChatId!;
     }
     
-    // Если это новый чат и есть получатель, создаем чат
+    // Если это новый чат и есть получатель, создаем чат через ChatService
     if (widget.chatId.isEmpty && widget.otherUserId != null) {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) throw Exception('User not authenticated');
-      
-      final fs = FirebaseFirestore.instance;
-      
-      // Проверяем, не создан ли уже чат другим пользователем
-      final existing = await fs
-          .collection('chats')
-          .where('isGroup', isEqualTo: false)
-          .where('participants', arrayContains: uid)
-          .get();
-      
-      for (final d in existing.docs) {
-        final parts = List<String>.from(d['participants'] ?? []);
-        if (parts.toSet().containsAll({uid, widget.otherUserId!}) && parts.length == 2) {
-          _actualChatId = d.id;
-          return _actualChatId!;
-        }
+      try {
+        final chatId = await ChatService.createChat(
+          otherUserId: widget.otherUserId!,
+          chatName: widget.chatName,
+        );
+        _actualChatId = chatId;
+        appLogger.d('Chat ensured/created: $chatId');
+        return chatId;
+      } catch (e) {
+        appLogger.e('Error ensuring chat exists', error: e);
+        throw Exception('Не удалось создать чат: $e');
       }
-      
-      // Создаем новый чат только при отправке первого сообщения
-      final now = FieldValue.serverTimestamp();
-      final doc = await fs.collection('chats').add({
-        'name': widget.chatName,
-        'isGroup': false,
-        'participants': [uid, widget.otherUserId!], // Оба участника добавлены
-        'admins': [],
-        'lastMessage': {
-          'text': '',
-          'timestamp': now,
-        },
-        'lastMessageStatus': 'sent',
-        'lastMessageTime': now, // Для обратной совместимости
-        'createdAt': now,
-      });
-      
-      _actualChatId = doc.id;
-      return _actualChatId!;
     }
     
     // Если chatId был передан, используем его

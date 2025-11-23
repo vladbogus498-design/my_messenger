@@ -8,12 +8,12 @@ import '../services/storage_service.dart';
 import '../utils/logger.dart';
 
 class UserProfileScreen extends StatefulWidget {
-  final String userId;
+  final String? userId; // Если null, используется текущий пользователь
   final bool isMyProfile;
 
   const UserProfileScreen({
     Key? key,
-    required this.userId,
+    this.userId,
     this.isMyProfile = false,
   }) : super(key: key);
 
@@ -29,8 +29,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   final TextEditingController _bioController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  String get _targetUserId {
+    return widget.userId ?? _auth.currentUser?.uid ?? '';
+  }
+
   bool get _isMyProfile {
-    return widget.isMyProfile || _auth.currentUser?.uid == widget.userId;
+    return widget.isMyProfile || _auth.currentUser?.uid == _targetUserId;
   }
 
   @override
@@ -42,16 +46,25 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   Future<void> _loadUserData() async {
     setState(() => _isLoading = true);
     try {
-      final user = await UserService.getUserData(widget.userId);
+      final targetUserId = _targetUserId;
+      if (targetUserId.isEmpty) {
+        appLogger.w('Cannot load user data: no userId provided and user not authenticated');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final user = await UserService.getUserData(targetUserId);
       if (user != null) {
         setState(() {
           _user = user;
           _nameController.text = user.name;
           _bioController.text = user.bio ?? '';
         });
+      } else {
+        appLogger.w('User data not found for userId: $targetUserId');
       }
     } catch (e) {
-      appLogger.e('Error loading user data for userId: ${widget.userId}', error: e);
+      appLogger.e('Error loading user data for userId: ${_targetUserId}', error: e);
     } finally {
       setState(() => _isLoading = false);
     }

@@ -56,8 +56,8 @@ class RSAKeyService {
     }
 
     try {
-      // Конвертируем приватный ключ в PEM формат
-      final keyBytes = _encodeRSAPrivateKeyToPEM(privateKey);
+    // Конвертируем приватный ключ в PEM формат
+    final keyBytes = _encodeRSAPrivateKeyToPEM(privateKey);
       await _secureStorage.write(
         key: 'rsa_private_key_$userId',
         value: keyBytes,

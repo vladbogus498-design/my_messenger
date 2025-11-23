@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'chat_screen.dart';
 import 'contacts_screen.dart';
-import 'profile_screen.dart';
+import 'user_profile_screen.dart';
 
 class MainChatScreen extends StatefulWidget {
   @override
@@ -17,7 +17,7 @@ class _MainChatScreenState extends State<MainChatScreen> {
   final List<Widget> _screens = [
     ChatScreen(),
     ContactsScreen(),
-    ProfileScreen(),
+    UserProfileScreen(), // Старый профиль с аватаром, именем и bio
   ];
 
   @override

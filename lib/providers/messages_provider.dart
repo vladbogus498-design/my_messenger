@@ -28,7 +28,7 @@ final messagesProvider = StreamProvider.family<List<Message>, String>((ref, chat
           messageText = await E2EEncryptionService.decryptMessage(messageText);
         } catch (e) {
             appLogger.e('Error decrypting message in chat: $chatId', error: e);
-          }
+        }
       }
 
       messages.add(Message(

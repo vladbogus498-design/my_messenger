@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'ui_constants.dart';
 
 class AppTheme {
   static const Color _darkBackground = Color(0xFF0A0A0A);
@@ -54,9 +55,14 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: _primaryRed,
           foregroundColor: Colors.white,
-          elevation: 2,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          elevation: UIConstants.elevationMedium,
+          padding: const EdgeInsets.symmetric(
+            horizontal: UIConstants.paddingXLarge,
+            vertical: UIConstants.paddingLarge,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(UIConstants.borderRadiusMedium),
+          ),
           shadowColor: _primaryRed.withOpacity(0.4),
         ),
       ),
@@ -78,12 +84,16 @@ class AppTheme {
         filled: true,
         fillColor: Colors.white.withOpacity(0.05),
         labelStyle: TextStyle(color: Colors.white70),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: UIConstants.paddingLarge,
+          vertical: UIConstants.paddingLarge,
+        ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(UIConstants.borderRadiusMedium),
           borderSide: BorderSide(color: Colors.white12),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(UIConstants.borderRadiusMedium),
           borderSide: BorderSide(color: _primaryRed),
         ),
       ),
@@ -181,12 +191,16 @@ class AppTheme {
         filled: true,
         fillColor: Colors.black.withOpacity(0.04),
         labelStyle: TextStyle(color: Colors.black54),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: UIConstants.paddingLarge,
+          vertical: UIConstants.paddingLarge,
+        ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(UIConstants.borderRadiusMedium),
           borderSide: BorderSide(color: Colors.black12),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(UIConstants.borderRadiusMedium),
           borderSide: BorderSide(color: _primaryRed),
         ),
       ),
