@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// UI константы для единообразного дизайна
 class UIConstants {
   // Отступы
