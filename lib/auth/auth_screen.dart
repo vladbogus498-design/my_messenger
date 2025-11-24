@@ -659,6 +659,7 @@ class _PhoneAuthViewState extends ConsumerState<_PhoneAuthView> {
     final controller = ref.read(authControllerProvider.notifier);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final isCodeStep = state.codeSent;
 
     return SingleChildScrollView(
