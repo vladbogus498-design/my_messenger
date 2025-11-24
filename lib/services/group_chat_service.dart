@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/chat.dart';
+import '../utils/logger.dart';
 
 class GroupChatService {
   static final _fs = FirebaseFirestore.instance;
@@ -27,6 +28,10 @@ class GroupChatService {
       'createdBy': creatorId,
       'avatarUrl': null,
     });
+    
+    final chatId = docRef.id;
+    appLogger.d('Group chat created: $chatId');
+    
     await docRef.collection('messages').add({
       'text': 'Группа "$name" создана',
       'type': 'system',
@@ -34,6 +39,30 @@ class GroupChatService {
       'timestamp': now,
       'status': 'delivered',
     });
+    
+    // Создаем записи в подколлекциях пользователей для сохранения группы
+    try {
+      final batch = _fs.batch();
+      
+      // Добавляем группу в список чатов каждого участника
+      for (final participantId in participantIds) {
+        batch.set(
+          _fs.collection('users').doc(participantId).collection('chats').doc(chatId),
+          {
+            'chatId': chatId,
+            'addedAt': now,
+            'isGroup': true,
+          },
+          SetOptions(merge: true),
+        );
+      }
+      
+      await batch.commit();
+      appLogger.d('User chat references created for group: $chatId');
+    } catch (e) {
+      // Не критично, если не удалось создать ссылки
+      appLogger.w('Failed to create user chat references for group', error: e);
+    }
     
     // Fetch the created document to return as Chat object
     final doc = await docRef.get();

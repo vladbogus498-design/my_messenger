@@ -249,54 +249,54 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
 
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),
-          child: Column(
+      child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
               // Переключатель Войти/Регистрация
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 child: Container(
                   key: ValueKey(_isSignUp),
-                  decoration: BoxDecoration(
+            decoration: BoxDecoration(
                     color: isDark ? Colors.grey[800] : Colors.grey[100],
                     borderRadius: BorderRadius.circular(12),
-                  ),
+            ),
                   padding: const EdgeInsets.all(4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _SegmentButton(
-                          isActive: !_isSignUp,
-                          label: 'Войти',
-                          onTap: () {
-                            if (_isSignUp) {
-                              setState(() => _isSignUp = false);
-                              authController.clearError();
-                            }
-                          },
+            child: Row(
+              children: [
+                Expanded(
+                  child: _SegmentButton(
+                    isActive: !_isSignUp,
+                    label: 'Войти',
+                      onTap: () {
+                        if (_isSignUp) {
+                          setState(() => _isSignUp = false);
+                          authController.clearError();
+                        }
+                      },
                           isDark: isDark,
-                        ),
-                      ),
-                      Expanded(
-                        child: _SegmentButton(
-                          isActive: _isSignUp,
-                          label: 'Регистрация',
-                          onTap: () {
-                            if (!_isSignUp) {
-                              setState(() => _isSignUp = true);
-                              authController.clearError();
-                            }
-                          },
-                          isDark: isDark,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
+                Expanded(
+                  child: _SegmentButton(
+                    isActive: _isSignUp,
+                    label: 'Регистрация',
+                      onTap: () {
+                        if (!_isSignUp) {
+                          setState(() => _isSignUp = true);
+                          authController.clearError();
+                        }
+                      },
+                          isDark: isDark,
+                  ),
+                ),
+              ],
+            ),
+          ),
               ),
               const SizedBox(height: 32),
               // Email поле
@@ -304,90 +304,91 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
                 opacity: 1.0,
                 duration: const Duration(milliseconds: 300),
                 child: TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
                   style: TextStyle(
                     color: textColor,
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
-                  decoration: InputDecoration(
-                    labelText: 'Email',
+            decoration: InputDecoration(
+              labelText: 'Email',
                     labelStyle: TextStyle(color: hintColor),
                     prefixIcon: Icon(Icons.alternate_email, color: hintColor),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+              border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(color: borderColor),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(color: borderColor),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(color: textColor, width: 2),
-                    ),
-                    filled: true,
-                    fillColor: backgroundColor,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  ),
-                  onChanged: (_) {
-                    _clearLocalError();
-                    authController.clearError();
-                  },
-                ),
               ),
-              const SizedBox(height: 16),
+              filled: true,
+                    fillColor: backgroundColor,
+
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            ),
+            onChanged: (_) {
+              _clearLocalError();
+              authController.clearError();
+            },
+                ),
+          ),
+          const SizedBox(height: 16),
               // Пароль поле
               AnimatedOpacity(
                 opacity: 1.0,
                 duration: const Duration(milliseconds: 300),
                 child: TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  textInputAction: _isSignUp ? TextInputAction.next : TextInputAction.done,
+            controller: _passwordController,
+            obscureText: true,
+            textInputAction: _isSignUp ? TextInputAction.next : TextInputAction.done,
                   style: TextStyle(
                     color: textColor,
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
-                  decoration: InputDecoration(
-                    labelText: 'Пароль',
+            decoration: InputDecoration(
+              labelText: 'Пароль',
                     labelStyle: TextStyle(color: hintColor),
                     prefixIcon: Icon(Icons.lock_outline, color: hintColor),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+              border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(color: borderColor),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(color: borderColor),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(color: textColor, width: 2),
-                    ),
-                    filled: true,
+              ),
+              filled: true,
                     fillColor: backgroundColor,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  ),
-                  onChanged: (_) {
-                    _clearLocalError();
-                    authController.clearError();
-                  },
-                  onSubmitted: (_) {
-                    if (!_isSignUp) {
-                      FocusScope.of(context).unfocus();
-                      if (_validateInputs()) {
-                        authController.signInWithEmail(
-                          email: _emailController.text.trim(),
-                          password: _passwordController.text.trim(),
-                        );
-                      }
-                    }
-                  },
-                ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            ),
+            onChanged: (_) {
+              _clearLocalError();
+              authController.clearError();
+            },
+            onSubmitted: (_) {
+              if (!_isSignUp) {
+                FocusScope.of(context).unfocus();
+                if (_validateInputs()) {
+                  authController.signInWithEmail(
+                    email: _emailController.text.trim(),
+                    password: _passwordController.text.trim(),
+                  );
+                }
+              }
+            },
+          ),
               ),
               // Поле подтверждения пароля (только для регистрации)
               AnimatedSize(
@@ -395,21 +396,21 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
                 child: _isSignUp
                     ? Column(
                         children: [
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _confirmController,
-                            obscureText: true,
-                            textInputAction: TextInputAction.done,
+            const SizedBox(height: 16),
+            TextField(
+              controller: _confirmController,
+              obscureText: true,
+              textInputAction: TextInputAction.done,
                             style: TextStyle(
                               color: textColor,
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
                             ),
-                            decoration: InputDecoration(
-                              labelText: 'Повторите пароль',
+              decoration: InputDecoration(
+                labelText: 'Повторите пароль',
                               labelStyle: TextStyle(color: hintColor),
                               prefixIcon: Icon(Icons.lock, color: hintColor),
-                              border: OutlineInputBorder(
+                border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(color: borderColor),
                               ),
@@ -420,26 +421,26 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(color: textColor, width: 2),
-                              ),
-                              filled: true,
+                ),
+                filled: true,
                               fillColor: backgroundColor,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                            ),
-                            onChanged: (_) {
-                              _clearLocalError();
-                              authController.clearError();
-                            },
-                            onSubmitted: (_) {
-                              FocusScope.of(context).unfocus();
-                              if (_validateInputs()) {
-                                authController.registerWithEmail(
-                                  email: _emailController.text.trim(),
-                                  password: _passwordController.text.trim(),
-                                );
-                              }
-                            },
-                          ),
-                        ],
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              ),
+              onChanged: (_) {
+                _clearLocalError();
+                authController.clearError();
+              },
+              onSubmitted: (_) {
+                FocusScope.of(context).unfocus();
+                if (_validateInputs()) {
+                  authController.registerWithEmail(
+                    email: _emailController.text.trim(),
+                    password: _passwordController.text.trim(),
+                  );
+                }
+              },
+            ),
+          ],
                       )
                     : const SizedBox.shrink(),
               ),
@@ -448,94 +449,94 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
                 duration: const Duration(milliseconds: 200),
                 child: (_localError != null || (authState.errorMessage != null && _localError == null))
                     ? Column(
-                        children: [
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
+                children: [
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
                               color: isDark ? Colors.grey[800] : Colors.grey[100],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
                                 Icon(
                                   Icons.info_outline,
                                   color: hintColor,
                                   size: 20,
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
                                     _localError ?? authState.errorMessage ?? '',
                                     style: TextStyle(
                                       color: hintColor,
-                                      fontSize: 14,
+                        fontSize: 14,
                                       fontWeight: FontWeight.w400,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
                       )
                     : const SizedBox.shrink(),
               ),
-              const SizedBox(height: 24),
+          const SizedBox(height: 24),
               // Кнопка входа/регистрации
               PrimaryButton(
                 text: _isSignUp ? 'Создать аккаунт' : 'Войти',
                 isLoading: authState.isLoading,
                 onPressed: () async {
-                  FocusScope.of(context).unfocus();
-                  if (_validateInputs()) {
-                    if (_isSignUp) {
-                      await authController.registerWithEmail(
-                        email: _emailController.text.trim(),
-                        password: _passwordController.text.trim(),
-                      );
-                    } else {
-                      await authController.signInWithEmail(
-                        email: _emailController.text.trim(),
-                        password: _passwordController.text.trim(),
-                      );
-                    }
-                  }
-                },
+                      FocusScope.of(context).unfocus();
+                      if (_validateInputs()) {
+                        if (_isSignUp) {
+                          await authController.registerWithEmail(
+                            email: _emailController.text.trim(),
+                            password: _passwordController.text.trim(),
+                          );
+                        } else {
+                          await authController.signInWithEmail(
+                            email: _emailController.text.trim(),
+                            password: _passwordController.text.trim(),
+                          );
+                        }
+                      }
+                    },
               ),
               // Кнопка "Забыли пароль?" (только для входа)
-              if (!_isSignUp) ...[
-                const SizedBox(height: 12),
+          if (!_isSignUp) ...[
+            const SizedBox(height: 12),
                 SecondaryButton(
                   text: 'Забыли пароль?',
-                  height: 48,
-                  onPressed: () async {
-                    authController.clearError();
-                    final email = _emailController.text.trim();
-                    if (email.isEmpty) {
-                      setState(() {
-                        _localError = 'Введите email для восстановления пароля.';
-                      });
-                      return;
-                    }
-                    await ref
-                        .read(appAuthServiceProvider)
-                        .sendPasswordReset(email)
-                        .then((_) {
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Ссылка для сброса пароля отправлена.'),
-                          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
-                        ),
-                      );
+              height: 48,
+                onPressed: () async {
+                  authController.clearError();
+                  final email = _emailController.text.trim();
+                  if (email.isEmpty) {
+                    setState(() {
+                      _localError = 'Введите email для восстановления пароля.';
                     });
-                  },
+                    return;
+                  }
+                  await ref
+                      .read(appAuthServiceProvider)
+                      .sendPasswordReset(email)
+                      .then((_) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                        content: Text('Ссылка для сброса пароля отправлена.'),
+                          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+                      ),
+                    );
+                  });
+                },
                 ),
               ],
             ],
-          ),
-        ),
+              ),
+            ),
       ),
     );
   }
@@ -573,9 +574,9 @@ class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
         return false;
       }
       if (password != confirmPassword) {
-        setState(() => _localError = 'Пароли не совпадают.');
-        return false;
-      }
+      setState(() => _localError = 'Пароли не совпадают.');
+      return false;
+    }
     }
     
     return true;
@@ -728,9 +729,32 @@ class _PhoneAuthViewState extends ConsumerState<_PhoneAuthView> {
           ),
           if (state.errorMessage != null) ...[
             const SizedBox(height: 12),
-            Text(
-              state.errorMessage!,
-              style: TextStyle(color: theme.colorScheme.error),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[800] : Colors.grey[100],
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      state.errorMessage!,
+                      style: TextStyle(
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
           if (isCodeStep) ...[

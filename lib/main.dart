@@ -7,6 +7,7 @@ import 'screens/splash_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/theme_provider.dart';
 import 'utils/rate_limiter.dart';
+import 'services/bot_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,6 +15,9 @@ void main() async {
   
   // Запуск периодической очистки rate limiters
   AppRateLimiters.startCleanup();
+  
+  // Создаем бота при запуске приложения
+  BotService.ensureBotExists();
   
   runApp(
     const ProviderScope(

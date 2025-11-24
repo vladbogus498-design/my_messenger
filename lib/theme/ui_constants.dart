@@ -5,6 +5,7 @@ class UIConstants {
   // Отступы
   static const double paddingSmall = 8.0;
   static const double paddingMedium = 12.0;
+  static const double paddingForm = 14.0; // Для форм (регистрация и т.д.)
   static const double paddingLarge = 16.0;
   static const double paddingXLarge = 24.0;
 
