@@ -6,8 +6,10 @@ import 'package:lottie/lottie.dart';
 import '../providers/auth_provider.dart';
 import '../screens/main_chat_screen.dart';
 import '../services/user_service.dart';
+import '../services/email_phone_verification_service.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/secondary_button.dart';
+import 'enhanced_auth_views.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -129,8 +131,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                       controller: _tabController,
                       physics: const BouncingScrollPhysics(),
                       children: const [
-                        _PhoneAuthView(),
-                        _EmailAuthView(),
+                        EnhancedPhoneAuthView(),
+                        EnhancedEmailAuthView(),
                       ],
                     ),
                   ),
