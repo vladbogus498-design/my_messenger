@@ -1,0 +1,44 @@
+# Required pubspec.yaml updates for refactoring-core branch
+
+# Add these to your dependencies section:
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Existing dependencies
+  firebase_core: ^latest
+  firebase_auth: ^latest
+  cloud_firestore: ^latest
+  flutter_riverpod: ^2.4.0
+  
+  # ===== NEW: Offline Storage =====
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  
+  # ===== NEW: Security =====
+  flutter_secure_storage: ^9.0.0
+  local_auth: ^2.1.0
+  pointycastle: ^3.7.0
+  
+  # ===== NEW: HTTP & SSL Pinning =====
+  dio: ^5.3.0
+  dio_smart_retry: ^5.2.0
+  
+  # Optional: For better certificate validation
+  x509: ^0.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  # ===== NEW: Testing =====
+  mocktail: ^1.4.0
+  flutter_riverpod_generator: ^2.3.0
+  build_runner: ^2.4.0
+  hive_generator: ^2.0.0
+
+# Important: After adding dependencies, run:
+# flutter pub get
+# flutterfire configure  (for Firebase)
+# dart run build_runner build   (for Hive adapters)
