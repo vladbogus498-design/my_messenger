@@ -42,8 +42,16 @@ dev_dependencies:
   flutter_lints: ^2.0.0
   integration_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/auth_bg.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/auth_bg.png"
+  adaptive_icon_foreground: "assets/images/auth_bg.png"
+  adaptive_icon_background: "#07050C"
