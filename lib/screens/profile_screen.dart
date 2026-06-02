@@ -5,9 +5,6 @@ import '../theme/darkkick_colors.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,13 +30,13 @@ class ProfileScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
             _buildAboutCard(),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
             _buildStatsGrid(),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
             _buildMenuItems(context),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -48,7 +45,7 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _buildHeader() {
     return Padding(
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -122,9 +119,9 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _buildAboutCard() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: DarkKickColors.mediumGray,
           borderRadius: BorderRadius.circular(16),
@@ -141,7 +138,7 @@ class ProfileScreen extends StatelessWidget {
                 color: DarkKickColors.textPrimary,
               ),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
               'Сделал Darkkick в соло. Без команды. Без слежки. Только код, кофе и желание.',
               style: TextStyle(
@@ -150,9 +147,9 @@ class ProfileScreen extends StatelessWidget {
                 height: 1.6,
               ),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
-              'Тольки код, кофе и желание создать что-то своё.',
+              'Только код, кофе и желание создать что-то своё.',
               style: TextStyle(
                 fontSize: 12,
                 color: DarkKickColors.textTertiary,
@@ -173,11 +170,11 @@ class ProfileScreen extends StatelessWidget {
     ];
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: GridView.count(
         crossAxisCount: 3,
         shrinkWrap: true,
-        physics: NeverScrollableScrollPhysics(),
+        physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
         childAspectRatio: 1,
@@ -202,7 +199,7 @@ class ProfileScreen extends StatelessWidget {
                   color: DarkKickColors.neonPurple,
                   size: 28,
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Text(
                   stat.title,
                   textAlign: TextAlign.center,
@@ -246,7 +243,7 @@ class ProfileScreen extends StatelessWidget {
     bool showArrow = false,
   }) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: GestureDetector(
         onTap: onTap,
         child: Row(
@@ -268,7 +265,7 @@ class ProfileScreen extends StatelessWidget {
                 size: 24,
               ),
             ),
-            SizedBox(width: 16),
+            const SizedBox(width: 16),
             Expanded(
               child: Text(
                 title,
@@ -291,5 +288,3 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 }
-
-
