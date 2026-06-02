@@ -1,845 +1,148 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lottie/lottie.dart';
-import '../providers/auth_provider.dart';
-import '../screens/main_chat_screen.dart';
-import '../services/user_service.dart';
-import '../services/email_phone_verification_service.dart';
-import '../widgets/primary_button.dart';
-import '../widgets/secondary_button.dart';
-import 'enhanced_auth_views.dart';
-import 'auth_welcome_slide.dart';
 
-class AuthScreen extends ConsumerStatefulWidget {
+/// Clean authentication screen with background image and button interface
+class AuthScreen extends StatelessWidget {
   const AuthScreen({super.key});
 
-  @override
-  ConsumerState<AuthScreen> createState() => _AuthScreenState();
-}
-
-class _AuthScreenState extends ConsumerState<AuthScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-  bool _isNavigating = false; // Защита от множественных навигаций
-  bool _showWelcomeSlide = true; // Show welcome slide on first load
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() => setState(() {}));
-
-    ref.listen(authStateProvider, (previous, next) {
-      next.whenData((user) async {
-        if (user != null && mounted && !_isNavigating) {
-          _isNavigating = true;
-          try {
-            // Ensure user profile exists before navigation
-            await UserService.ensureUserProfile(
-              user: user,
-              fallbackName: user.email?.split('@').first ?? user.phoneNumber,
-            );
-            if (mounted) {
-              // Используем pushReplacement для замены экрана авторизации
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => MainChatScreen()),
-              );
-            }
-          } catch (e) {
-            // Логирование через logger будет добавлено позже, если нужно
-            if (mounted) {
-              _isNavigating = false;
-            }
-          }
-        }
-      });
-    });
-
-    ref.listen<AuthFlowState>(authControllerProvider, (prev, next) {
-      if (next.errorMessage != null &&
-          next.errorMessage != prev?.errorMessage &&
-          mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(next.errorMessage!)),
-          );
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+  static const Color _darkBackground = Color(0xFF07050C);
+  static const Color _neonPurple = Color(0xFF9D4EDD);
+  static const Color _darkPurple = Color(0xFF4A148C);
+  static const Color _brightPurple = Color(0xFF7B2CBF);
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    // Show welcome slide on first load
-    if (_showWelcomeSlide) {
-      return AuthWelcomeSlide(
-        onSignInPressed: () {
-          setState(() => _showWelcomeSlide = false);
-        },
-        onCreateAccountPressed: () {
-          setState(() => _showWelcomeSlide = false);
-        },
-      );
-    }
-
-    // Show authentication tabs (phone/email)
-    final gradient = LinearGradient(
-      colors: [
-        colorScheme.primary.withOpacity(0.12),
-        colorScheme.surface,
-      ],
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-    );
-
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: BoxDecoration(gradient: gradient),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 24),
-                  _AnimatedHeader(tabIndex: _tabController.index),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Добро пожаловать',
-                          style: GoogleFonts.poppins(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Войдите с помощью номера телефона или электронной почты — выберите удобный способ.',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTabBar(context),
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      physics: const BouncingScrollPhysics(),
-                      children: const [
-                        EnhancedPhoneAuthView(),
-                        EnhancedEmailAuthView(),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              if (authState.isLoading)
-                AnimatedOpacity(
-                  opacity: authState.isLoading ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 220),
-                  child: Container(
-                    color: Colors.black.withOpacity(0.18),
-                    child: const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabBar(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceVariant.withOpacity(0.4),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: TabBar(
-          controller: _tabController,
-          indicator: BoxDecoration(
-            color: colorScheme.primary.withOpacity(0.85),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          labelColor: colorScheme.onPrimary,
-          unselectedLabelColor: colorScheme.onSurfaceVariant,
-          labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
-          tabs: const [
-            Tab(text: 'Телефон'),
-            Tab(text: 'Email'),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AnimatedHeader extends StatelessWidget {
-  const _AnimatedHeader({required this.tabIndex});
-
-  final int tabIndex;
-
-  static const _lottieScenes = [
-    'https://assets9.lottiefiles.com/packages/lf20_kyu6j0i3.json',
-    'https://assets7.lottiefiles.com/packages/lf20_u4jjb9bd.json',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 220,
-      child: Center(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 420),
-          child: Lottie.network(
-            _lottieScenes[tabIndex % _lottieScenes.length],
-            key: ValueKey(tabIndex),
-            repeat: true,
-            frameRate: FrameRate.max,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmailAuthView extends ConsumerStatefulWidget {
-  const _EmailAuthView();
-
-  @override
-  ConsumerState<_EmailAuthView> createState() => _EmailAuthViewState();
-}
-
-class _EmailAuthViewState extends ConsumerState<_EmailAuthView> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmController = TextEditingController();
-  bool _isSignUp = false;
-  String? _localError;
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final authController = ref.read(authControllerProvider.notifier);
-    final authState = ref.watch(authControllerProvider);
-
-    // Минималистичные цвета: белый + чёрный
-    final backgroundColor = isDark ? Colors.grey[900] : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black;
-    final borderColor = isDark ? Colors.grey[700]! : Colors.grey[300]!;
-    final hintColor = isDark ? Colors.grey[500]! : Colors.grey[600]!;
-
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-      child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      backgroundColor: _darkBackground,
+      body: Stack(
         children: [
-              // Переключатель Войти/Регистрация
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Container(
-                  key: ValueKey(_isSignUp),
-            decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[800] : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12),
-            ),
-                  padding: const EdgeInsets.all(4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _SegmentButton(
-                    isActive: !_isSignUp,
-                    label: 'Войти',
-                      onTap: () {
-                        if (_isSignUp) {
-                          setState(() => _isSignUp = false);
-                          authController.clearError();
-                        }
-                      },
-                          isDark: isDark,
-                  ),
-                ),
-                Expanded(
-                  child: _SegmentButton(
-                    isActive: _isSignUp,
-                    label: 'Регистрация',
-                      onTap: () {
-                        if (!_isSignUp) {
-                          setState(() => _isSignUp = true);
-                          authController.clearError();
-                        }
-                      },
-                          isDark: isDark,
-                  ),
-                ),
-              ],
+          // Background image with shader mask for smooth fade to black
+          Positioned.fill(
+            child: ShaderMask(
+              shaderCallback: (Rect bounds) {
+                return LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.center,
+                  colors: [Colors.white, Colors.transparent],
+                ).createShader(bounds);
+              },
+              blendMode: BlendMode.dstIn,
+              child: Image.asset(
+                'assets/images/auth_bg.png',
+                fit: BoxFit.fitWidth,
+                alignment: Alignment.topCenter,
+              ),
             ),
           ),
-              ),
-              const SizedBox(height: 32),
-              // Email поле
-              AnimatedOpacity(
-                opacity: 1.0,
-                duration: const Duration(milliseconds: 300),
-                child: TextField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.next,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-            decoration: InputDecoration(
-              labelText: 'Email',
-                    labelStyle: TextStyle(color: hintColor),
-                    prefixIcon: Icon(Icons.alternate_email, color: hintColor),
-              border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: borderColor),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: borderColor),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: textColor, width: 2),
-              ),
-              filled: true,
-                    fillColor: backgroundColor,
 
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            ),
-            onChanged: (_) {
-              _clearLocalError();
-              authController.clearError();
-            },
-                ),
-          ),
-          const SizedBox(height: 16),
-              // Пароль поле
-              AnimatedOpacity(
-                opacity: 1.0,
-                duration: const Duration(milliseconds: 300),
-                child: TextField(
-            controller: _passwordController,
-            obscureText: true,
-            textInputAction: _isSignUp ? TextInputAction.next : TextInputAction.done,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-            decoration: InputDecoration(
-              labelText: 'Пароль',
-                    labelStyle: TextStyle(color: hintColor),
-                    prefixIcon: Icon(Icons.lock_outline, color: hintColor),
-              border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: borderColor),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: borderColor),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: textColor, width: 2),
-              ),
-              filled: true,
-                    fillColor: backgroundColor,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            ),
-            onChanged: (_) {
-              _clearLocalError();
-              authController.clearError();
-            },
-            onSubmitted: (_) {
-              if (!_isSignUp) {
-                FocusScope.of(context).unfocus();
-                if (_validateInputs()) {
-                  authController.signInWithEmail(
-                    email: _emailController.text.trim(),
-                    password: _passwordController.text.trim(),
-                  );
-                }
-              }
-            },
-          ),
-              ),
-              // Поле подтверждения пароля (только для регистрации)
-              AnimatedSize(
-                duration: const Duration(milliseconds: 300),
-                child: _isSignUp
-                    ? Column(
-                        children: [
-            const SizedBox(height: 16),
-            TextField(
-              controller: _confirmController,
-              obscureText: true,
-              textInputAction: TextInputAction.done,
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+          // Foreground interface
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Top spacing - don't cover the angel image
+                  const SizedBox(height: 40),
+
+                  // Bottom buttons block
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Sign In button with gradient
+                      Container(
+                        height: 54,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [_darkPurple, _brightPurple],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _neonPurple.withOpacity(0.3),
+                              blurRadius: 20,
+                              spreadRadius: 2,
                             ),
-              decoration: InputDecoration(
-                labelText: 'Повторите пароль',
-                              labelStyle: TextStyle(color: hintColor),
-                              prefixIcon: Icon(Icons.lock, color: hintColor),
-                border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: borderColor),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: borderColor),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: textColor, width: 2),
-                ),
-                filled: true,
-                              fillColor: backgroundColor,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              ),
-              onChanged: (_) {
-                _clearLocalError();
-                authController.clearError();
-              },
-              onSubmitted: (_) {
-                FocusScope.of(context).unfocus();
-                if (_validateInputs()) {
-                  authController.registerWithEmail(
-                    email: _emailController.text.trim(),
-                    password: _passwordController.text.trim(),
-                  );
-                }
-              },
-            ),
-          ],
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              // Мягкие ошибки
-              AnimatedSize(
-                duration: const Duration(milliseconds: 200),
-                child: (_localError != null || (authState.errorMessage != null && _localError == null))
-                    ? Column(
-                children: [
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                              color: isDark ? Colors.grey[800] : Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                                Icon(
-                                  Icons.info_outline,
-                                  color: hintColor,
-                                  size: 20,
-                                ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                                    _localError ?? authState.errorMessage ?? '',
-                                    style: TextStyle(
-                                      color: hintColor,
-                        fontSize: 14,
-                                      fontWeight: FontWeight.w400,
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // TODO: Connect to Firebase/Riverpod
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Text(
+                            'Войти',
+                            style: GoogleFonts.montserrat(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+
+                      // Create Account button with outline
+                      OutlinedButton(
+                        onPressed: () {
+                          // TODO: Connect to Firebase/Riverpod
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: Colors.white.withOpacity(0.15),
+                            width: 1.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: Text(
+                          'Создать аккаунт',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Copyright text with lightning icon
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Сделано с нуля одним человеком. ',
+                            style: GoogleFonts.montserrat(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w400,
+                              color: Colors.white.withOpacity(0.4),
+                            ),
+                          ),
+                          Icon(
+                            Icons.bolt,
+                            size: 14,
+                            color: _neonPurple,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                   ),
                 ],
               ),
             ),
-          ],
-                      )
-                    : const SizedBox.shrink(),
-              ),
-          const SizedBox(height: 24),
-              // Кнопка входа/регистрации
-              PrimaryButton(
-                text: _isSignUp ? 'Создать аккаунт' : 'Войти',
-                isLoading: authState.isLoading,
-                onPressed: () async {
-                      FocusScope.of(context).unfocus();
-                      if (_validateInputs()) {
-                        if (_isSignUp) {
-                          await authController.registerWithEmail(
-                            email: _emailController.text.trim(),
-                            password: _passwordController.text.trim(),
-                          );
-                        } else {
-                          await authController.signInWithEmail(
-                            email: _emailController.text.trim(),
-                            password: _passwordController.text.trim(),
-                          );
-                        }
-                      }
-                    },
-              ),
-              // Кнопка "Забыли пароль?" (только для входа)
-          if (!_isSignUp) ...[
-            const SizedBox(height: 12),
-                SecondaryButton(
-                  text: 'Забыли пароль?',
-              height: 48,
-                onPressed: () async {
-                  authController.clearError();
-                  final email = _emailController.text.trim();
-                  if (email.isEmpty) {
-                    setState(() {
-                      _localError = 'Введите email для восстановления пароля.';
-                    });
-                    return;
-                  }
-                  await ref
-                      .read(appAuthServiceProvider)
-                      .sendPasswordReset(email)
-                      .then((_) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                        content: Text('Ссылка для сброса пароля отправлена.'),
-                          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
-                      ),
-                    );
-                  });
-                },
-                ),
-              ],
-            ],
-              ),
-            ),
-      ),
-    );
-  }
-
-  bool _validateInputs() {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-    
-    // Улучшенная валидация email
-    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-    if (email.isEmpty) {
-      setState(() => _localError = 'Введите email.');
-      return false;
-    }
-    if (!emailRegex.hasMatch(email)) {
-      setState(() => _localError = 'Введите корректный email адрес.');
-      return false;
-    }
-    
-    // Улучшенная валидация пароля
-    if (password.isEmpty) {
-      setState(() => _localError = 'Введите пароль.');
-      return false;
-    }
-    if (password.length < 6) {
-      setState(() => _localError = 'Пароль должен быть не короче 6 символов.');
-      return false;
-    }
-    
-    // Проверка совпадения паролей при регистрации
-    if (_isSignUp) {
-      final confirmPassword = _confirmController.text.trim();
-      if (confirmPassword.isEmpty) {
-        setState(() => _localError = 'Повторите пароль.');
-        return false;
-      }
-      if (password != confirmPassword) {
-      setState(() => _localError = 'Пароли не совпадают.');
-      return false;
-    }
-    }
-    
-    return true;
-  }
-
-  void _clearLocalError() {
-    if (_localError != null) {
-      setState(() => _localError = null);
-    }
-  }
-}
-
-class _SegmentButton extends StatelessWidget {
-  const _SegmentButton({
-    required this.isActive,
-    required this.label,
-    required this.onTap,
-    required this.isDark,
-  });
-
-  final bool isActive;
-  final String label;
-  final VoidCallback onTap;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final backgroundColor = isActive
-        ? (isDark ? Colors.black : Colors.black)
-        : Colors.transparent;
-    final textColor = isActive
-        ? Colors.white
-        : (isDark ? Colors.grey[400]! : Colors.grey[600]!);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 15,
-              color: textColor,
-            ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PhoneAuthView extends ConsumerStatefulWidget {
-  const _PhoneAuthView();
-
-  @override
-  ConsumerState<_PhoneAuthView> createState() => _PhoneAuthViewState();
-}
-
-class _PhoneAuthViewState extends ConsumerState<_PhoneAuthView> {
-  final _phoneController = TextEditingController();
-  final _codeController = TextEditingController();
-
-  @override
-  void dispose() {
-    _phoneController.dispose();
-    _codeController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(authControllerProvider);
-    final controller = ref.read(authControllerProvider.notifier);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final isCodeStep = state.codeSent;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withOpacity(0.4),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Введите номер телефона',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Мы отправим SMS с кодом подтверждения. Это займёт пару секунд.',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: colorScheme.onPrimaryContainer.withOpacity(0.8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9 +()]'))
-            ],
-            decoration: InputDecoration(
-              labelText: 'Номер телефона',
-              prefixIcon: const Icon(Icons.phone_rounded),
-              hintText: '+7 900 000-00-00',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
-            ),
-            onChanged: (_) => controller.clearError(),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                FocusScope.of(context).unfocus();
-                await controller.sendPhoneCode(_phoneController.text);
-              },
-              icon: const Icon(Icons.sms_outlined),
-              label: const Text('Отправить код'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-              ),
-            ),
-          ),
-          if (state.errorMessage != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[800] : Colors.grey[100],
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      state.errorMessage!,
-                      style: TextStyle(
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          if (isCodeStep) ...[
-            const SizedBox(height: 28),
-            Text(
-              'Введите код из SMS',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _codeController,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              decoration: InputDecoration(
-                labelText: 'Код подтверждения',
-                counterText: '',
-                prefixIcon: const Icon(Icons.verified_rounded),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-              ),
-              onChanged: (_) => controller.clearError(),
-            ),
-            const SizedBox(height: 16),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () async {
-                  FocusScope.of(context).unfocus();
-                  await controller.verifySmsCode(_codeController.text);
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-                child: const Text('Подтвердить код'),
-              ),
-            ),
-            TextButton(
-              onPressed: controller.resetPhoneFlow,
-              child: const Text('Изменить номер'),
-            ),
-          ],
-          if (state.isPhoneVerified)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.green),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Телефон подтверждён. Добро пожаловать!',
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
