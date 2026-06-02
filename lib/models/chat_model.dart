@@ -1,6 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 
 class ChatUser {
   final String id;
@@ -12,6 +10,12 @@ class ChatUser {
     required this.name,
     required this.avatarUrl,
   });
+
+  /// Initial letter for avatar placeholder when no image URL is set.
+  String get avatar {
+    if (name.isEmpty) return '?';
+    return name[0].toUpperCase();
+  }
 
   factory ChatUser.fromMap(Map<String, dynamic> map, String id) {
     return ChatUser(
@@ -36,6 +40,7 @@ class Chat {
   final List<String> participants;
   final String lastMessage;
   final DateTime lastMessageTime;
+  final int unreadCount;
 
   Chat({
     required this.id,
@@ -43,7 +48,14 @@ class Chat {
     required this.participants,
     required this.lastMessage,
     required this.lastMessageTime,
+    this.unreadCount = 0,
   });
+
+  /// Initial letter for avatar placeholder.
+  String? get avatar {
+    if (name.isEmpty) return null;
+    return name[0].toUpperCase();
+  }
 
   factory Chat.fromMap(Map<String, dynamic> map, String id) {
     return Chat(
@@ -52,6 +64,7 @@ class Chat {
       participants: List<String>.from(map['participants'] ?? []),
       lastMessage: map['lastMessage'] ?? '',
       lastMessageTime: (map['lastMessageTime'] as Timestamp).toDate(),
+      unreadCount: map['unreadCount'] ?? 0,
     );
   }
 
@@ -62,6 +75,7 @@ class Chat {
       'participants': participants,
       'lastMessage': lastMessage,
       'lastMessageTime': lastMessageTime,
+      'unreadCount': unreadCount,
     };
   }
 }

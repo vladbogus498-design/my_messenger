@@ -20,6 +20,7 @@ final mockChats = [
     participants: ['Dark'],
     lastMessage: 'Привет, как дела?',
     lastMessageTime: DateTime.now().subtract(const Duration(hours: 1)),
+    unreadCount: 2,
   ),
   Chat(
     id: '2',
@@ -27,6 +28,7 @@ final mockChats = [
     participants: ['void.exe'],
     lastMessage: 'Отправил код 👍',
     lastMessageTime: DateTime.now().subtract(const Duration(hours: 3)),
+    unreadCount: 1,
   ),
   Chat(
     id: '3',
