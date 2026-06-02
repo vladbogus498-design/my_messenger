@@ -5,6 +5,52 @@ import '../models/chat_model.dart';
 import 'security_screen.dart';
 import 'profile_screen.dart';
 
+// Mock data
+final mockStories = [
+  ChatUser(id: '1', name: 'Dark', avatarUrl: ''),
+  ChatUser(id: '2', name: 'void.exe', avatarUrl: ''),
+  ChatUser(id: '3', name: 'Nox', avatarUrl: ''),
+  ChatUser(id: '4', name: 'Dreamer', avatarUrl: ''),
+];
+
+final mockChats = [
+  Chat(
+    id: '1',
+    name: 'Dark',
+    participants: ['Dark'],
+    lastMessage: 'Привет, как дела?',
+    lastMessageTime: DateTime.now().subtract(const Duration(hours: 1)),
+  ),
+  Chat(
+    id: '2',
+    name: 'void.exe',
+    participants: ['void.exe'],
+    lastMessage: 'Отправил код 👍',
+    lastMessageTime: DateTime.now().subtract(const Duration(hours: 3)),
+  ),
+  Chat(
+    id: '3',
+    name: 'Group Chat',
+    participants: ['Nox', 'Dreamer', 'You'],
+    lastMessage: 'Спасибо за помощь!',
+    lastMessageTime: DateTime.now().subtract(const Duration(days: 1)),
+  ),
+  Chat(
+    id: '4',
+    name: 'Nox',
+    participants: ['Nox'],
+    lastMessage: 'Когда готово?',
+    lastMessageTime: DateTime.now().subtract(const Duration(days: 2)),
+  ),
+  Chat(
+    id: '5',
+    name: 'Dreamer',
+    participants: ['Dreamer'],
+    lastMessage: 'Классная идея! 🚀',
+    lastMessageTime: DateTime.now().subtract(const Duration(days: 3)),
+  ),
+];
+
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 

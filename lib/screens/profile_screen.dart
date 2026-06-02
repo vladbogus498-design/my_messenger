@@ -107,7 +107,7 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
             child: Icon(
-              Icons.crown,
+              Icons.military_tech
               color: DarkKickColors.neonPurple,
               size: 32,
             ),
