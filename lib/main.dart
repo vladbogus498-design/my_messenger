@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'auth/auth_screen.dart';
-import 'screens/main_chat_screen.dart';
+import 'screens/chats_screen.dart';
 import 'screens/improved_splash_screen.dart';
 import 'widgets/otp_verification_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,10 +41,10 @@ class MyApp extends ConsumerWidget {
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: themeMode,
-      home: const ImprovedSplashScreen(), // ✅ МГНОВЕННАЯ НАВИГАЦИЯ БЕЗ ПЕРЕЗАГРУЗКИ
+      home: const ImprovedSplashScreen(),
       routes: {
         '/auth': (context) => const AuthScreen(),
-        '/main': (context) => MainChatScreen(),
+        '/main': (context) => const ChatScreen(),
         '/email-verification': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as String?;
           return EmailVerificationScreen(email: args ?? '');
