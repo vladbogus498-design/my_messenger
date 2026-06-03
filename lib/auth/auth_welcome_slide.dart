@@ -25,8 +25,6 @@ class AuthWelcomeSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.height < 800;
-
     return Scaffold(
       backgroundColor: _darkBackground,
       body: SafeArea(

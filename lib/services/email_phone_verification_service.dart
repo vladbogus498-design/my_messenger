@@ -180,9 +180,8 @@ enum AuthStatus {
 
 /// Enhanced auth controller with verification
 class EnhancedAuthController extends StateNotifier<AuthFlowStateV2> {
-  EnhancedAuthController(this._ref) : super(const AuthFlowStateV2());
+  EnhancedAuthController() : super(const AuthFlowStateV2());
 
-  final Ref _ref;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<void> registerWithEmail({
@@ -349,5 +348,5 @@ class EnhancedAuthController extends StateNotifier<AuthFlowStateV2> {
 /// Provider for enhanced auth
 final enhancedAuthControllerProvider =
     StateNotifierProvider<EnhancedAuthController, AuthFlowStateV2>((ref) {
-  return EnhancedAuthController(ref);
+  return EnhancedAuthController();
 });

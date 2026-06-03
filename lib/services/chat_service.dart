@@ -25,7 +25,7 @@ class ChatService {
           .get();
 
       final chats = snapshot.docs.map(Chat.fromFirestore).toList();
-      chats.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+      chats.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return chats;
     } catch (e) {
       appLogger.e('Error loading chats', error: e);
@@ -81,10 +81,12 @@ class ChatService {
     required String text,
     required String type,
     String? imageUrl,
+    String? stickerUrl,
+    String? voiceUrl,
     String? voiceAudioBase64,
     int? voiceDuration,
     String? stickerId,
-    String? stickerUrl,
+    Map<String, dynamic>? replyTo,
     String? replyToId,
     String? replyToText,
     bool isForwarded = false,
@@ -137,14 +139,12 @@ class ChatService {
         if (sizeError != null) throw Exception(sizeError);
       }
 
-      if (replyToId != null && !InputValidator.isValidChatId(replyToId)) {
-        appLogger.w('Invalid replyToId: $replyToId');
+      if (replyToId != null && replyToId.contains('/')) {
         replyToId = null;
       }
 
       if (recipientIds != null) {
-        recipientIds =
-            recipientIds.where(InputValidator.isValidUserId).toList();
+        recipientIds = recipientIds.where(InputValidator.isValidUserId).toList();
         if (recipientIds.isEmpty && encrypt) {
           encrypt = false;
         }
@@ -169,51 +169,75 @@ class ChatService {
         }
       }
 
-      final now = FieldValue.serverTimestamp();
       final chatRef = _firestore.collection('chats').doc(chatId);
       final messageRef = chatRef
           .collection('messages')
           .doc(messageId ?? createMessageId(chatId));
+      final now = FieldValue.serverTimestamp();
+      final replyPayload = replyTo ??
+          (replyToId == null
+              ? null
+              : {
+                  'id': replyToId,
+                  'text': replyToText ?? '',
+                });
 
-      final messageData = <String, dynamic>{
-        'chatId': chatId,
-        'text': messageText,
-        'type': type,
-        'senderId': userId,
-        'timestamp': now,
-        'createdAt': now,
-        if (imageUrl != null) 'imageUrl': imageUrl,
-        if (voiceAudioBase64 != null) 'voiceAudioBase64': voiceAudioBase64,
-        if (voiceDuration != null) 'voiceDuration': voiceDuration,
-        if (stickerId != null) 'stickerId': stickerId,
-        if (stickerUrl != null) 'stickerUrl': stickerUrl,
-        'isEncrypted': isEncrypted,
-        if (replyToId != null) 'replyToId': replyToId,
-        if (replyToText != null) 'replyToText': replyToText,
-        'isForwarded': isForwarded,
-        if (originalSender != null) 'originalSender': originalSender,
-        'reactions': <String, String>{},
-        'isTyping': false,
-        'status': 'sent',
-        'readBy': [userId],
-      };
+      await _firestore.runTransaction((transaction) async {
+        final chatSnapshot = await transaction.get(chatRef);
+        if (!chatSnapshot.exists) {
+          throw Exception('Chat not found');
+        }
 
-      final chatUpdate = <String, dynamic>{
-        'lastMessage': previewText,
-        'lastMessageType': type,
-        'lastMessageAt': now,
-        'lastMessageTime': now,
-        'lastMessageId': messageRef.id,
-        'lastMessageStatus': 'sent',
-        'lastMessageReadBy': [userId],
-        'lastSenderId': userId,
-        'updatedAt': now,
-      };
+        final chatData = chatSnapshot.data() ?? const <String, dynamic>{};
+        final participants =
+            List<String>.from(chatData['participants'] ?? const []);
+        final unreadCount = _readUnreadCount(chatData['unreadCount']);
+        for (final participant in participants) {
+          unreadCount[participant] ??= 0;
+          if (participant != userId) {
+            unreadCount[participant] = unreadCount[participant]! + 1;
+          }
+        }
 
-      final batch = _firestore.batch();
-      batch.set(messageRef, messageData);
-      batch.update(chatRef, chatUpdate);
-      await batch.commit();
+        final messageData = <String, dynamic>{
+          'chatId': chatId,
+          'text': messageText,
+          'type': type,
+          'senderId': userId,
+          'timestamp': now,
+          'createdAt': now,
+          if (imageUrl != null) 'imageUrl': imageUrl,
+          if (stickerUrl != null) 'stickerUrl': stickerUrl,
+          if (voiceUrl != null) 'voiceUrl': voiceUrl,
+          if (voiceAudioBase64 != null) 'voiceAudioBase64': voiceAudioBase64,
+          if (voiceDuration != null) 'voiceDuration': voiceDuration,
+          if (stickerId != null) 'stickerId': stickerId,
+          'isEncrypted': isEncrypted,
+          if (replyPayload != null) 'replyTo': replyPayload,
+          if (replyToId != null) 'replyToId': replyToId,
+          if (replyToText != null) 'replyToText': replyToText,
+          'isForwarded': isForwarded,
+          if (originalSender != null) 'originalSender': originalSender,
+          'reactions': <String, String>{},
+          'isTyping': false,
+          'status': 'sent',
+          'readBy': [userId],
+        };
+
+        transaction.set(messageRef, messageData);
+        transaction.update(chatRef, {
+          'lastMessage': previewText,
+          'lastMessageType': type,
+          'lastMessageAt': now,
+          'lastMessageTime': now,
+          'lastMessageId': messageRef.id,
+          'lastMessageStatus': 'sent',
+          'lastMessageReadBy': [userId],
+          'lastSenderId': userId,
+          'unreadCount': unreadCount,
+          'updatedAt': now,
+        });
+      });
 
       appLogger.d('Message sent successfully to chat: $chatId');
     } catch (e) {
@@ -231,10 +255,11 @@ class ChatService {
       text: message.text,
       type: message.type,
       imageUrl: message.imageUrl,
+      stickerUrl: message.stickerUrl,
+      voiceUrl: message.voiceUrl,
       voiceAudioBase64: message.voiceAudioBase64,
       voiceDuration: message.voiceDuration,
       stickerId: message.stickerId,
-      stickerUrl: message.stickerUrl,
       isForwarded: true,
       originalSender: message.senderId,
     );
@@ -269,6 +294,30 @@ class ChatService {
       await messageRef.update({'reactions': reactions});
     } catch (e) {
       appLogger.e('Error adding reaction to message: $messageId', error: e);
+    }
+  }
+
+  static Future<void> pinMessage(String chatId, Message message) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      await _firestore.collection('chats').doc(chatId).update({
+        'pinnedMessage': {
+          'id': message.id,
+          'text': _lastMessagePreview(message.type, message.text),
+          'type': message.type,
+          'senderId': message.senderId,
+          'imageUrl': message.imageUrl,
+          'stickerUrl': message.stickerUrl,
+          'voiceUrl': message.voiceUrl,
+          'createdAt': Timestamp.fromDate(message.createdAt),
+          'pinnedBy': userId,
+          'pinnedAt': FieldValue.serverTimestamp(),
+        },
+      });
+    } catch (e) {
+      appLogger.e('Error pinning message in chat: $chatId', error: e);
     }
   }
 
@@ -385,7 +434,7 @@ class ChatService {
 
       for (final doc in existingChats.docs) {
         final data = doc.data();
-        if (data['isGroup'] == true) continue;
+        if (data['isGroup'] == true || data['type'] == 'group') continue;
 
         final participants = List<String>.from(data['participants'] ?? const []);
         if (participants.length == 2 &&
@@ -400,6 +449,7 @@ class ChatService {
       final batch = _firestore.batch();
 
       batch.set(chatRef, {
+        'type': 'direct',
         'name': chatName ?? 'Chat',
         'isGroup': false,
         'participants': participants,
@@ -411,6 +461,12 @@ class ChatService {
         'lastMessageStatus': 'sent',
         'lastMessageReadBy': <String>[],
         'lastSenderId': null,
+        'unreadCount': {
+          userId: 0,
+          otherUserId: 0,
+        },
+        'typing': <String, dynamic>{},
+        'pinnedMessage': null,
         'createdAt': now,
         'updatedAt': now,
         'createdBy': userId,
@@ -473,6 +529,11 @@ class ChatService {
     try {
       final chatRef = _firestore.collection('chats').doc(chatId);
       final messagesRef = chatRef.collection('messages');
+      final chatDoc = await chatRef.get();
+      final chatData = chatDoc.data();
+      final unreadCount = _readUnreadCount(chatData?['unreadCount']);
+      unreadCount[userId] = 0;
+
       final snapshot = await messagesRef.get();
       final batch = _firestore.batch();
       var changed = 0;
@@ -490,16 +551,14 @@ class ChatService {
         changed++;
       }
 
-      if (changed == 0) return;
-
-      final chatDoc = await chatRef.get();
-      final chatData = chatDoc.data();
+      final chatUpdate = <String, dynamic>{
+        'unreadCount': unreadCount,
+      };
       if (chatData != null && chatData['lastSenderId'] != userId) {
-        batch.update(chatRef, {
-          'lastMessageReadBy': FieldValue.arrayUnion([userId]),
-          'lastMessageStatus': 'read',
-        });
+        chatUpdate['lastMessageReadBy'] = FieldValue.arrayUnion([userId]);
+        chatUpdate['lastMessageStatus'] = 'read';
       }
+      batch.update(chatRef, chatUpdate);
 
       await batch.commit();
       appLogger.d('Marked $changed messages as read in chat: $chatId');
@@ -534,6 +593,14 @@ class ChatService {
         return (data?[field] as List<dynamic>?)?.cast<String>() ?? const [];
       },
     );
+  }
+
+  static Map<String, int> _readUnreadCount(dynamic value) {
+    final raw = Map<String, dynamic>.from(value ?? const {});
+    return raw.map((key, value) {
+      final count = value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+      return MapEntry(key, count);
+    });
   }
 
   static String _lastMessagePreview(String type, String text) {

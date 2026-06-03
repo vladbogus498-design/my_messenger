@@ -23,8 +23,17 @@ class GroupChatService {
         'timestamp': now,
       },
       'lastMessageStatus': 'sent',
+      'lastMessageType': 'system',
+      'lastMessageAt': now,
+      'lastSenderId': creatorId,
+      'unreadCount': {
+        for (final participantId in participantIds) participantId: 0,
+      },
+      'typing': <String, dynamic>{},
+      'pinnedMessage': null,
       'lastMessageTime': now, // Для обратной совместимости
       'createdAt': now,
+      'updatedAt': now,
       'createdBy': creatorId,
       'avatarUrl': null,
     });
@@ -73,13 +82,24 @@ class GroupChatService {
     final data = doc.data() as Map<String, dynamic>;
     return Chat(
       id: doc.id,
+      type: data['type'] ?? 'group',
       name: data['name'] ?? 'Chat',
       participants: List<String>.from(data['participants'] ?? []),
-      lastMessage: data['lastMessage'] ?? '',
+      lastMessage: 'Группа создана',
       lastMessageStatus: data['lastMessageStatus'] ?? 'sent',
       lastMessageTime: data['lastMessageTime'] != null
           ? (data['lastMessageTime'] as Timestamp).toDate()
           : DateTime.now(),
+      updatedAt: data['updatedAt'] != null
+          ? (data['updatedAt'] as Timestamp).toDate()
+          : DateTime.now(),
+      lastMessageType: data['lastMessageType'] ?? 'system',
+      lastSenderId: data['lastSenderId'],
+      unreadCount: Map<String, int>.from(data['unreadCount'] ?? const {}),
+      typing: Map<String, dynamic>.from(data['typing'] ?? const {}),
+      pinnedMessage: data['pinnedMessage'] == null
+          ? null
+          : Map<String, dynamic>.from(data['pinnedMessage']),
       isGroup: data['isGroup'] ?? false,
       admins: List<String>.from(data['admins'] ?? const []),
       groupName: data['groupName'],

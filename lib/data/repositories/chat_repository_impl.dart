@@ -58,19 +58,15 @@ class ChatRepositoryImpl implements ChatRepository {
       // 2. Get from remote if cache is empty
       final remoteResult = await _remoteDataSource.getChats(userId);
 
-      return remoteResult.maybeMap(
-        success: (chats) async {
-          // Save to local cache
+      switch (remoteResult) {
+        case Success(value: final chats):
           for (final chat in chats) {
-            await _localDataSource.saveChat(
-              chat.id,
-              chat.toMap(),
-            );
+            await _localDataSource.saveChat(chat.id, chat.toMap());
           }
           return Success(chats);
-        },
-        failure: (failure) => Failure(failure),
-      );
+        case Failure(failure: final failure):
+          return Failure(failure);
+      }
     } catch (e) {
       appLogger.e('Error getting chats', error: e);
       return Failure(
@@ -95,15 +91,15 @@ class ChatRepositoryImpl implements ChatRepository {
 
       // Get from remote
       final result = await _remoteDataSource.getChat(chatId);
-      return result.maybeMap(
-        success: (chat) async {
+      switch (result) {
+        case Success(value: final chat):
           if (chat != null) {
             await _localDataSource.saveChat(chatId, chat.toMap());
           }
           return Success(chat);
-        },
-        failure: (failure) => Failure(failure),
-      );
+        case Failure(failure: final failure):
+          return Failure(failure);
+      }
     } catch (e) {
       appLogger.e('Error getting chat: $chatId', error: e);
       return Failure(
@@ -135,8 +131,8 @@ class ChatRepositoryImpl implements ChatRepository {
 
       // Get from remote
       final result = await _remoteDataSource.getMessages(chatId, limit: limit);
-      return result.maybeMap(
-        success: (messages) async {
+      switch (result) {
+        case Success(value: final messages):
           for (final message in messages) {
             await _localDataSource.saveMessage(
               chatId,
@@ -145,9 +141,9 @@ class ChatRepositoryImpl implements ChatRepository {
             );
           }
           return Success(messages);
-        },
-        failure: (failure) => Failure(failure),
-      );
+        case Failure(failure: final failure):
+          return Failure(failure);
+      }
     } catch (e) {
       appLogger.e('Error getting messages', error: e);
       return Failure(
@@ -169,8 +165,8 @@ class ChatRepositoryImpl implements ChatRepository {
       }
 
       final result = await _remoteDataSource.getMessage(chatId, messageId);
-      return result.maybeMap(
-        success: (message) async {
+      switch (result) {
+        case Success(value: final message):
           if (message != null) {
             await _localDataSource.saveMessage(
               chatId,
@@ -179,9 +175,9 @@ class ChatRepositoryImpl implements ChatRepository {
             );
           }
           return Success(message);
-        },
-        failure: (failure) => Failure(failure),
-      );
+        case Failure(failure: final failure):
+          return Failure(failure);
+      }
     } catch (e) {
       appLogger.e('Error getting message', error: e);
       return Failure(
@@ -204,15 +200,15 @@ class ChatRepositoryImpl implements ChatRepository {
 
       // Get from remote
       final result = await _remoteDataSource.getUser(userId);
-      return result.maybeMap(
-        success: (user) async {
+      switch (result) {
+        case Success(value: final user):
           if (user != null) {
             await _localDataSource.saveUser(userId, user.toMap());
           }
           return Success(user);
-        },
-        failure: (failure) => Failure(failure),
-      );
+        case Failure(failure: final failure):
+          return Failure(failure);
+      }
     } catch (e) {
       appLogger.e('Error getting user', error: e);
       return Failure(
@@ -418,6 +414,7 @@ class ChatRepositoryImpl implements ChatRepository {
   Chat _chatFromMap(Map<String, dynamic> data) {
     return Chat(
       id: data['id'] ?? '',
+      type: data['type'] ?? (data['isGroup'] == true ? 'group' : 'direct'),
       name: data['name'] ?? '',
       participants: List<String>.from(data['participants'] ?? []),
       lastMessage: data['lastMessage'] ?? '',
@@ -425,6 +422,18 @@ class ChatRepositoryImpl implements ChatRepository {
       lastMessageTime: data['lastMessageTime'] is String
           ? DateTime.parse(data['lastMessageTime'])
           : DateTime.now(),
+      updatedAt: data['updatedAt'] is String
+          ? DateTime.parse(data['updatedAt'])
+          : DateTime.now(),
+      lastMessageType: data['lastMessageType'] ?? 'text',
+      lastSenderId: data['lastSenderId'],
+      lastMessageId: data['lastMessageId'],
+      lastMessageReadBy: List<String>.from(data['lastMessageReadBy'] ?? []),
+      unreadCount: Map<String, int>.from(data['unreadCount'] ?? const {}),
+      typing: Map<String, dynamic>.from(data['typing'] ?? const {}),
+      pinnedMessage: data['pinnedMessage'] == null
+          ? null
+          : Map<String, dynamic>.from(data['pinnedMessage']),
       isGroup: data['isGroup'] ?? false,
       admins: List<String>.from(data['admins'] ?? []),
       groupName: data['groupName'],

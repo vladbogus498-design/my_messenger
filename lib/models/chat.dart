@@ -3,43 +3,69 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class Chat {
   const Chat({
     required this.id,
+    required this.type,
     required this.name,
     required this.participants,
     required this.lastMessage,
     required this.lastMessageStatus,
     required this.lastMessageTime,
+    required this.updatedAt,
     this.lastMessageType = 'text',
     this.lastSenderId,
     this.lastMessageId,
     this.lastMessageReadBy = const [],
+    this.unreadCount = const {},
+    this.typing = const {},
+    this.pinnedMessage,
     this.isGroup = false,
     this.admins = const [],
     this.groupName,
   });
 
   final String id;
+  final String type;
   final String name;
   final List<String> participants;
   final String lastMessage;
   final String lastMessageStatus;
   final DateTime lastMessageTime;
+  final DateTime updatedAt;
   final String lastMessageType;
   final String? lastSenderId;
   final String? lastMessageId;
   final List<String> lastMessageReadBy;
+  final Map<String, int> unreadCount;
+  final Map<String, dynamic> typing;
+  final Map<String, dynamic>? pinnedMessage;
   final bool isGroup;
   final List<String> admins;
   final String? groupName;
 
+  bool get isDirect => type == 'direct' || !isGroup;
+
+  String? otherParticipantId(String? currentUid) {
+    if (currentUid == null) return null;
+    for (final participant in participants) {
+      if (participant != currentUid) return participant;
+    }
+    return null;
+  }
+
+  int unreadFor(String? uid) {
+    if (uid == null) return 0;
+    return unreadCount[uid] ?? 0;
+  }
+
   factory Chat.fromFirestore(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
+    final isGroup = data['isGroup'] ?? data['type'] == 'group';
+    final type = data['type'] ?? (isGroup ? 'group' : 'direct');
     final legacyLastMessage = data['lastMessage'];
     final rawLastMessage = legacyLastMessage is Map<String, dynamic>
         ? (legacyLastMessage['text'] ?? '').toString()
         : (legacyLastMessage ?? '').toString();
     final lastMessageType = data['lastMessageType'] ?? 'text';
     final lastMessage = _previewText(rawLastMessage, lastMessageType);
-
     final legacyLastMessageAt = legacyLastMessage is Map<String, dynamic>
         ? legacyLastMessage['timestamp']
         : null;
@@ -48,6 +74,7 @@ class Chat {
         legacyLastMessageAt ??
         data['lastMessageTime'] ??
         data['createdAt'];
+    final updatedAt = data['updatedAt'] ?? lastMessageAt;
     final lastMessageReadBy =
         List<String>.from(data['lastMessageReadBy'] ?? const []);
     final lastMessageStatus = data['lastMessageStatus'] ??
@@ -55,16 +82,23 @@ class Chat {
 
     return Chat(
       id: doc.id,
+      type: type,
       name: data['name'] ?? 'Chat',
       participants: List<String>.from(data['participants'] ?? const []),
       lastMessage: lastMessage,
       lastMessageStatus: lastMessageStatus,
       lastMessageTime: _readDate(lastMessageAt),
+      updatedAt: _readDate(updatedAt),
       lastMessageType: lastMessageType,
       lastSenderId: data['lastSenderId'],
       lastMessageId: data['lastMessageId'],
       lastMessageReadBy: lastMessageReadBy,
-      isGroup: data['isGroup'] ?? false,
+      unreadCount: _readUnreadCount(data['unreadCount']),
+      typing: Map<String, dynamic>.from(data['typing'] ?? const {}),
+      pinnedMessage: data['pinnedMessage'] == null
+          ? null
+          : Map<String, dynamic>.from(data['pinnedMessage']),
+      isGroup: isGroup,
       admins: List<String>.from(data['admins'] ?? const []),
       groupName: data['groupName'],
     );
@@ -72,12 +106,13 @@ class Chat {
 
   @override
   String toString() {
-    return 'Chat{id: $id, name: $name, participants: $participants}';
+    return 'Chat{id: $id, type: $type, participants: $participants}';
   }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'type': type,
       'name': name,
       'participants': participants,
       'lastMessage': lastMessage,
@@ -87,10 +122,22 @@ class Chat {
       'lastSenderId': lastSenderId,
       'lastMessageId': lastMessageId,
       'lastMessageReadBy': lastMessageReadBy,
+      'unreadCount': unreadCount,
+      'typing': typing,
+      'pinnedMessage': pinnedMessage,
+      'updatedAt': updatedAt.toString(),
       'isGroup': isGroup,
       'admins': admins,
       'groupName': groupName,
     };
+  }
+
+  static Map<String, int> _readUnreadCount(dynamic value) {
+    final raw = Map<String, dynamic>.from(value ?? const {});
+    return raw.map((key, value) {
+      final count = value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+      return MapEntry(key, count);
+    });
   }
 
   static DateTime _readDate(dynamic value) {

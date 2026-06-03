@@ -21,14 +21,6 @@ class _MockChatScreenState extends State<MockChatScreen> {
     return chatMessages[widget.chat.id]!;
   }
 
-  bool get _isAdmin =>
-      widget.chat.type == ChatType.personal || widget.chat.isSubscribed;
-
-  bool get _canWrite =>
-      widget.chat.type == ChatType.personal ||
-      (widget.chat.type == ChatType.group && widget.chat.isSubscribed) ||
-      (widget.chat.type == ChatType.channel && widget.chat.isSubscribed);
-
   @override
   void initState() {
     super.initState();

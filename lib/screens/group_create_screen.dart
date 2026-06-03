@@ -138,7 +138,7 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
                       : () async {
                           final creator = uid;
                           final name = _name.text.trim();
-                          if (creator == null || name.isEmpty) {
+                          if (name.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('Введите название группы'),

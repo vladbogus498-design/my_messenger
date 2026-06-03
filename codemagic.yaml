@@ -2,7 +2,7 @@ workflows:
   android-workflow:
     name: Android Build
     environment:
-      flutter: stable
+      flutter: 3.44.1
       java: 17
     scripts:
       - name: Force Build with Fix

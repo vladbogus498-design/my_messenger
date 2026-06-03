@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../models/chat.dart';
 import '../providers/chats_provider.dart';
 import '../theme/darkkick_colors.dart';
@@ -23,6 +25,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   int _selectedNavIndex = 0;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  String? get _currentUserId => FirebaseAuth.instance.currentUser?.uid;
 
   @override
   void initState() {
@@ -114,7 +118,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             icon: Icons.edit_square,
             onTap: () => Navigator.push(
               context,
-              NavigationAnimations.slideFadeRoute(NewChatScreen()),
+              NavigationAnimations.slideFadeRoute(const NewChatScreen()),
             ),
           ),
         ],
@@ -150,7 +154,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             if (_searchQuery.isNotEmpty)
               IconButton(
-                icon: const Icon(Icons.close, color: DarkKickColors.textTertiary, size: 18),
+                icon: const Icon(
+                  Icons.close,
+                  color: DarkKickColors.textTertiary,
+                  size: 18,
+                ),
                 onPressed: _searchController.clear,
               )
             else
@@ -165,7 +173,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildStoriesList(List<Chat> chats) {
-    final personalChats = chats.where((chat) => !chat.isGroup).take(8).toList();
+    final personalChats = chats.where((chat) => chat.isDirect).take(8).toList();
+    final currentUserId = _currentUserId;
 
     return SizedBox(
       height: 86,
@@ -190,15 +199,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
               onTap: () => Navigator.push(
                 context,
-                NavigationAnimations.slideFadeRoute(NewChatScreen()),
+                NavigationAnimations.slideFadeRoute(const NewChatScreen()),
               ),
             );
           }
 
           final chat = personalChats[index - 1];
-          return _StoryItem(
-            label: _displayName(chat),
-            child: _ChatAvatar(chat: chat, size: 58),
+          return _DirectAwareStoryItem(
+            chat: chat,
+            currentUserId: currentUserId,
+            fallbackTitle: _fallbackTitle(chat),
             onTap: () => _openChat(chat),
           );
         },
@@ -270,7 +280,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildChatsList(List<Chat> allChats) {
     final chats = _filterChats(allChats);
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    final currentUserId = _currentUserId;
 
     if (chats.isEmpty) {
       final isChannels = _selectedFilterIndex == 3;
@@ -291,8 +301,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         final chat = chats[index];
         return _ChatTile(
           chat: chat,
-          title: _displayName(chat),
           currentUserId: currentUserId,
+          fallbackTitle: _fallbackTitle(chat),
           onTap: () => _openChat(chat),
         );
       },
@@ -302,7 +312,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   List<Chat> _filterChats(List<Chat> chats) {
     var filtered = chats;
     if (_selectedFilterIndex == 1) {
-      filtered = filtered.where((chat) => !chat.isGroup).toList();
+      filtered = filtered.where((chat) => chat.isDirect).toList();
     } else if (_selectedFilterIndex == 2) {
       filtered = filtered.where((chat) => chat.isGroup).toList();
     } else if (_selectedFilterIndex == 3) {
@@ -311,7 +321,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     if (_searchQuery.isEmpty) return filtered;
     return filtered
-        .where((chat) => _displayName(chat).toLowerCase().contains(_searchQuery))
+        .where((chat) => _fallbackTitle(chat).toLowerCase().contains(_searchQuery))
         .toList();
   }
 
@@ -325,7 +335,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return const _EmptyState(
       icon: Icons.cloud_off_outlined,
       title: 'Не удалось загрузить чаты',
-      subtitle: 'Проверь подключение и попробуй открыть экран еще раз.',
+      subtitle: 'Проверь подключение и попробуй открыть экран ещё раз.',
     );
   }
 
@@ -364,7 +374,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  String _displayName(Chat chat) => chat.groupName ?? chat.name;
+  String _fallbackTitle(Chat chat) => chat.groupName ?? chat.name;
 
   void _openChat(Chat chat) {
     Navigator.push(
@@ -372,7 +382,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       NavigationAnimations.slideFadeRoute(
         SingleChatScreen(
           chatId: chat.id,
-          chatName: _displayName(chat),
+          chatName: _fallbackTitle(chat),
+          otherUserId: chat.otherParticipantId(_currentUserId),
         ),
       ),
     );
@@ -382,101 +393,193 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 class _ChatTile extends StatelessWidget {
   const _ChatTile({
     required this.chat,
-    required this.title,
     required this.currentUserId,
+    required this.fallbackTitle,
     required this.onTap,
   });
 
   final Chat chat;
-  final String title;
   final String? currentUserId;
+  final String fallbackTitle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final shouldShowStatus =
-        currentUserId != null && chat.lastSenderId == currentUserId;
-    final isReadByOther = currentUserId != null &&
-        chat.lastMessageReadBy.any((uid) => uid != currentUserId);
+    final otherUserId = chat.isDirect ? chat.otherParticipantId(currentUserId) : null;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: DarkKickColors.panel,
+    return StreamBuilder<_PeerMeta>(
+      stream: _peerMetaStream(otherUserId),
+      builder: (context, snapshot) {
+        final meta = snapshot.data;
+        final title = chat.isDirect ? meta?.name ?? fallbackTitle : fallbackTitle;
+        final photoUrl = chat.isDirect ? meta?.photoUrl : null;
+        final unread = chat.unreadFor(currentUserId);
+        final shouldShowStatus =
+            unread == 0 && currentUserId != null && chat.lastSenderId == currentUserId;
+        final isReadByOther = currentUserId != null &&
+            chat.lastMessageReadBy.any((uid) => uid != currentUserId);
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: DarkKickColors.divider),
-          ),
-          child: Row(
-            children: [
-              _ChatAvatar(chat: chat, size: 52),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+            child: Ink(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: DarkKickColors.panel,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: DarkKickColors.divider),
+              ),
+              child: Row(
+                children: [
+                  _ChatAvatar(
+                    title: title,
+                    photoUrl: photoUrl,
+                    isGroup: chat.isGroup,
+                    size: 52,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.spaceGrotesk(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.spaceGrotesk(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
+                            if (chat.isGroup)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 4),
+                                child: Icon(
+                                  Icons.group,
+                                  color: DarkKickColors.neonPurple,
+                                  size: 14,
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          chat.lastMessage,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: DarkKickColors.textSecondary,
+                            fontSize: 12,
                           ),
                         ),
-                        if (chat.isGroup)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 4),
-                            child: Icon(Icons.group, color: DarkKickColors.neonPurple, size: 14),
-                          ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      chat.lastMessage.isEmpty ? 'Сообщений пока нет' : chat.lastMessage,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: DarkKickColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    TimeFormatter.formatChatTime(chat.lastMessageTime),
-                    style: const TextStyle(
-                      color: DarkKickColors.textTertiary,
-                      fontSize: 11,
-                    ),
                   ),
-                  const SizedBox(height: 10),
-                  if (shouldShowStatus)
-                    Icon(
-                      isReadByOther ? Icons.done_all : Icons.done,
-                      size: 16,
-                      color: isReadByOther
-                          ? DarkKickColors.neonPurple
-                          : DarkKickColors.textTertiary,
-                    ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        TimeFormatter.formatChatTime(chat.lastMessageTime),
+                        style: const TextStyle(
+                          color: DarkKickColors.textTertiary,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (unread > 0)
+                        _UnreadBadge(count: unread)
+                      else if (shouldShowStatus)
+                        Icon(
+                          isReadByOther ? Icons.done_all : Icons.done,
+                          size: 16,
+                          color: isReadByOther
+                              ? DarkKickColors.neonPurple
+                              : DarkKickColors.textTertiary,
+                        ),
+                    ],
+                  ),
                 ],
               ),
-            ],
+            ),
           ),
+        );
+      },
+    );
+  }
+}
+
+class _DirectAwareStoryItem extends StatelessWidget {
+  const _DirectAwareStoryItem({
+    required this.chat,
+    required this.currentUserId,
+    required this.fallbackTitle,
+    required this.onTap,
+  });
+
+  final Chat chat;
+  final String? currentUserId;
+  final String fallbackTitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final otherUserId = chat.otherParticipantId(currentUserId);
+
+    return StreamBuilder<_PeerMeta>(
+      stream: _peerMetaStream(otherUserId),
+      builder: (context, snapshot) {
+        final meta = snapshot.data;
+        final title = meta?.name ?? fallbackTitle;
+        return _StoryItem(
+          label: title,
+          onTap: onTap,
+          child: _ChatAvatar(
+            title: title,
+            photoUrl: meta?.photoUrl,
+            isGroup: chat.isGroup,
+            size: 58,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: DarkKickColors.neonPurple,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: DarkKickColors.neonPurple.withValues(alpha: 0.35),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: Text(
+        count > 99 ? '99+' : '$count',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -485,18 +588,21 @@ class _ChatTile extends StatelessWidget {
 
 class _ChatAvatar extends StatelessWidget {
   const _ChatAvatar({
-    required this.chat,
+    required this.title,
+    required this.photoUrl,
+    required this.isGroup,
     required this.size,
   });
 
-  final Chat chat;
+  final String title;
+  final String? photoUrl;
+  final bool isGroup;
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    final name = chat.groupName ?? chat.name;
-    final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
-    final color = _avatarColor(name);
+    final initial = title.trim().isEmpty ? '?' : title.trim()[0].toUpperCase();
+    final color = _avatarColor(title);
 
     return Container(
       width: size,
@@ -512,21 +618,23 @@ class _ChatAvatar extends StatelessWidget {
         ],
       ),
       child: ClipOval(
-        child: ColoredBox(
-          color: color,
-          child: Center(
-            child: chat.isGroup
-                ? const Icon(Icons.groups_2_outlined, color: Colors.white)
-                : Text(
-                    initial,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: size * 0.38,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-          ),
-        ),
+        child: photoUrl != null && photoUrl!.isNotEmpty
+            ? Image.network(
+                photoUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _AvatarFallback(
+                  color: color,
+                  initial: initial,
+                  isGroup: isGroup,
+                  size: size,
+                ),
+              )
+            : _AvatarFallback(
+                color: color,
+                initial: initial,
+                isGroup: isGroup,
+                size: size,
+              ),
       ),
     );
   }
@@ -542,6 +650,61 @@ class _ChatAvatar extends StatelessWidget {
     ];
     return colors[hash % colors.length];
   }
+}
+
+class _AvatarFallback extends StatelessWidget {
+  const _AvatarFallback({
+    required this.color,
+    required this.initial,
+    required this.isGroup,
+    required this.size,
+  });
+
+  final Color color;
+  final String initial;
+  final bool isGroup;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: color,
+      child: Center(
+        child: isGroup
+            ? const Icon(Icons.groups_2_outlined, color: Colors.white)
+            : Text(
+                initial,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: size * 0.38,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class _PeerMeta {
+  const _PeerMeta({required this.name, this.photoUrl});
+
+  final String name;
+  final String? photoUrl;
+}
+
+Stream<_PeerMeta>? _peerMetaStream(String? uid) {
+  if (uid == null || uid.isEmpty) return null;
+
+  return FirebaseFirestore.instance.collection('users').doc(uid).snapshots().map(
+    (doc) {
+      final data = doc.data() ?? const <String, dynamic>{};
+      final email = (data['email'] ?? '').toString();
+      final fallback = email.contains('@') ? email.split('@').first : 'Пользователь';
+      final name = (data['name'] ?? fallback).toString();
+      final photoUrl = data['photoURL']?.toString();
+      return _PeerMeta(name: name, photoUrl: photoUrl);
+    },
+  );
 }
 
 class _StoryItem extends StatelessWidget {

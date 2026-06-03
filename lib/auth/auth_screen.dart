@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../theme/darkkick_colors.dart';
 import 'auth_credentials_screen.dart';
 
@@ -72,7 +73,8 @@ class AuthScreen extends StatelessWidget {
                       letterSpacing: 7,
                       shadows: [
                         Shadow(
-                          color: DarkKickColors.neonPurple.withValues(alpha: 0.75),
+                          color:
+                              DarkKickColors.neonPurple.withValues(alpha: 0.75),
                           blurRadius: 22,
                         ),
                       ],
@@ -82,10 +84,12 @@ class AuthScreen extends StatelessWidget {
                   Text.rich(
                     TextSpan(
                       children: [
-                        const TextSpan(text: 'БЕЗ ГРАНИЦ. БЕЗ СЛЕЖКИ. ЭТО '),
+                        const TextSpan(text: 'Без границ. Без слежки. Это '),
                         TextSpan(
-                          text: 'DARKKICK.',
-                          style: TextStyle(color: DarkKickColors.electricPurple),
+                          text: 'Darkkick.',
+                          style: TextStyle(
+                            color: DarkKickColors.electricPurple,
+                          ),
                         ),
                       ],
                     ),

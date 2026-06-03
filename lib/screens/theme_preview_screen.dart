@@ -45,6 +45,8 @@ class ThemePreviewScreen extends ConsumerWidget {
 }
 
 class _ChatPreview extends StatelessWidget {
+  const _ChatPreview();
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -81,5 +83,4 @@ class _ChatPreview extends StatelessWidget {
     );
   }
 }
-
 

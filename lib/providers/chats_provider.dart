@@ -18,7 +18,7 @@ final chatsProvider = StreamProvider<List<Chat>>((ref) {
       .snapshots()
       .map((snapshot) {
     final chats = snapshot.docs.map((doc) => Chat.fromFirestore(doc)).toList();
-    chats.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+    chats.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return chats;
   });
 });
@@ -52,7 +52,7 @@ class ChatsNotifier extends StateNotifier<AsyncValue<List<Chat>>> {
         .snapshots()
         .map((snapshot) {
       final chats = snapshot.docs.map((doc) => Chat.fromFirestore(doc)).toList();
-      chats.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+      chats.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return chats;
     }).listen(
       (chats) {

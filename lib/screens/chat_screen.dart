@@ -193,7 +193,7 @@ class ChatScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                ts != null ? TimeFormatter.formatChatTime(ts) : '',
+                TimeFormatter.formatChatTime(ts),
                 style: TextStyle(fontSize: 12),
               ),
               if (d['unreadCount'] != null && d['unreadCount'] > 0)
@@ -320,7 +320,7 @@ class ChatScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            ts != null ? TimeFormatter.formatChatTime(ts) : '',
+            TimeFormatter.formatChatTime(ts),
             style: TextStyle(fontSize: 12),
           ),
           if (d['unreadCount'] != null && d['unreadCount'] > 0)

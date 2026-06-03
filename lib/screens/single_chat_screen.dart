@@ -49,6 +49,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   String? _playingVoiceMessageId;
   StreamSubscription? _playbackCompleteSubscription;
   StreamSubscription? _typingStatusSubscription;
+  String? _otherUserId;
+  String? _peerName;
 
   @override
   void initState() {
@@ -56,6 +58,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     _actualChatId = widget.chatId.isEmpty ? null : widget.chatId;
     _setupTypingListener();
     _setupTypingDetection();
+    _loadPeerInfo();
     _markMessagesAsRead();
     _setupVoicePlaybackListener();
   }
@@ -68,12 +71,58 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     }
   }
 
+  Future<void> _loadPeerInfo([String? chatIdOverride]) async {
+    String? otherUserId = widget.otherUserId ?? _otherUserId;
+    final chatId = chatIdOverride ?? _actualChatId ?? widget.chatId;
+
+    if ((otherUserId == null || otherUserId.isEmpty) && chatId.isNotEmpty) {
+      try {
+        final chatDoc = await FirebaseFirestore.instance
+            .collection('chats')
+            .doc(chatId)
+            .get();
+        final participants = List<String>.from(
+          chatDoc.data()?['participants'] ?? const [],
+        );
+        otherUserId = participants.firstWhere(
+          (id) => id != _currentUser?.uid,
+          orElse: () => '',
+        );
+      } catch (e) {
+        appLogger.e('Error resolving direct chat peer: $chatId', error: e);
+      }
+    }
+
+    if (otherUserId == null || otherUserId.isEmpty) return;
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(otherUserId)
+          .get();
+      final data = userDoc.data() ?? const <String, dynamic>{};
+      final email = (data['email'] ?? '').toString();
+      final fallback =
+          email.contains('@') ? email.split('@').first : widget.chatName;
+      final name = (data['name'] ?? fallback).toString();
+
+      if (!mounted) return;
+      setState(() {
+        _otherUserId = otherUserId;
+        _peerName = name;
+      });
+    } catch (e) {
+      appLogger.e('Error loading peer profile: $otherUserId', error: e);
+    }
+  }
+
   void _setupTypingListener() {
     // Слушатели работают только для существующих чатов
-    if (widget.chatId.isEmpty) return;
+    final chatId = _actualChatId ?? widget.chatId;
+    if (chatId.isEmpty) return;
     
     // Используем единый поток для всех статусов
-    _typingStatusSubscription = ChatService.getTypingStatus(widget.chatId)
+    _typingStatusSubscription = ChatService.getTypingStatus(chatId)
         .listen((status) {
       if (mounted) {
         setState(() {
@@ -160,6 +209,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         } else {
           _actualChatId = chatId;
         }
+        _typingStatusSubscription?.cancel();
+        _setupTypingListener();
+        unawaited(_loadPeerInfo(chatId));
         appLogger.d('Chat ensured/created: $chatId');
         return chatId;
       } catch (e) {
@@ -354,6 +406,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     if (chatId.isEmpty) return;
     await ChatService.addReaction(chatId, message.id, emoji);
     // StreamBuilder will automatically update
+  }
+
+  Future<void> _pinMessage(Message message) async {
+    final chatId = _actualChatId ?? widget.chatId;
+    if (chatId.isEmpty) return;
+    await ChatService.pinMessage(chatId, message);
   }
 
   bool _isMyMessage(String senderId) {
@@ -824,6 +882,81 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
 
+  Widget _buildPinnedMessageCard(String chatId) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('chats').doc(chatId).snapshots(),
+      builder: (context, snapshot) {
+        final pinned = snapshot.data?.data()?['pinnedMessage'];
+        if (pinned == null) return const SizedBox.shrink();
+
+        final data = Map<String, dynamic>.from(pinned);
+        final text = (data['text'] ?? '').toString();
+        final type = (data['type'] ?? 'text').toString();
+        final label = text.isNotEmpty
+            ? text
+            : type == 'image'
+                ? 'Фото'
+                : type == 'sticker'
+                    ? 'Стикер'
+                    : 'Сообщение';
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: DarkKickColors.panel,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: DarkKickColors.divider),
+              boxShadow: [
+                BoxShadow(
+                  color: DarkKickColors.neonPurple.withValues(alpha: 0.12),
+                  blurRadius: 16,
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.push_pin_outlined,
+                  color: DarkKickColors.neonPurple,
+                  size: 18,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Закреплено',
+                        style: TextStyle(
+                          color: DarkKickColors.textTertiary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: DarkKickColors.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showMessageMenu(Message message) {
     showModalBottomSheet(
       context: context,
@@ -846,6 +979,14 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
               onTap: () {
                 Navigator.pop(context);
                 _startForward(message);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.push_pin_outlined),
+              title: Text('Закрепить'),
+              onTap: () {
+                Navigator.pop(context);
+                _pinMessage(message);
               },
             ),
             Divider(),
@@ -872,7 +1013,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   void _showUserProfile() async {
     // Используем otherUserId если он передан, иначе получаем из участников чата напрямую
-    String? otherUserId = widget.otherUserId;
+    String? otherUserId = widget.otherUserId ?? _otherUserId;
     
     if (otherUserId == null) {
       // Получаем ID другого пользователя из участников чата напрямую через Firestore
@@ -933,7 +1074,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(widget.chatName),
+              Text(_peerName ?? widget.chatName),
               if (_typingStatus.recordingVoiceUsers.isNotEmpty)
                 _AnimatedStatusRow(
                   icon: Icons.mic,
@@ -956,6 +1097,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       ),
       body: Column(
         children: [
+          if (chatId.isNotEmpty) _buildPinnedMessageCard(chatId),
           Expanded(
             child: chatId.isNotEmpty
                 ? StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(

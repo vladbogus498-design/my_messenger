@@ -9,11 +9,13 @@ class Message {
     required this.type,
     required this.timestamp,
     this.imageUrl,
+    this.stickerUrl,
+    this.voiceUrl,
     this.voiceAudioBase64,
     this.voiceDuration,
     this.stickerId,
-    this.stickerUrl,
     this.isEncrypted = false,
+    this.replyTo,
     this.replyToId,
     this.replyToText,
     this.isForwarded = false,
@@ -30,16 +32,18 @@ class Message {
   final String text;
   final String type;
   final String? imageUrl;
+  final String? stickerUrl;
+  final String? voiceUrl;
   final String? voiceAudioBase64;
   final int? voiceDuration;
   final String? stickerId;
-  final String? stickerUrl;
   final bool isEncrypted;
 
   // Backward compatible name used by the current UI.
   final DateTime timestamp;
   DateTime get createdAt => timestamp;
 
+  final Map<String, dynamic>? replyTo;
   final String? replyToId;
   final String? replyToText;
   final bool isForwarded;
@@ -51,6 +55,9 @@ class Message {
 
   factory Message.fromMap(Map<String, dynamic> data, String id) {
     final createdAt = data['createdAt'] ?? data['timestamp'];
+    final replyTo = data['replyTo'] == null
+        ? null
+        : Map<String, dynamic>.from(data['replyTo']);
 
     return Message(
       id: id,
@@ -59,14 +66,16 @@ class Message {
       text: data['text'] ?? '',
       type: data['type'] ?? 'text',
       imageUrl: data['imageUrl'],
+      stickerUrl: data['stickerUrl'] ?? data['stickerId'],
+      voiceUrl: data['voiceUrl'],
       voiceAudioBase64: data['voiceAudioBase64'],
       voiceDuration: data['voiceDuration'],
       stickerId: data['stickerId'],
-      stickerUrl: data['stickerUrl'] ?? data['stickerId'],
       isEncrypted: data['isEncrypted'] ?? false,
       timestamp: _readDate(createdAt),
-      replyToId: data['replyToId'],
-      replyToText: data['replyToText'],
+      replyTo: replyTo,
+      replyToId: data['replyToId'] ?? replyTo?['id'],
+      replyToText: data['replyToText'] ?? replyTo?['text'],
       isForwarded: data['isForwarded'] ?? false,
       originalSender: data['originalSender'],
       reactions: Map<String, String>.from(data['reactions'] ?? const {}),
@@ -83,13 +92,15 @@ class Message {
       'text': text,
       'type': type,
       if (imageUrl != null) 'imageUrl': imageUrl,
+      if (stickerUrl != null) 'stickerUrl': stickerUrl,
+      if (voiceUrl != null) 'voiceUrl': voiceUrl,
       if (voiceAudioBase64 != null) 'voiceAudioBase64': voiceAudioBase64,
       if (voiceDuration != null) 'voiceDuration': voiceDuration,
       if (stickerId != null) 'stickerId': stickerId,
-      if (stickerUrl != null) 'stickerUrl': stickerUrl,
       'isEncrypted': isEncrypted,
       'timestamp': timestamp,
       'createdAt': timestamp,
+      if (replyTo != null) 'replyTo': replyTo,
       if (replyToId != null) 'replyToId': replyToId,
       if (replyToText != null) 'replyToText': replyToText,
       'isForwarded': isForwarded,
@@ -116,12 +127,14 @@ class Message {
       text: text,
       type: type,
       imageUrl: imageUrl,
+      stickerUrl: stickerUrl,
+      voiceUrl: voiceUrl,
       voiceAudioBase64: voiceAudioBase64,
       voiceDuration: voiceDuration,
       stickerId: stickerId,
-      stickerUrl: stickerUrl,
       isEncrypted: isEncrypted,
       timestamp: timestamp,
+      replyTo: replyTo,
       replyToId: replyToId,
       replyToText: replyToText,
       isForwarded: isForwarded,

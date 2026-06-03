@@ -38,11 +38,16 @@ final messagesProvider = StreamProvider.family<List<Message>, String>((ref, chat
         text: messageText,
         type: data['type'] ?? 'text',
         imageUrl: data['imageUrl'],
+        stickerUrl: data['stickerUrl'],
+        voiceUrl: data['voiceUrl'],
         voiceAudioBase64: data['voiceAudioBase64'],
         voiceDuration: data['voiceDuration'],
         stickerId: data['stickerId'],
         isEncrypted: isEncrypted,
         timestamp: (data['timestamp'] as Timestamp).toDate(),
+        replyTo: data['replyTo'] == null
+            ? null
+            : Map<String, dynamic>.from(data['replyTo']),
         replyToId: data['replyToId'],
         replyToText: data['replyToText'],
         isForwarded: data['isForwarded'] ?? false,
@@ -50,6 +55,7 @@ final messagesProvider = StreamProvider.family<List<Message>, String>((ref, chat
         reactions: Map<String, String>.from(data['reactions'] ?? {}),
         isTyping: data['isTyping'] ?? false,
         status: data['status'] ?? 'sent',
+        readBy: List<String>.from(data['readBy'] ?? const []),
       ));
     }
     return messages;
@@ -58,4 +64,3 @@ final messagesProvider = StreamProvider.family<List<Message>, String>((ref, chat
 
 // Примечание: Логика отправки сообщений унифицирована в ChatService.sendMessage
 // Этот провайдер используется только для получения сообщений
-
