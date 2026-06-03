@@ -56,7 +56,9 @@ class UserService {
         if (nameError != null) {
           throw Exception(nameError);
         }
-        updates['name'] = InputValidator.sanitizeName(name);
+        final sanitizedName = InputValidator.sanitizeName(name);
+        updates['name'] = sanitizedName;
+        updates['nameLower'] = sanitizedName.toLowerCase();
       }
       if (bio != null) {
         final bioError = InputValidator.validateBio(bio);
@@ -78,7 +80,7 @@ class UserService {
       appLogger.d('User data updated for userId: $userId');
     } catch (e) {
       appLogger.e('Error updating user data for userId: $userId', error: e);
-      throw e;
+      rethrow;
     }
   }
 
@@ -101,7 +103,7 @@ class UserService {
       final snapshot = await _firestore
           .collection('users')
           .where('name', isGreaterThanOrEqualTo: sanitizedTag)
-          .where('name', isLessThan: sanitizedTag + '\uf8ff')
+          .where('name', isLessThan: '$sanitizedTag\uf8ff')
           .limit(20)
           .get();
 
@@ -149,13 +151,15 @@ class UserService {
         'uid': uid,
         'email': email.toLowerCase().trim(),
         'name': sanitizedName,
+        'nameLower': sanitizedName.toLowerCase(),
+        'emailLower': email.toLowerCase().trim(),
         'createdAt': FieldValue.serverTimestamp(),
       });
       // Не логируем email в открытом виде (безопасность)
       appLogger.i('User profile created: uid=$uid');
     } catch (e) {
       appLogger.e('Error creating user profile: uid=$uid', error: e);
-      throw e;
+      rethrow;
     }
   }
 
@@ -190,8 +194,10 @@ class UserService {
       await docRef.set({
         'uid': user.uid,
         'email': email.toLowerCase().trim(),
+        'emailLower': email.toLowerCase().trim(),
         'phone': phone.trim(),
         'name': sanitizedName,
+        'nameLower': sanitizedName.toLowerCase(),
         'createdAt': FieldValue.serverTimestamp(),
       });
       appLogger.d('User profile ensured for uid: ${user.uid}');

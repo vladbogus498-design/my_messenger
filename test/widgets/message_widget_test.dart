@@ -1,12 +1,12 @@
+import 'package:darkkick/widgets/message_status_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:darkkick/lib/widgets/message_status_icon.dart';
 
 void main() {
   group('MessageStatusIcon', () {
-    testWidgets('отображает иконку отправки для статуса sending', (WidgetTester tester) async {
+    testWidgets('shows sending status', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: Scaffold(
             body: MessageStatusIcon(
               status: 'sending',
@@ -16,14 +16,13 @@ void main() {
         ),
       );
 
-      // Проверяем, что виджет отображается
       expect(find.byType(MessageStatusIcon), findsOneWidget);
       expect(find.byIcon(Icons.access_time), findsOneWidget);
     });
 
-    testWidgets('отображает иконку отправлено для статуса sent', (WidgetTester tester) async {
+    testWidgets('shows sent status', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: Scaffold(
             body: MessageStatusIcon(
               status: 'sent',
@@ -36,9 +35,9 @@ void main() {
       expect(find.byIcon(Icons.check), findsOneWidget);
     });
 
-    testWidgets('отображает иконку доставлено для статуса delivered', (WidgetTester tester) async {
+    testWidgets('shows delivered status', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: Scaffold(
             body: MessageStatusIcon(
               status: 'delivered',
@@ -51,9 +50,9 @@ void main() {
       expect(find.byIcon(Icons.done_all), findsOneWidget);
     });
 
-    testWidgets('отображает иконку прочитано для статуса read', (WidgetTester tester) async {
+    testWidgets('shows read status', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: Scaffold(
             body: MessageStatusIcon(
               status: 'read',
@@ -66,9 +65,9 @@ void main() {
       expect(find.byIcon(Icons.done_all), findsOneWidget);
     });
 
-    testWidgets('не отображается для чужих сообщений', (WidgetTester tester) async {
+    testWidgets('hides status for incoming messages', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: Scaffold(
             body: MessageStatusIcon(
               status: 'sent',
@@ -78,9 +77,7 @@ void main() {
         ),
       );
 
-      // Виджет должен быть пустым для чужих сообщений
       expect(find.byType(SizedBox), findsWidgets);
     });
   });
 }
-

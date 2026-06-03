@@ -113,6 +113,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: Icon(_isEditing ? Icons.check : Icons.edit_outlined),
               onPressed: _isEditing ? _saveProfile : () => setState(() => _isEditing = true),
             ),
+          IconButton(
+            icon: const Icon(Icons.logout, size: 20),
+            onPressed: () async {
+              final navigator = Navigator.of(context);
+              await FirebaseAuth.instance.signOut();
+              if (!mounted) return;
+              navigator.pushNamedAndRemoveUntil('/auth', (route) => false);
+            },
+          ),
         ],
       ),
       body: _isLoading

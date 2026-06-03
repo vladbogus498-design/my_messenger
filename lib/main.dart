@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'auth/auth_screen.dart';
 import 'auth/auth_credentials_screen.dart';
 import 'screens/chats_screen.dart';
-import 'screens/improved_splash_screen.dart';
 import 'widgets/otp_verification_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'utils/rate_limiter.dart';
 import 'services/bot_service.dart';
@@ -57,7 +56,7 @@ class MyApp extends ConsumerWidget {
       darkTheme: darkTheme,
       themeMode: themeMode,
       // На ПК сразу открываем форму входа, на телефоне — сплеш
-      home: kIsWeb ? const AuthScreen() : const ImprovedSplashScreen(),
+      home: const AuthGate(),
       routes: {
         '/auth': (context) => const AuthScreen(),
         '/auth/sign-in': (context) => const AuthCredentialsScreen(
@@ -80,6 +79,34 @@ class MyApp extends ConsumerWidget {
         },
       },
       debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+class AuthGate extends ConsumerWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+
+    return authState.when(
+      data: (user) => user == null ? const AuthScreen() : const ChatScreen(),
+      loading: () => const _DarkkickLoadingScreen(),
+      error: (_, __) => const AuthScreen(),
+    );
+  }
+}
+
+class _DarkkickLoadingScreen extends StatelessWidget {
+  const _DarkkickLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
     );
   }
 }

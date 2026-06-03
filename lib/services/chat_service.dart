@@ -21,10 +21,11 @@ class ChatService {
       final snapshot = await _firestore
           .collection('chats')
           .where('participants', arrayContains: userId)
-          .orderBy('lastMessage.timestamp', descending: true)
           .get();
 
-      return snapshot.docs.map<Chat>((doc) => Chat.fromFirestore(doc)).toList();
+      final chats = snapshot.docs.map<Chat>((doc) => Chat.fromFirestore(doc)).toList();
+      chats.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+      return chats;
     } catch (e) {
       // Если запрос с lastMessage.timestamp не работает, пробуем fallback
       appLogger.w('Error loading chats with lastMessage.timestamp, trying fallback', error: e);
@@ -32,9 +33,10 @@ class ChatService {
         final snapshot = await _firestore
             .collection('chats')
             .where('participants', arrayContains: userId)
-            .orderBy('lastMessageTime', descending: true)
             .get();
-        return snapshot.docs.map<Chat>((doc) => Chat.fromFirestore(doc)).toList();
+        final chats = snapshot.docs.map<Chat>((doc) => Chat.fromFirestore(doc)).toList();
+        chats.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+        return chats;
       } catch (e2) {
         appLogger.e('Error loading chats (fallback failed)', error: e2);
         return [];
@@ -127,11 +129,13 @@ class ChatService {
       }
 
       // Валидация и санитизация текста сообщения
-      final validationError = InputValidator.validateMessage(text);
-      if (validationError != null) {
-        throw Exception(validationError);
+      if (type == 'text' || type == 'image' || type == 'voice') {
+        final validationError = InputValidator.validateMessage(text);
+        if (validationError != null) {
+          throw Exception(validationError);
+        }
       }
-      var messageText = InputValidator.sanitizeMessage(text);
+      var messageText = text.isEmpty ? '' : InputValidator.sanitizeMessage(text);
       var isEncrypted = false;
 
       // Шифруем сообщение, если требуется
@@ -178,6 +182,7 @@ class ChatService {
       }
 
       final messageData = {
+        'chatId': chatId,
         'text': messageText,
         'type': type,
         'senderId': _auth.currentUser?.uid,
@@ -227,7 +232,7 @@ class ChatService {
       appLogger.d('Message sent successfully to chat: $chatId');
     } catch (e) {
       appLogger.e('Error sending message to chat: $chatId', error: e);
-      throw e;
+      rethrow;
     }
   }
 
@@ -424,12 +429,14 @@ class ChatService {
       // Проверяем, существует ли уже чат между этими пользователями
       final existingChats = await _firestore
           .collection('chats')
-          .where('isGroup', isEqualTo: false)
           .where('participants', arrayContains: userId)
           .get();
 
       for (final doc in existingChats.docs) {
-        final participants = List<String>.from(doc.data()['participants'] ?? []);
+        final data = doc.data();
+        if (data['isGroup'] == true) continue;
+
+        final participants = List<String>.from(data['participants'] ?? []);
         if (participants.toSet().containsAll({userId, otherUserId}) && 
             participants.length == 2) {
           appLogger.d('Chat already exists: ${doc.id}');
@@ -493,7 +500,7 @@ class ChatService {
       return chatId;
     } catch (e) {
       appLogger.e('Error creating chat with user: $otherUserId', error: e);
-      throw e;
+      rethrow;
     }
   }
 

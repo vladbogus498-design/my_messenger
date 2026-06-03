@@ -15,10 +15,11 @@ final chatsProvider = StreamProvider<List<Chat>>((ref) {
   return firestore
       .collection('chats')
       .where('participants', arrayContains: userId)
-      .orderBy('lastMessageTime', descending: true)
       .snapshots()
       .map((snapshot) {
-    return snapshot.docs.map((doc) => Chat.fromFirestore(doc)).toList();
+    final chats = snapshot.docs.map((doc) => Chat.fromFirestore(doc)).toList();
+    chats.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+    return chats;
   });
 });
 
@@ -48,10 +49,11 @@ class ChatsNotifier extends StateNotifier<AsyncValue<List<Chat>>> {
     _chatsSubscription = firestore
         .collection('chats')
         .where('participants', arrayContains: _currentUserId!)
-        .orderBy('lastMessageTime', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => Chat.fromFirestore(doc)).toList();
+      final chats = snapshot.docs.map((doc) => Chat.fromFirestore(doc)).toList();
+      chats.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+      return chats;
     }).listen(
       (chats) {
         state = AsyncValue.data(chats);
@@ -79,4 +81,3 @@ final chatsNotifierProvider =
     StateNotifierProvider<ChatsNotifier, AsyncValue<List<Chat>>>((ref) {
   return ChatsNotifier();
 });
-

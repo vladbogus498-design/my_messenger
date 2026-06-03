@@ -11,6 +11,7 @@ import 'chat_input_panel.dart';
 import 'user_profile_screen.dart';
 import '../widgets/reaction_picker.dart';
 import '../widgets/message_status_icon.dart';
+import '../theme/darkkick_colors.dart';
 import '../utils/time_formatter.dart';
 import '../utils/navigation_animations.dart';
 import '../utils/logger.dart';
@@ -50,6 +51,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   @override
   void initState() {
     super.initState();
+    _actualChatId = widget.chatId.isEmpty ? null : widget.chatId;
     _setupTypingListener();
     _setupTypingDetection();
     _markMessagesAsRead();
@@ -563,10 +565,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final bubbleColor = isMyMessage
-        ? colorScheme.primary
-        : (theme.brightness == Brightness.dark
-            ? colorScheme.surfaceVariant
-            : colorScheme.surfaceVariant.withOpacity(0.8));
+        ? DarkKickColors.neonPurple
+        : DarkKickColors.panel;
     final textColor =
         isMyMessage ? colorScheme.onPrimary : colorScheme.onSurface;
     final metaTextColor = isMyMessage
@@ -574,7 +574,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         : colorScheme.onSurfaceVariant;
 
     return Container(
-      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 12),
       child: Row(
         mainAxisAlignment:
             isMyMessage ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -604,10 +604,26 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                 GestureDetector(
                   onLongPress: () => _showMessageMenu(message),
                   child: Container(
-                    padding: EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
                     decoration: BoxDecoration(
                       color: bubbleColor,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(18),
+                        topRight: const Radius.circular(18),
+                        bottomLeft: Radius.circular(isMyMessage ? 18 : 4),
+                        bottomRight: Radius.circular(isMyMessage ? 4 : 18),
+                      ),
+                      border: isMyMessage
+                          ? null
+                          : Border.all(color: DarkKickColors.divider),
+                      boxShadow: isMyMessage
+                          ? [
+                              BoxShadow(
+                                color: DarkKickColors.neonPurple.withValues(alpha: 0.22),
+                                blurRadius: 14,
+                              ),
+                            ]
+                          : null,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -860,8 +876,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       }
     }
 
-    if (otherUserId != null && otherUserId.isNotEmpty) {
-      Navigator.push(
+    if (!mounted || otherUserId == null || otherUserId.isEmpty) return;
+
+    Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => UserProfileScreen(
@@ -870,15 +887,19 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           ),
         ),
       );
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final chatId = _actualChatId ?? widget.chatId;
+
     return Scaffold(
+      backgroundColor: DarkKickColors.darkBackground,
       appBar: AppBar(
+        backgroundColor: DarkKickColors.darkBackground,
+        foregroundColor: DarkKickColors.textPrimary,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         title: GestureDetector(
@@ -910,17 +931,28 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _actualChatId != null && _actualChatId!.isNotEmpty
+            child: chatId.isNotEmpty
                 ? StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: FirebaseFirestore.instance
                         .collection('chats')
-                        .doc(_actualChatId)
+                        .doc(chatId)
                         .collection('messages')
                         .orderBy('timestamp', descending: true)
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(child: CircularProgressIndicator());
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: DarkKickColors.neonPurple,
+                          ),
+                        );
+                      }
+                      if (snapshot.hasError) {
+                        return const _ChatEmptyState(
+                          icon: Icons.cloud_off_outlined,
+                          title: 'Не удалось загрузить сообщения',
+                          subtitle: 'Проверь подключение и открой чат еще раз.',
+                        );
                       }
                       if (snapshot.hasError) {
                         return Center(
@@ -928,6 +960,13 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                         );
                       }
                       final docs = snapshot.data?.docs ?? [];
+                      if (docs.isEmpty) {
+                        return const _ChatEmptyState(
+                          icon: Icons.chat_bubble_outline,
+                          title: 'Диалог пуст',
+                          subtitle: 'Отправь первое сообщение.',
+                        );
+                      }
                       if (docs.isEmpty) {
                         return Center(
                           child: Text(
@@ -940,7 +979,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                         controller: _scrollController,
                         reverse: true,
                         itemCount: docs.length,
-                        key: ValueKey('messages_list_${_actualChatId}'),
+                        key: ValueKey('messages_list_$chatId'),
                         itemBuilder: (_, i) {
                           final doc = docs[i];
                           final message = Message.fromMap(doc.data(), doc.id);
@@ -962,6 +1001,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
           // Action preview (reply/forward)
           _buildActionPreview(),
+
+          if (_typingStatus.typingUsers.isNotEmpty) _buildTypingIndicator(),
 
           ChatInputPanel(
             chatId: _actualChatId ?? widget.chatId,
@@ -1017,6 +1058,52 @@ class _AnimatedStatusRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ChatEmptyState extends StatelessWidget {
+  const _ChatEmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: DarkKickColors.neonPurple, size: 44),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: DarkKickColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: DarkKickColors.textSecondary,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

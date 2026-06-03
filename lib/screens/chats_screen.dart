@@ -319,10 +319,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildErrorState(Object error) {
-    return _EmptyState(
+    return const _EmptyState(
       icon: Icons.cloud_off_outlined,
       title: 'Не удалось загрузить чаты',
-      subtitle: error.toString(),
+      subtitle: 'Проверь подключение и попробуй открыть экран еще раз.',
     );
   }
 
