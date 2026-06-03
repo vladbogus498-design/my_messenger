@@ -6,6 +6,7 @@ import '../services/chat_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/input_validator.dart';
 import '../utils/navigation_animations.dart';
+import '../utils/user_formatters.dart';
 import 'single_chat_screen.dart';
 
 class NewChatScreen extends StatefulWidget {
@@ -221,11 +222,14 @@ class _SearchUser {
         .toString();
     final tag = (data['tag'] ?? data['username'] ?? data['email'] ?? '')
         .toString();
+    final photoUrl = UserFormatters.readPhotoUrl(data);
+    final avatarUpdatedAt = UserFormatters.readDate(data['avatarUpdatedAt']);
+
     return _SearchUser(
       uid: doc.id,
       displayName: name,
       subtitle: tag.isEmpty ? 'Darkkick user' : tag,
-      photoURL: data['photoURL'] as String?,
+      photoURL: UserFormatters.versionedImageUrl(photoUrl, avatarUpdatedAt),
     );
   }
 }

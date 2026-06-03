@@ -2,9 +2,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/user_model.dart';
 import '../services/user_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/navigation_animations.dart';
+import '../utils/user_formatters.dart';
 import 'profile_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -61,6 +63,8 @@ class SettingsScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
           children: [
+            _SettingsProfileHeader(onTap: () => _openProfile(context)),
+            const SizedBox(height: 18),
             _SettingsGroup(
               children: [
                 _SettingsTile(
@@ -144,13 +148,119 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Темный приватный мессенджер с фиолетовым glow и личными чатами.',
+                  'Тёмный приватный мессенджер с фиолетовым glow и личными чатами.',
                   style: TextStyle(
                     color: DarkKickColors.textSecondary,
                     height: 1.35,
                   ),
                 ),
               ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SettingsProfileHeader extends StatelessWidget {
+  const _SettingsProfileHeader({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final authUser = FirebaseAuth.instance.currentUser;
+    final uid = authUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    return StreamBuilder<UserModel?>(
+      stream: UserService.watchUserData(uid),
+      builder: (context, snapshot) {
+        final user =
+            snapshot.data ??
+            UserModel(
+              uid: uid,
+              email: authUser?.email ?? '',
+              name:
+                  authUser?.displayName ??
+                  authUser?.email?.split('@').first ??
+                  'Пользователь',
+              photoURL: authUser?.photoURL,
+            );
+        final initial = user.name.trim().isEmpty
+            ? '?'
+            : user.name.trim()[0].toUpperCase();
+        final photoUrl = UserFormatters.versionedImageUrl(
+          user.photoURL,
+          user.avatarUpdatedAt,
+        );
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(18),
+            child: Ink(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: DarkKickColors.panel,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: DarkKickColors.divider),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: DarkKickColors.cardSoft,
+                    backgroundImage: photoUrl == null
+                        ? null
+                        : NetworkImage(photoUrl),
+                    child: photoUrl == null
+                        ? Text(
+                            initial,
+                            style: GoogleFonts.spaceGrotesk(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.spaceGrotesk(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          user.email.isEmpty ? 'Darkkick аккаунт' : user.email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: DarkKickColors.textTertiary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: DarkKickColors.textTertiary,
+                  ),
+                ],
+              ),
             ),
           ),
         );

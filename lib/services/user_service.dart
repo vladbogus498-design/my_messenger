@@ -82,6 +82,7 @@ class UserService {
           throw Exception('Invalid photoURL format');
         }
         updates['photoURL'] = photoURL;
+        updates['avatarUpdatedAt'] = FieldValue.serverTimestamp();
       }
 
       if (updates.isEmpty) return;
@@ -89,6 +90,13 @@ class UserService {
           .collection('users')
           .doc(userId)
           .set(updates, SetOptions(merge: true));
+      if (photoURL != null) {
+        try {
+          await _auth.currentUser?.updatePhotoURL(photoURL);
+        } catch (e) {
+          appLogger.e('Error updating FirebaseAuth photoURL', error: e);
+        }
+      }
       appLogger.d('User data updated for userId: $userId');
     } catch (e) {
       appLogger.e('Error updating user data for userId: $userId', error: e);

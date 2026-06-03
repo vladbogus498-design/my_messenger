@@ -762,13 +762,16 @@ Stream<_PeerMeta>? _peerMetaStream(String? uid) {
             ? email.split('@').first
             : 'Пользователь';
         final name = (data['name'] ?? fallback).toString();
-        final photoUrl = data['photoURL']?.toString();
+        final photoUrl = UserFormatters.readPhotoUrl(data);
+        final avatarUpdatedAt = UserFormatters.readDate(
+          data['avatarUpdatedAt'],
+        );
         final lastSeen = data['lastSeen'] is Timestamp
             ? (data['lastSeen'] as Timestamp).toDate()
             : null;
         return _PeerMeta(
           name: name,
-          photoUrl: photoUrl,
+          photoUrl: UserFormatters.versionedImageUrl(photoUrl, avatarUpdatedAt),
           isOnline: data['isOnline'] == true,
           lastSeen: lastSeen,
         );

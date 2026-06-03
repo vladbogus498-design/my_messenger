@@ -9,6 +9,7 @@ import '../services/user_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/navigation_animations.dart';
 import '../utils/user_formatters.dart';
+import '../widgets/media_stats_card.dart';
 import 'single_chat_screen.dart';
 
 class UserProfileScreen extends StatelessWidget {
@@ -87,6 +88,8 @@ class UserProfileScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 18),
                               _InfoCard(user: user),
+                              const SizedBox(height: 18),
+                              MediaStatsCard(chatId: chatId),
                               const SizedBox(height: 20),
                               const TabBar(
                                 labelColor: Colors.white,
@@ -189,6 +192,10 @@ class _LargeAvatar extends StatelessWidget {
     final initial = user.name.trim().isEmpty
         ? '?'
         : user.name.trim()[0].toUpperCase();
+    final photoUrl = UserFormatters.versionedImageUrl(
+      user.photoURL,
+      user.avatarUpdatedAt,
+    );
 
     return Container(
       width: 118,
@@ -204,9 +211,9 @@ class _LargeAvatar extends StatelessWidget {
         ],
       ),
       child: ClipOval(
-        child: user.photoURL != null && user.photoURL!.isNotEmpty
+        child: photoUrl != null
             ? Image.network(
-                user.photoURL!,
+                photoUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => _AvatarFallback(initial: initial),
               )
@@ -465,7 +472,7 @@ class _PhotoGrid extends StatelessWidget {
           );
         }
         if (urls.isEmpty) {
-          return const _ProfileTabEmpty(text: 'В этом диалоге пока нет фото');
+          return const _ProfileTabEmpty(text: 'Фотографий пока нет');
         }
 
         return GridView.builder(

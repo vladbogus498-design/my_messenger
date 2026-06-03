@@ -38,6 +38,7 @@ class SingleChatScreen extends StatefulWidget {
 
 class _SingleChatScreenState extends State<SingleChatScreen> {
   final _scrollController = ScrollController();
+  final Map<String, GlobalKey> _messageKeys = {};
   final User? _currentUser = FirebaseAuth.instance.currentUser;
   Message? _replyingTo;
   Message? _forwardingMessage;
@@ -55,6 +56,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   String? _peerPhotoUrl;
   bool _peerIsOnline = false;
   DateTime? _peerLastSeen;
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _messageDocs = [];
+  String? _highlightedMessageId;
+  Timer? _highlightTimer;
 
   @override
   void initState() {
@@ -110,16 +114,18 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           ? email.split('@').first
           : widget.chatName;
       final name = (data['name'] ?? fallback).toString();
-      final photoUrl = data['photoURL']?.toString();
-      final lastSeen = data['lastSeen'] is Timestamp
-          ? (data['lastSeen'] as Timestamp).toDate()
-          : null;
+      final photoUrl = UserFormatters.readPhotoUrl(data);
+      final avatarUpdatedAt = UserFormatters.readDate(data['avatarUpdatedAt']);
+      final lastSeen = UserFormatters.readDate(data['lastSeen']);
 
       if (!mounted) return;
       setState(() {
         _otherUserId = otherUserId;
         _peerName = name;
-        _peerPhotoUrl = photoUrl;
+        _peerPhotoUrl = UserFormatters.versionedImageUrl(
+          photoUrl,
+          avatarUpdatedAt,
+        );
         _peerIsOnline = data['isOnline'] == true;
         _peerLastSeen = lastSeen;
       });
@@ -439,6 +445,77 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     await ChatService.pinMessage(chatId, message);
   }
 
+  GlobalKey _messageKey(String messageId) {
+    return _messageKeys.putIfAbsent(messageId, GlobalKey.new);
+  }
+
+  Future<void> _scrollToPinnedMessage(Map<String, dynamic> pinned) async {
+    final messageId = (pinned['messageId'] ?? pinned['id'] ?? '').toString();
+    if (messageId.isEmpty) {
+      _showSnackBar('Сообщение не найдено');
+      return;
+    }
+
+    final existingContext = _messageKeys[messageId]?.currentContext;
+    if (existingContext != null) {
+      await Scrollable.ensureVisible(
+        existingContext,
+        duration: const Duration(milliseconds: 360),
+        curve: Curves.easeOutCubic,
+        alignment: 0.35,
+      );
+      _highlightMessage(messageId);
+      return;
+    }
+
+    final index = _messageDocs.indexWhere((doc) => doc.id == messageId);
+    if (index == -1 || !_scrollController.hasClients) {
+      _showSnackBar('Сообщение не найдено');
+      return;
+    }
+
+    final maxOffset = _scrollController.position.maxScrollExtent;
+    final targetOffset = _messageDocs.length <= 1
+        ? 0.0
+        : (maxOffset * (index / (_messageDocs.length - 1)))
+              .clamp(0.0, maxOffset)
+              .toDouble();
+    await _scrollController.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutCubic,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final context = _messageKeys[messageId]?.currentContext;
+      if (context != null) {
+        await Scrollable.ensureVisible(
+          context,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+          alignment: 0.35,
+        );
+        _highlightMessage(messageId);
+      }
+    });
+  }
+
+  void _highlightMessage(String messageId) {
+    _highlightTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _highlightedMessageId = messageId);
+    _highlightTimer = Timer(const Duration(milliseconds: 1600), () {
+      if (mounted && _highlightedMessageId == messageId) {
+        setState(() => _highlightedMessageId = null);
+      }
+    });
+  }
+
+  void _showSnackBar(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
   bool _isMyMessage(String senderId) {
     return senderId == _currentUser?.uid;
   }
@@ -675,6 +752,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     final metaTextColor = isMyMessage
         ? colorScheme.onPrimary.withOpacity(0.8)
         : colorScheme.onSurfaceVariant;
+    final isHighlighted = _highlightedMessageId == message.id;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 12),
@@ -720,10 +798,25 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                         bottomLeft: Radius.circular(isMyMessage ? 18 : 4),
                         bottomRight: Radius.circular(isMyMessage ? 4 : 18),
                       ),
-                      border: isMyMessage
+                      border: isHighlighted
+                          ? Border.all(
+                              color: DarkKickColors.neonPurple,
+                              width: 1.4,
+                            )
+                          : isMyMessage
                           ? null
                           : Border.all(color: DarkKickColors.divider),
-                      boxShadow: isMyMessage
+                      boxShadow: isHighlighted
+                          ? [
+                              BoxShadow(
+                                color: DarkKickColors.neonPurple.withValues(
+                                  alpha: 0.55,
+                                ),
+                                blurRadius: 22,
+                                spreadRadius: 1,
+                              ),
+                            ]
+                          : isMyMessage
                           ? [
                               BoxShadow(
                                 color: DarkKickColors.neonPurple.withValues(
@@ -946,54 +1039,63 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: DarkKickColors.panel,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: DarkKickColors.divider),
-              boxShadow: [
-                BoxShadow(
-                  color: DarkKickColors.neonPurple.withValues(alpha: 0.12),
-                  blurRadius: 16,
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.push_pin_outlined,
-                  color: DarkKickColors.neonPurple,
-                  size: 18,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Закреплено',
-                        style: TextStyle(
-                          color: DarkKickColors.textTertiary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: DarkKickColors.textPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+          child: GestureDetector(
+            onTap: () => _scrollToPinnedMessage(data),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: DarkKickColors.panel,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: DarkKickColors.divider),
+                boxShadow: [
+                  BoxShadow(
+                    color: DarkKickColors.neonPurple.withValues(alpha: 0.12),
+                    blurRadius: 16,
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.push_pin_outlined,
+                    color: DarkKickColors.neonPurple,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Закреплено',
+                          style: TextStyle(
+                            color: DarkKickColors.textTertiary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          text.isNotEmpty
+                              ? label
+                              : type == 'image'
+                              ? 'Фото'
+                              : type == 'sticker'
+                              ? 'Стикер'
+                              : 'Сообщение',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: DarkKickColors.textPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -1192,13 +1294,18 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
             : email.contains('@')
             ? email.split('@').first
             : fallbackName;
-        final lastSeen = data['lastSeen'] is Timestamp
-            ? (data['lastSeen'] as Timestamp).toDate()
-            : _peerLastSeen;
+        final photoUrl = UserFormatters.readPhotoUrl(data);
+        final avatarUpdatedAt = UserFormatters.readDate(
+          data['avatarUpdatedAt'],
+        );
+        final lastSeen =
+            UserFormatters.readDate(data['lastSeen']) ?? _peerLastSeen;
 
         return titleContent(
           name: name,
-          photoUrl: data['photoURL']?.toString() ?? _peerPhotoUrl,
+          photoUrl:
+              UserFormatters.versionedImageUrl(photoUrl, avatarUpdatedAt) ??
+              _peerPhotoUrl,
           isOnline: data['isOnline'] == true,
           lastSeen: lastSeen,
         );
@@ -1258,6 +1365,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                         );
                       }
                       final docs = snapshot.data?.docs ?? [];
+                      _messageDocs = docs;
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         _markMessagesAsRead();
                       });
@@ -1285,7 +1393,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                           final doc = docs[i];
                           final message = Message.fromMap(doc.data(), doc.id);
                           return RepaintBoundary(
-                            key: ValueKey('message_${message.id}'),
+                            key: _messageKey(message.id),
                             child: _buildMessageBubble(message),
                           );
                         },
@@ -1321,6 +1429,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   @override
   void dispose() {
+    _highlightTimer?.cancel();
     _playbackCompleteSubscription?.cancel();
     _typingStatusSubscription?.cancel();
     VoiceMessageService.stopPlaying();

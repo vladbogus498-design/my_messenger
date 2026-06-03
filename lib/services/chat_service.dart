@@ -42,25 +42,32 @@ class ChatService {
           .orderBy('timestamp', descending: false)
           .get();
 
-      return Future.wait(snapshot.docs.map((doc) async {
-        final data = doc.data();
-        var messageText = data['text'] ?? '';
-        final isEncrypted = data['isEncrypted'] ?? false;
+      return Future.wait(
+        snapshot.docs.map((doc) async {
+          final data = doc.data();
+          var messageText = data['text'] ?? '';
+          final isEncrypted = data['isEncrypted'] ?? false;
 
-        if (isEncrypted && messageText.isNotEmpty) {
-          try {
-            messageText = await E2EEncryptionService.decryptMessage(messageText);
-          } catch (e) {
-            appLogger.e('Error decrypting message in chat: $chatId', error: e);
+          if (isEncrypted && messageText.isNotEmpty) {
+            try {
+              messageText = await E2EEncryptionService.decryptMessage(
+                messageText,
+              );
+            } catch (e) {
+              appLogger.e(
+                'Error decrypting message in chat: $chatId',
+                error: e,
+              );
+            }
           }
-        }
 
-        return Message.fromMap({
-          ...data,
-          'chatId': chatId,
-          'text': messageText,
-        }, doc.id);
-      }));
+          return Message.fromMap({
+            ...data,
+            'chatId': chatId,
+            'text': messageText,
+          }, doc.id);
+        }),
+      );
     } catch (e) {
       appLogger.e('Error loading messages for chat: $chatId', error: e);
       return [];
@@ -134,8 +141,10 @@ class ChatService {
 
       if (type == 'voice' && voiceAudioBase64 != null) {
         final base64Size = voiceAudioBase64.length * 3 ~/ 4;
-        final sizeError =
-            InputValidator.validateFileSize(base64Size, isVoice: true);
+        final sizeError = InputValidator.validateFileSize(
+          base64Size,
+          isVoice: true,
+        );
         if (sizeError != null) throw Exception(sizeError);
       }
 
@@ -144,15 +153,18 @@ class ChatService {
       }
 
       if (recipientIds != null) {
-        recipientIds = recipientIds.where(InputValidator.isValidUserId).toList();
+        recipientIds = recipientIds
+            .where(InputValidator.isValidUserId)
+            .toList();
         if (recipientIds.isEmpty && encrypt) {
           encrypt = false;
         }
       }
 
       final originalText = text.trim();
-      var messageText =
-          originalText.isEmpty ? '' : InputValidator.sanitizeMessage(text);
+      var messageText = originalText.isEmpty
+          ? ''
+          : InputValidator.sanitizeMessage(text);
       final previewText = _lastMessagePreview(type, messageText);
       var isEncrypted = false;
 
@@ -161,8 +173,10 @@ class ChatService {
           recipientIds != null &&
           recipientIds.isNotEmpty) {
         try {
-          messageText =
-              await E2EEncryptionService.encryptMessage(messageText, recipientIds[0]);
+          messageText = await E2EEncryptionService.encryptMessage(
+            messageText,
+            recipientIds[0],
+          );
           isEncrypted = true;
         } catch (e) {
           appLogger.e('Error encrypting message for chat: $chatId', error: e);
@@ -174,13 +188,11 @@ class ChatService {
           .collection('messages')
           .doc(messageId ?? createMessageId(chatId));
       final now = FieldValue.serverTimestamp();
-      final replyPayload = replyTo ??
+      final replyPayload =
+          replyTo ??
           (replyToId == null
               ? null
-              : {
-                  'id': replyToId,
-                  'text': replyToText ?? '',
-                });
+              : {'id': replyToId, 'text': replyToText ?? ''});
 
       await _firestore.runTransaction((transaction) async {
         final chatSnapshot = await transaction.get(chatRef);
@@ -189,8 +201,9 @@ class ChatService {
         }
 
         final chatData = chatSnapshot.data() ?? const <String, dynamic>{};
-        final participants =
-            List<String>.from(chatData['participants'] ?? const []);
+        final participants = List<String>.from(
+          chatData['participants'] ?? const [],
+        );
         final unreadCount = _readUnreadCount(chatData['unreadCount']);
         for (final participant in participants) {
           unreadCount[participant] ??= 0;
@@ -304,13 +317,11 @@ class ChatService {
     try {
       await _firestore.collection('chats').doc(chatId).update({
         'pinnedMessage': {
-          'id': message.id,
+          'messageId': message.id,
           'text': _lastMessagePreview(message.type, message.text),
           'type': message.type,
           'senderId': message.senderId,
           'imageUrl': message.imageUrl,
-          'stickerUrl': message.stickerUrl,
-          'voiceUrl': message.voiceUrl,
           'createdAt': Timestamp.fromDate(message.createdAt),
           'pinnedBy': userId,
           'pinnedAt': FieldValue.serverTimestamp(),
@@ -385,23 +396,22 @@ class ChatService {
   }
 
   static Stream<TypingStatus> getTypingStatus(String chatId) {
-    return _firestore.collection('typingStatus').doc(chatId).snapshots().map(
-      (doc) {
-        final data = doc.data();
-        return TypingStatus(
-          typingUsers:
-              (data?['typingUsers'] as List<dynamic>?)?.cast<String>() ??
-                  const [],
-          sendingPhotoUsers:
-              (data?['sendingPhotoUsers'] as List<dynamic>?)?.cast<String>() ??
-                  const [],
-          recordingVoiceUsers:
-              (data?['recordingVoiceUsers'] as List<dynamic>?)
-                      ?.cast<String>() ??
-                  const [],
-        );
-      },
-    );
+    return _firestore.collection('typingStatus').doc(chatId).snapshots().map((
+      doc,
+    ) {
+      final data = doc.data();
+      return TypingStatus(
+        typingUsers:
+            (data?['typingUsers'] as List<dynamic>?)?.cast<String>() ??
+            const [],
+        sendingPhotoUsers:
+            (data?['sendingPhotoUsers'] as List<dynamic>?)?.cast<String>() ??
+            const [],
+        recordingVoiceUsers:
+            (data?['recordingVoiceUsers'] as List<dynamic>?)?.cast<String>() ??
+            const [],
+      );
+    });
   }
 
   static Future<String> createChat({
@@ -422,8 +432,9 @@ class ChatService {
     }
 
     try {
-      if (!AppRateLimiters.chatCreationLimiter
-          .tryRequest('create_chat_$userId')) {
+      if (!AppRateLimiters.chatCreationLimiter.tryRequest(
+        'create_chat_$userId',
+      )) {
         throw Exception('Превышен лимит создания чатов. Попробуй позже.');
       }
 
@@ -436,7 +447,9 @@ class ChatService {
         final data = doc.data();
         if (data['isGroup'] == true || data['type'] == 'group') continue;
 
-        final participants = List<String>.from(data['participants'] ?? const []);
+        final participants = List<String>.from(
+          data['participants'] ?? const [],
+        );
         if (participants.length == 2 &&
             participants.toSet().containsAll({userId, otherUserId})) {
           return doc.id;
@@ -461,10 +474,7 @@ class ChatService {
         'lastMessageStatus': 'sent',
         'lastMessageReadBy': <String>[],
         'lastSenderId': null,
-        'unreadCount': {
-          userId: 0,
-          otherUserId: 0,
-        },
+        'unreadCount': {userId: 0, otherUserId: 0},
         'typing': <String, dynamic>{},
         'pinnedMessage': null,
         'createdAt': now,
@@ -479,10 +489,7 @@ class ChatService {
               .doc(participant)
               .collection('chats')
               .doc(chatRef.id),
-          {
-            'chatId': chatRef.id,
-            'createdAt': now,
-          },
+          {'chatId': chatRef.id, 'createdAt': now},
           SetOptions(merge: true),
         );
       }
@@ -500,10 +507,7 @@ class ChatService {
     appLogger.d('Creating test chat...');
   }
 
-  static Future<void> markMessageAsRead(
-    String chatId,
-    String messageId,
-  ) async {
+  static Future<void> markMessageAsRead(String chatId, String messageId) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
@@ -514,9 +518,9 @@ class ChatService {
           .collection('messages')
           .doc(messageId)
           .update({
-        'readBy': FieldValue.arrayUnion([userId]),
-        'status': 'read',
-      });
+            'readBy': FieldValue.arrayUnion([userId]),
+            'status': 'read',
+          });
     } catch (e) {
       appLogger.e('Error marking message as read: $messageId', error: e);
     }
@@ -551,9 +555,7 @@ class ChatService {
         changed++;
       }
 
-      final chatUpdate = <String, dynamic>{
-        'unreadCount': unreadCount,
-      };
+      final chatUpdate = <String, dynamic>{'unreadCount': unreadCount};
       if (chatData != null && chatData['lastSenderId'] != userId) {
         chatUpdate['lastMessageReadBy'] = FieldValue.arrayUnion([userId]);
         chatUpdate['lastMessageStatus'] = 'read';
@@ -563,7 +565,10 @@ class ChatService {
       await batch.commit();
       appLogger.d('Marked $changed messages as read in chat: $chatId');
     } catch (e) {
-      appLogger.e('Error marking all messages as read in chat: $chatId', error: e);
+      appLogger.e(
+        'Error marking all messages as read in chat: $chatId',
+        error: e,
+      );
     }
   }
 
@@ -583,16 +588,13 @@ class ChatService {
     }
   }
 
-  static Stream<List<String>> _typingStatusField(
-    String chatId,
-    String field,
-  ) {
-    return _firestore.collection('typingStatus').doc(chatId).snapshots().map(
-      (doc) {
-        final data = doc.data();
-        return (data?[field] as List<dynamic>?)?.cast<String>() ?? const [];
-      },
-    );
+  static Stream<List<String>> _typingStatusField(String chatId, String field) {
+    return _firestore.collection('typingStatus').doc(chatId).snapshots().map((
+      doc,
+    ) {
+      final data = doc.data();
+      return (data?[field] as List<dynamic>?)?.cast<String>() ?? const [];
+    });
   }
 
   static Map<String, int> _readUnreadCount(dynamic value) {

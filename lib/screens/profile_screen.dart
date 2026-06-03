@@ -10,11 +10,13 @@ import '../services/storage_service.dart';
 import '../services/user_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/user_formatters.dart';
+import '../widgets/media_stats_card.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, this.showBackButton = true});
+  const ProfileScreen({super.key, this.showBackButton = true, this.chatId});
 
   final bool showBackButton;
+  final String? chatId;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -49,7 +51,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final url = await StorageService.uploadUserAvatar(File(picked.path));
       await UserService.updateUserData(photoURL: url);
-      _showMessage('Аватар обновлен');
+      _showMessage('Аватар обновлён');
     } catch (error) {
       _showMessage('Не удалось загрузить аватар: $error');
     } finally {
@@ -65,7 +67,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         bio: _bioController.text.trim(),
       );
       if (mounted) setState(() => _isEditing = false);
-      _showMessage('Профиль сохранен');
+      _showMessage('Профиль сохранён');
     } catch (error) {
       _showMessage('Не удалось сохранить профиль: $error');
     } finally {
@@ -234,7 +236,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         onTap: _busy ? () {} : _uploadAvatar,
                       ),
                       const SizedBox(height: 22),
-                      const _StatsCard(),
+                      MediaStatsCard(chatId: widget.chatId),
                     ],
                   ),
                 );
@@ -260,6 +262,10 @@ class _ProfileAvatar extends StatelessWidget {
     final initial = user.name.trim().isEmpty
         ? '?'
         : user.name.trim()[0].toUpperCase();
+    final photoUrl = UserFormatters.versionedImageUrl(
+      user.photoURL,
+      user.avatarUpdatedAt,
+    );
 
     return GestureDetector(
       onTap: onTap,
@@ -280,14 +286,15 @@ class _ProfileAvatar extends StatelessWidget {
               ],
             ),
             child: ClipOval(
-              child: user.photoURL != null && user.photoURL!.isNotEmpty
-                  ? Image.network(
-                      user.photoURL!,
+              child: photoUrl == null
+                  ? _AvatarFallback(initial: initial)
+                  : Image.network(
+                      photoUrl,
                       fit: BoxFit.cover,
+                      gaplessPlayback: false,
                       errorBuilder: (_, __, ___) =>
                           _AvatarFallback(initial: initial),
-                    )
-                  : _AvatarFallback(initial: initial),
+                    ),
             ),
           ),
           Container(
@@ -428,57 +435,6 @@ class _ActionCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _StatsCard extends StatelessWidget {
-  const _StatsCard();
-
-  @override
-  Widget build(BuildContext context) {
-    const stats = [
-      ('Фотографии', '128'),
-      ('Файлы', '42'),
-      ('Ссылки', '18'),
-      ('Голосовые', '7'),
-    ];
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        color: DarkKickColors.panel,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: DarkKickColors.divider),
-      ),
-      child: Row(
-        children: stats
-            .map(
-              (stat) => Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      stat.$1,
-                      style: const TextStyle(
-                        color: DarkKickColors.textTertiary,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      stat.$2,
-                      style: GoogleFonts.spaceGrotesk(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
       ),
     );
   }

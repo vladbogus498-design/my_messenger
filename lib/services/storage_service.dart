@@ -13,10 +13,8 @@ class StorageService {
   static const String _uploadPreset = 'darkkick_uploads';
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  static Uri get _uploadUri => Uri.https(
-        'api.cloudinary.com',
-        '/v1_1/$_cloudName/image/upload',
-      );
+  static Uri get _uploadUri =>
+      Uri.https('api.cloudinary.com', '/v1_1/$_cloudName/image/upload');
 
   static Future<String> uploadChatImage(
     File imageFile,
@@ -32,7 +30,10 @@ class StorageService {
       }
 
       final fileSize = await imageFile.length();
-      final sizeError = InputValidator.validateFileSize(fileSize, isImage: true);
+      final sizeError = InputValidator.validateFileSize(
+        fileSize,
+        isImage: true,
+      );
       if (sizeError != null) throw Exception(sizeError);
 
       if (!InputValidator.isValidChatId(chatId)) {
@@ -49,7 +50,10 @@ class StorageService {
         publicId: messageId,
       );
     } catch (e) {
-      appLogger.e('Error uploading chat image to Cloudinary: $chatId', error: e);
+      appLogger.e(
+        'Error uploading chat image to Cloudinary: $chatId',
+        error: e,
+      );
       rethrow;
     }
   }
@@ -64,13 +68,16 @@ class StorageService {
       }
 
       final fileSize = await imageFile.length();
-      final sizeError = InputValidator.validateFileSize(fileSize, isImage: true);
+      final sizeError = InputValidator.validateFileSize(
+        fileSize,
+        isImage: true,
+      );
       if (sizeError != null) throw Exception(sizeError);
 
       return _uploadUnsignedImage(
         imageFile,
         folder: 'darkkick/avatars',
-        publicId: userId,
+        publicId: '${userId}_${DateTime.now().millisecondsSinceEpoch}',
       );
     } catch (e) {
       appLogger.e('Error uploading avatar to Cloudinary: $userId', error: e);
@@ -81,7 +88,9 @@ class StorageService {
   static Future<void> deleteUserAvatar() async {
     // Unsigned Cloudinary uploads cannot delete assets safely from the client.
     // Deleting requires a signed backend/API secret, which must not be in APK.
-    appLogger.w('Cloudinary unsigned upload does not support client-side delete');
+    appLogger.w(
+      'Cloudinary unsigned upload does not support client-side delete',
+    );
   }
 
   static Future<String> _uploadUnsignedImage(

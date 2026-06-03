@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../utils/user_formatters.dart';
+
 class UserModel {
   const UserModel({
     required this.uid,
@@ -11,6 +13,7 @@ class UserModel {
     this.username,
     this.premiumStatus = false,
     this.createdAt,
+    this.avatarUpdatedAt,
     this.isOnline = false,
     this.lastSeen,
   });
@@ -24,6 +27,7 @@ class UserModel {
   final String? username;
   final bool premiumStatus;
   final DateTime? createdAt;
+  final DateTime? avatarUpdatedAt;
   final bool isOnline;
   final DateTime? lastSeen;
 
@@ -32,12 +36,13 @@ class UserModel {
       uid: (data['uid'] ?? '').toString(),
       email: (data['email'] ?? '').toString(),
       name: (data['name'] ?? '').toString(),
-      photoURL: data['photoURL']?.toString(),
+      photoURL: UserFormatters.readPhotoUrl(data),
       bio: data['bio']?.toString(),
       tag: data['tag']?.toString(),
       username: data['username']?.toString(),
       premiumStatus: data['premiumStatus'] == true,
       createdAt: _readDate(data['createdAt']),
+      avatarUpdatedAt: _readDate(data['avatarUpdatedAt']),
       isOnline: data['isOnline'] == true,
       lastSeen: _readDate(data['lastSeen']),
     );
@@ -58,6 +63,9 @@ class UserModel {
       'username': username,
       'premiumStatus': premiumStatus,
       'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
+      'avatarUpdatedAt': avatarUpdatedAt == null
+          ? null
+          : Timestamp.fromDate(avatarUpdatedAt!),
       'isOnline': isOnline,
       'lastSeen': lastSeen == null ? null : Timestamp.fromDate(lastSeen!),
     };
