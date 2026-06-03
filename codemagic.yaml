@@ -6,6 +6,9 @@ workflows:
     scripts:
       - name: Force Build with Fix
         script: |
+          echo "=== Checking required assets ==="
+          test -f assets/images/auth_bg.png || (echo "Missing assets/images/auth_bg.png" && exit 1)
+          test -f assets/images/auth_angel.png || (echo "Missing assets/images/auth_angel.png" && exit 1)
           echo "=== IGNORING ANDROID VERSION WARNINGS ==="
           flutter clean
           flutter pub get

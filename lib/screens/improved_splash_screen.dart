@@ -65,9 +65,17 @@ class _ImprovedSplashScreenState extends State<ImprovedSplashScreen> {
           children: [
             // Logo
             Image.asset(
-              'assets/logo.png',
+              'assets/images/auth_bg.png',
               width: 120,
               height: 120,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(
+                  Icons.bolt,
+                  size: 72,
+                  color: Theme.of(context).colorScheme.primary,
+                );
+              },
             ),
             const SizedBox(height: 24),
             // App name
