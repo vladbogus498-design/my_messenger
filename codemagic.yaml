@@ -15,6 +15,7 @@ workflows:
           test -f assets/images/auth_angel.png || (echo "Missing assets/images/auth_angel.png" && exit 1)
           echo "=== Preparing Flutter packages ==="
           flutter clean
+          rm -f pubspec.lock
           flutter pub get
           test -f .dart_tool/package_config.json || (echo "Missing .dart_tool/package_config.json after pub get" && exit 1)
           echo "=== Building Android release APK ==="
