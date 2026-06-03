@@ -1,13 +1,14 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../models/chat.dart';
 import '../models/message.dart';
 import '../models/message_type.dart';
-import '../models/chat.dart';
 import '../models/typing_status.dart';
-import 'e2e_encryption_service.dart';
-import '../utils/logger.dart';
 import '../utils/input_validator.dart';
+import '../utils/logger.dart';
 import '../utils/rate_limiter.dart';
+import 'e2e_encryption_service.dart';
 
 class ChatService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -23,24 +24,12 @@ class ChatService {
           .where('participants', arrayContains: userId)
           .get();
 
-      final chats = snapshot.docs.map<Chat>((doc) => Chat.fromFirestore(doc)).toList();
+      final chats = snapshot.docs.map(Chat.fromFirestore).toList();
       chats.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
       return chats;
     } catch (e) {
-      // Если запрос с lastMessage.timestamp не работает, пробуем fallback
-      appLogger.w('Error loading chats with lastMessage.timestamp, trying fallback', error: e);
-      try {
-        final snapshot = await _firestore
-            .collection('chats')
-            .where('participants', arrayContains: userId)
-            .get();
-        final chats = snapshot.docs.map<Chat>((doc) => Chat.fromFirestore(doc)).toList();
-        chats.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
-        return chats;
-      } catch (e2) {
-        appLogger.e('Error loading chats (fallback failed)', error: e2);
-        return [];
-      }
+      appLogger.e('Error loading chats', error: e);
+      return [];
     }
   }
 
@@ -53,12 +42,11 @@ class ChatService {
           .orderBy('timestamp', descending: false)
           .get();
 
-      final messages = await Future.wait(snapshot.docs.map((doc) async {
+      return Future.wait(snapshot.docs.map((doc) async {
         final data = doc.data();
         var messageText = data['text'] ?? '';
         final isEncrypted = data['isEncrypted'] ?? false;
 
-        // Дешифруем сообщение, если оно зашифровано
         if (isEncrypted && messageText.isNotEmpty) {
           try {
             messageText = await E2EEncryptionService.decryptMessage(messageText);
@@ -67,33 +55,25 @@ class ChatService {
           }
         }
 
-        return Message(
-          id: doc.id,
-          chatId: chatId,
-          senderId: data['senderId'] ?? '',
-          text: messageText,
-          type: data['type'] ?? 'text',
-          imageUrl: data['imageUrl'],
-          voiceAudioBase64: data['voiceAudioBase64'],
-          voiceDuration: data['voiceDuration'],
-          stickerId: data['stickerId'],
-          isEncrypted: isEncrypted,
-          timestamp: (data['timestamp'] as Timestamp).toDate(),
-          replyToId: data['replyToId'],
-          replyToText: data['replyToText'],
-          isForwarded: data['isForwarded'] ?? false,
-          originalSender: data['originalSender'],
-          reactions: Map<String, String>.from(data['reactions'] ?? {}),
-          isTyping: data['isTyping'] ?? false,
-          status: data['status'] ?? 'sent',
-        );
+        return Message.fromMap({
+          ...data,
+          'chatId': chatId,
+          'text': messageText,
+        }, doc.id);
       }));
-
-      return messages;
     } catch (e) {
       appLogger.e('Error loading messages for chat: $chatId', error: e);
       return [];
     }
+  }
+
+  static String createMessageId(String chatId) {
+    return _firestore
+        .collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .doc()
+        .id;
   }
 
   static Future<void> sendMessage({
@@ -104,131 +84,137 @@ class ChatService {
     String? voiceAudioBase64,
     int? voiceDuration,
     String? stickerId,
+    String? stickerUrl,
     String? replyToId,
     String? replyToText,
     bool isForwarded = false,
     String? originalSender,
     bool encrypt = false,
     List<String>? recipientIds,
+    String? messageId,
   }) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+
     try {
-      // Rate limiting: проверка лимита на отправку сообщений
-      final userId = _auth.currentUser?.uid ?? 'anonymous';
       if (!AppRateLimiters.messageLimiter.tryRequest('send_message_$userId')) {
-        throw Exception('Превышен лимит отправки сообщений. Попробуйте позже.');
+        throw Exception('Превышен лимит отправки сообщений. Попробуй позже.');
       }
 
-      // Валидация типа сообщения
       if (!MessageType.isValid(type)) {
         throw Exception('Invalid message type: $type');
       }
 
-      // Валидация входных данных
       if (!InputValidator.isValidChatId(chatId)) {
         throw Exception('Invalid chatId');
       }
 
-      // Валидация и санитизация текста сообщения
-      if (type == 'text' || type == 'image' || type == 'voice') {
+      if (messageId != null && messageId.contains('/')) {
+        throw Exception('Invalid messageId');
+      }
+
+      if (type == 'text') {
         final validationError = InputValidator.validateMessage(text);
-        if (validationError != null) {
-          throw Exception(validationError);
-        }
-      }
-      var messageText = text.isEmpty ? '' : InputValidator.sanitizeMessage(text);
-      var isEncrypted = false;
-
-      // Шифруем сообщение, если требуется
-      if (encrypt && messageText.isNotEmpty && recipientIds != null && recipientIds.isNotEmpty) {
-        try {
-          // Для простоты шифруем для первого получателя (в групповых чатах нужна более сложная логика)
-          messageText = await E2EEncryptionService.encryptMessage(messageText, recipientIds[0]);
-          isEncrypted = true;
-        } catch (e) {
-          appLogger.e('Error encrypting message for chat: $chatId', error: e);
-          // Продолжаем с незашифрованным сообщением
-        }
+        if (validationError != null) throw Exception(validationError);
       }
 
-      // Validate sticker type
-      if (type == 'sticker' && (stickerId == null || stickerId.isEmpty)) {
-        appLogger.e('Sticker type requires stickerId');
-        throw Exception('Sticker type requires stickerId');
+      if (type == 'image' && (imageUrl == null || imageUrl.isEmpty)) {
+        throw Exception('Image message requires imageUrl');
       }
 
-      // Валидация голосового сообщения
+      if (type == 'sticker' &&
+          ((stickerId == null || stickerId.isEmpty) &&
+              (stickerUrl == null || stickerUrl.isEmpty))) {
+        throw Exception('Sticker message requires stickerId or stickerUrl');
+      }
+
       if (type == 'voice' && voiceAudioBase64 != null) {
-        // Примерная проверка размера base64 (реальный размер будет меньше)
-        final base64Size = voiceAudioBase64.length * 3 ~/ 4; // Примерный размер в байтах
-        final sizeError = InputValidator.validateFileSize(base64Size, isVoice: true);
-        if (sizeError != null) {
-          throw Exception(sizeError);
-        }
+        final base64Size = voiceAudioBase64.length * 3 ~/ 4;
+        final sizeError =
+            InputValidator.validateFileSize(base64Size, isVoice: true);
+        if (sizeError != null) throw Exception(sizeError);
       }
 
-      // Валидация replyToId
       if (replyToId != null && !InputValidator.isValidChatId(replyToId)) {
         appLogger.w('Invalid replyToId: $replyToId');
-        replyToId = null; // Игнорируем невалидный ID
+        replyToId = null;
       }
 
-      // Валидация recipientIds
       if (recipientIds != null) {
-        recipientIds = recipientIds.where((id) => InputValidator.isValidUserId(id)).toList();
+        recipientIds =
+            recipientIds.where(InputValidator.isValidUserId).toList();
         if (recipientIds.isEmpty && encrypt) {
-          appLogger.w('No valid recipient IDs for encryption');
           encrypt = false;
         }
       }
 
-      final messageData = {
+      final originalText = text.trim();
+      var messageText =
+          originalText.isEmpty ? '' : InputValidator.sanitizeMessage(text);
+      final previewText = _lastMessagePreview(type, messageText);
+      var isEncrypted = false;
+
+      if (encrypt &&
+          messageText.isNotEmpty &&
+          recipientIds != null &&
+          recipientIds.isNotEmpty) {
+        try {
+          messageText =
+              await E2EEncryptionService.encryptMessage(messageText, recipientIds[0]);
+          isEncrypted = true;
+        } catch (e) {
+          appLogger.e('Error encrypting message for chat: $chatId', error: e);
+        }
+      }
+
+      final now = FieldValue.serverTimestamp();
+      final chatRef = _firestore.collection('chats').doc(chatId);
+      final messageRef = chatRef
+          .collection('messages')
+          .doc(messageId ?? createMessageId(chatId));
+
+      final messageData = <String, dynamic>{
         'chatId': chatId,
         'text': messageText,
         'type': type,
-        'senderId': _auth.currentUser?.uid,
-        'timestamp': FieldValue.serverTimestamp(), // Firestore автоматически использует UTC
+        'senderId': userId,
+        'timestamp': now,
+        'createdAt': now,
         if (imageUrl != null) 'imageUrl': imageUrl,
         if (voiceAudioBase64 != null) 'voiceAudioBase64': voiceAudioBase64,
         if (voiceDuration != null) 'voiceDuration': voiceDuration,
         if (stickerId != null) 'stickerId': stickerId,
+        if (stickerUrl != null) 'stickerUrl': stickerUrl,
         'isEncrypted': isEncrypted,
         if (replyToId != null) 'replyToId': replyToId,
         if (replyToText != null) 'replyToText': replyToText,
         'isForwarded': isForwarded,
         if (originalSender != null) 'originalSender': originalSender,
-        'reactions': {},
+        'reactions': <String, String>{},
         'isTyping': false,
-        'status': 'sending', // Начинаем со статуса "отправляется"
+        'status': 'sent',
+        'readBy': [userId],
       };
 
-      final messageRef = await _firestore
-          .collection('chats')
-          .doc(chatId)
-          .collection('messages')
-          .add(messageData);
+      final chatUpdate = <String, dynamic>{
+        'lastMessage': previewText,
+        'lastMessageType': type,
+        'lastMessageAt': now,
+        'lastMessageTime': now,
+        'lastMessageId': messageRef.id,
+        'lastMessageStatus': 'sent',
+        'lastMessageReadBy': [userId],
+        'lastSenderId': userId,
+        'updatedAt': now,
+      };
 
-      // Обновляем статус на "отправлено" после успешной записи
-      await messageRef.update({'status': 'sent'});
+      final batch = _firestore.batch();
+      batch.set(messageRef, messageData);
+      batch.update(chatRef, chatUpdate);
+      await batch.commit();
 
-      // Обновляем последнее сообщение в чате
-      final now = FieldValue.serverTimestamp();
-      await _firestore.collection('chats').doc(chatId).update({
-        'lastMessage': {
-          'text': text,
-          'timestamp': now,
-        },
-        'lastMessageTime': now, // Для обратной совместимости
-      });
-
-      // Автоматически обновляем статус на "доставлено" через небольшую задержку
-      // (в реальном приложении это должно происходить при получении сообщения на устройстве получателя)
-      Future.delayed(const Duration(seconds: 1), () async {
-        try {
-          await messageRef.update({'status': 'delivered'});
-        } catch (e) {
-          appLogger.e('Error updating message status to delivered', error: e);
-        }
-      });
       appLogger.d('Message sent successfully to chat: $chatId');
     } catch (e) {
       appLogger.e('Error sending message to chat: $chatId', error: e);
@@ -236,9 +222,10 @@ class ChatService {
     }
   }
 
-  // 🔄 Пересылка сообщения
   static Future<void> forwardMessage(
-      Message message, String targetChatId) async {
+    Message message,
+    String targetChatId,
+  ) async {
     await sendMessage(
       chatId: targetChatId,
       text: message.text,
@@ -247,14 +234,17 @@ class ChatService {
       voiceAudioBase64: message.voiceAudioBase64,
       voiceDuration: message.voiceDuration,
       stickerId: message.stickerId,
+      stickerUrl: message.stickerUrl,
       isForwarded: true,
       originalSender: message.senderId,
     );
   }
 
-  // ❤️ Добавление реакции
   static Future<void> addReaction(
-      String chatId, String messageId, String emoji) async {
+    String chatId,
+    String messageId,
+    String emoji,
+  ) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
@@ -266,167 +256,128 @@ class ChatService {
           .doc(messageId);
 
       final doc = await messageRef.get();
-      if (doc.exists) {
-        final data = doc.data()!;
-        final reactions = Map<String, String>.from(data['reactions'] ?? {});
+      if (!doc.exists) return;
 
-        if (reactions[userId] == emoji) {
-          reactions.remove(userId); // убираем реакцию
-        } else {
-          reactions[userId] = emoji; // добавляем реакцию
-        }
-
-        await messageRef.update({'reactions': reactions});
-        appLogger.d('Reaction added: $emoji to message: $messageId');
+      final data = doc.data()!;
+      final reactions = Map<String, String>.from(data['reactions'] ?? const {});
+      if (reactions[userId] == emoji) {
+        reactions.remove(userId);
+      } else {
+        reactions[userId] = emoji;
       }
+
+      await messageRef.update({'reactions': reactions});
     } catch (e) {
       appLogger.e('Error adding reaction to message: $messageId', error: e);
     }
   }
 
-  // ✍️ Статус "печатает"
   static Future<void> setTypingStatus(String chatId, bool isTyping) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
     try {
-      await _firestore.collection('chats').doc(chatId).update({
+      await _firestore.collection('typingStatus').doc(chatId).set({
         'typingUsers': isTyping
             ? FieldValue.arrayUnion([userId])
-            : FieldValue.arrayRemove([userId])
-      });
+            : FieldValue.arrayRemove([userId]),
+      }, SetOptions(merge: true));
     } catch (e) {
       appLogger.e('Error setting typing status for chat: $chatId', error: e);
     }
   }
 
-  // 📸 Статус "отправляет фото"
   static Future<void> setSendingPhotoStatus(
-      String chatId, bool isSending) async {
+    String chatId,
+    bool isSending,
+  ) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
     try {
-      await _firestore.collection('chats').doc(chatId).update({
+      await _firestore.collection('typingStatus').doc(chatId).set({
         'sendingPhotoUsers': isSending
             ? FieldValue.arrayUnion([userId])
-            : FieldValue.arrayRemove([userId])
-      });
+            : FieldValue.arrayRemove([userId]),
+      }, SetOptions(merge: true));
     } catch (e) {
       appLogger.e('Error setting photo status for chat: $chatId', error: e);
     }
   }
 
-  // 🎤 Статус "записывает голосовое"
   static Future<void> setRecordingVoiceStatus(
-      String chatId, bool isRecording) async {
+    String chatId,
+    bool isRecording,
+  ) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
     try {
-      await _firestore.collection('chats').doc(chatId).update({
+      await _firestore.collection('typingStatus').doc(chatId).set({
         'recordingVoiceUsers': isRecording
             ? FieldValue.arrayUnion([userId])
-            : FieldValue.arrayRemove([userId])
-      });
+            : FieldValue.arrayRemove([userId]),
+      }, SetOptions(merge: true));
     } catch (e) {
       appLogger.e('Error setting voice status for chat: $chatId', error: e);
     }
   }
 
-  // 👀 Получение статусов "печатает"
   static Stream<List<String>> getTypingUsers(String chatId) {
-    return _firestore
-        .collection('chats')
-        .doc(chatId)
-        .snapshots()
-        .map((snapshot) {
-      final data = snapshot.data();
-      final typingUsers = data?['typingUsers'] as List<dynamic>?;
-      return typingUsers?.cast<String>() ?? [];
-    });
+    return _typingStatusField(chatId, 'typingUsers');
   }
 
-  // 📸 Получение статусов "отправляет фото"
   static Stream<List<String>> getSendingPhotoUsers(String chatId) {
-    return _firestore
-        .collection('chats')
-        .doc(chatId)
-        .snapshots()
-        .map((snapshot) {
-      final data = snapshot.data();
-      final sendingPhotoUsers = data?['sendingPhotoUsers'] as List<dynamic>?;
-      return sendingPhotoUsers?.cast<String>() ?? [];
-    });
+    return _typingStatusField(chatId, 'sendingPhotoUsers');
   }
 
-  // 🎤 Получение статусов "записывает голосовое"
   static Stream<List<String>> getRecordingVoiceUsers(String chatId) {
-    return _firestore
-        .collection('chats')
-        .doc(chatId)
-        .snapshots()
-        .map((snapshot) {
-      final data = snapshot.data();
-      final recordingVoiceUsers =
-          data?['recordingVoiceUsers'] as List<dynamic>?;
-      return recordingVoiceUsers?.cast<String>() ?? [];
-    });
+    return _typingStatusField(chatId, 'recordingVoiceUsers');
   }
 
-  // 📊 Получение всех статусов активности в одном потоке
   static Stream<TypingStatus> getTypingStatus(String chatId) {
-    return _firestore
-        .collection('chats')
-        .doc(chatId)
-        .snapshots()
-        .map((snapshot) {
-      final data = snapshot.data();
-      return TypingStatus(
-        typingUsers: (data?['typingUsers'] as List<dynamic>?)
-                ?.cast<String>() ??
-            [],
-        sendingPhotoUsers: (data?['sendingPhotoUsers'] as List<dynamic>?)
-                ?.cast<String>() ??
-            [],
-        recordingVoiceUsers:
-            (data?['recordingVoiceUsers'] as List<dynamic>?)
-                    ?.cast<String>() ??
-                [],
-      );
-    });
+    return _firestore.collection('typingStatus').doc(chatId).snapshots().map(
+      (doc) {
+        final data = doc.data();
+        return TypingStatus(
+          typingUsers:
+              (data?['typingUsers'] as List<dynamic>?)?.cast<String>() ??
+                  const [],
+          sendingPhotoUsers:
+              (data?['sendingPhotoUsers'] as List<dynamic>?)?.cast<String>() ??
+                  const [],
+          recordingVoiceUsers:
+              (data?['recordingVoiceUsers'] as List<dynamic>?)
+                      ?.cast<String>() ??
+                  const [],
+        );
+      },
+    );
   }
 
-  /// Создание нового приватного чата между двумя пользователями
-  /// Возвращает ID созданного чата или существующего, если чат уже есть
   static Future<String> createChat({
     required String otherUserId,
     String? chatName,
   }) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) {
-      appLogger.w('Cannot create chat: user not authenticated');
       throw Exception('User not authenticated');
     }
 
-    // Валидация входных данных
     if (!InputValidator.isValidUserId(otherUserId)) {
-      appLogger.w('Invalid otherUserId: $otherUserId');
       throw Exception('Invalid otherUserId');
     }
 
     if (userId == otherUserId) {
-      appLogger.w('Cannot create chat with yourself');
       throw Exception('Cannot create chat with yourself');
     }
 
     try {
-      // Rate limiting: проверка лимита на создание чатов
-      if (!AppRateLimiters.chatCreationLimiter.tryRequest('create_chat_$userId')) {
-        throw Exception('Превышен лимит создания чатов. Попробуйте позже.');
+      if (!AppRateLimiters.chatCreationLimiter
+          .tryRequest('create_chat_$userId')) {
+        throw Exception('Превышен лимит создания чатов. Попробуй позже.');
       }
 
-      // Проверяем, существует ли уже чат между этими пользователями
       final existingChats = await _firestore
           .collection('chats')
           .where('participants', arrayContains: userId)
@@ -436,68 +387,53 @@ class ChatService {
         final data = doc.data();
         if (data['isGroup'] == true) continue;
 
-        final participants = List<String>.from(data['participants'] ?? []);
-        if (participants.toSet().containsAll({userId, otherUserId}) && 
-            participants.length == 2) {
-          appLogger.d('Chat already exists: ${doc.id}');
+        final participants = List<String>.from(data['participants'] ?? const []);
+        if (participants.length == 2 &&
+            participants.toSet().containsAll({userId, otherUserId})) {
           return doc.id;
         }
       }
 
-      // Создаем новый чат
       final now = FieldValue.serverTimestamp();
       final participants = [userId, otherUserId];
-      
-      final chatDoc = await _firestore.collection('chats').add({
+      final chatRef = _firestore.collection('chats').doc();
+      final batch = _firestore.batch();
+
+      batch.set(chatRef, {
         'name': chatName ?? 'Chat',
         'isGroup': false,
         'participants': participants,
         'admins': [],
-        'lastMessage': {
-          'text': '',
-          'timestamp': now,
-        },
+        'lastMessage': '',
+        'lastMessageType': 'text',
+        'lastMessageAt': now,
+        'lastMessageTime': now,
         'lastMessageStatus': 'sent',
-        'lastMessageTime': now, // Для обратной совместимости
+        'lastMessageReadBy': <String>[],
+        'lastSenderId': null,
         'createdAt': now,
+        'updatedAt': now,
         'createdBy': userId,
       });
 
-      final chatId = chatDoc.id;
-      appLogger.d('Chat created successfully: $chatId');
-
-      // Создаем записи в подколлекциях пользователей (опционально, для быстрого доступа)
-      try {
-        final batch = _firestore.batch();
-        
-        // Добавляем чат в список чатов первого пользователя
+      for (final participant in participants) {
         batch.set(
-          _firestore.collection('users').doc(userId).collection('chats').doc(chatId),
+          _firestore
+              .collection('users')
+              .doc(participant)
+              .collection('chats')
+              .doc(chatRef.id),
           {
-            'chatId': chatId,
-            'addedAt': now,
+            'chatId': chatRef.id,
+            'createdAt': now,
           },
           SetOptions(merge: true),
         );
-        
-        // Добавляем чат в список чатов второго пользователя
-        batch.set(
-          _firestore.collection('users').doc(otherUserId).collection('chats').doc(chatId),
-          {
-            'chatId': chatId,
-            'addedAt': now,
-          },
-          SetOptions(merge: true),
-        );
-        
-        await batch.commit();
-        appLogger.d('User chat references created for chat: $chatId');
-      } catch (e) {
-        // Не критично, если не удалось создать ссылки
-        appLogger.w('Failed to create user chat references', error: e);
       }
 
-      return chatId;
+      await batch.commit();
+      appLogger.d('Chat created successfully: ${chatRef.id}');
+      return chatRef.id;
     } catch (e) {
       appLogger.e('Error creating chat with user: $otherUserId', error: e);
       rethrow;
@@ -508,59 +444,108 @@ class ChatService {
     appLogger.d('Creating test chat...');
   }
 
-  // ✅ Отметить сообщение как прочитанное
-  static Future<void> markMessageAsRead(String chatId, String messageId) async {
+  static Future<void> markMessageAsRead(
+    String chatId,
+    String messageId,
+  ) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
     try {
       await _firestore
           .collection('chats')
           .doc(chatId)
           .collection('messages')
           .doc(messageId)
-          .update({'status': 'read'});
-      appLogger.d('Message marked as read: $messageId');
+          .update({
+        'readBy': FieldValue.arrayUnion([userId]),
+        'status': 'read',
+      });
     } catch (e) {
       appLogger.e('Error marking message as read: $messageId', error: e);
     }
   }
 
-  // ✅ Отметить все сообщения в чате как прочитанные
   static Future<void> markAllMessagesAsRead(String chatId) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
     try {
-      final snapshot = await _firestore
-          .collection('chats')
-          .doc(chatId)
-          .collection('messages')
-          .where('senderId', isNotEqualTo: userId)
-          .where('status', isEqualTo: 'sent')
-          .get();
-
+      final chatRef = _firestore.collection('chats').doc(chatId);
+      final messagesRef = chatRef.collection('messages');
+      final snapshot = await messagesRef.get();
       final batch = _firestore.batch();
-      for (var doc in snapshot.docs) {
-        batch.update(doc.reference, {'status': 'read'});
+      var changed = 0;
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final senderId = data['senderId'];
+        final readBy = List<String>.from(data['readBy'] ?? const []);
+        if (senderId == userId || readBy.contains(userId)) continue;
+
+        batch.update(doc.reference, {
+          'readBy': FieldValue.arrayUnion([userId]),
+          'status': 'read',
+        });
+        changed++;
       }
+
+      if (changed == 0) return;
+
+      final chatDoc = await chatRef.get();
+      final chatData = chatDoc.data();
+      if (chatData != null && chatData['lastSenderId'] != userId) {
+        batch.update(chatRef, {
+          'lastMessageReadBy': FieldValue.arrayUnion([userId]),
+          'lastMessageStatus': 'read',
+        });
+      }
+
       await batch.commit();
-      appLogger.d('All messages marked as read in chat: $chatId');
+      appLogger.d('Marked $changed messages as read in chat: $chatId');
     } catch (e) {
       appLogger.e('Error marking all messages as read in chat: $chatId', error: e);
     }
   }
 
-  // ✅ Обновить статус сообщения на "доставлено"
   static Future<void> markMessageAsDelivered(
-      String chatId, String messageId) async {
+    String chatId,
+    String messageId,
+  ) async {
     try {
       await _firestore
           .collection('chats')
           .doc(chatId)
           .collection('messages')
           .doc(messageId)
-          .update({'status': 'delivered'});
-      appLogger.d('Message marked as delivered: $messageId');
+          .update({'status': 'sent'});
     } catch (e) {
       appLogger.e('Error marking message as delivered: $messageId', error: e);
+    }
+  }
+
+  static Stream<List<String>> _typingStatusField(
+    String chatId,
+    String field,
+  ) {
+    return _firestore.collection('typingStatus').doc(chatId).snapshots().map(
+      (doc) {
+        final data = doc.data();
+        return (data?[field] as List<dynamic>?)?.cast<String>() ?? const [];
+      },
+    );
+  }
+
+  static String _lastMessagePreview(String type, String text) {
+    switch (type) {
+      case 'image':
+        return 'Фото';
+      case 'sticker':
+        return 'Стикер';
+      case 'voice':
+        return 'Голосовое сообщение';
+      default:
+        return text;
     }
   }
 }

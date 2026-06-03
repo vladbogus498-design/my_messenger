@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/chat.dart';
 import '../providers/chats_provider.dart';
@@ -269,6 +270,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildChatsList(List<Chat> allChats) {
     final chats = _filterChats(allChats);
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
     if (chats.isEmpty) {
       final isChannels = _selectedFilterIndex == 3;
@@ -290,6 +292,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         return _ChatTile(
           chat: chat,
           title: _displayName(chat),
+          currentUserId: currentUserId,
           onTap: () => _openChat(chat),
         );
       },
@@ -380,15 +383,22 @@ class _ChatTile extends StatelessWidget {
   const _ChatTile({
     required this.chat,
     required this.title,
+    required this.currentUserId,
     required this.onTap,
   });
 
   final Chat chat;
   final String title;
+  final String? currentUserId;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final shouldShowStatus =
+        currentUserId != null && chat.lastSenderId == currentUserId;
+    final isReadByOther = currentUserId != null &&
+        chat.lastMessageReadBy.any((uid) => uid != currentUserId);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -455,10 +465,14 @@ class _ChatTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  if (chat.lastMessageStatus == 'read')
-                    const Icon(Icons.done_all, size: 16, color: DarkKickColors.neonPurple)
-                  else
-                    const Icon(Icons.done, size: 16, color: DarkKickColors.textTertiary),
+                  if (shouldShowStatus)
+                    Icon(
+                      isReadByOther ? Icons.done_all : Icons.done,
+                      size: 16,
+                      color: isReadByOther
+                          ? DarkKickColors.neonPurple
+                          : DarkKickColors.textTertiary,
+                    ),
                 ],
               ),
             ],

@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../services/storage_service.dart';
+
 import '../theme/darkkick_colors.dart';
 import '../widgets/sticker_picker.dart';
 
@@ -21,7 +21,7 @@ class ChatInputPanel extends StatefulWidget {
   final String chatId;
   final String currentUserId;
   final void Function(String text, String type) onSendMessage;
-  final void Function(String imageUrl) onImageUpload;
+  final Future<void> Function(File imageFile) onImageUpload;
   final void Function(String base64Audio, int duration)? onVoiceMessageSent;
   final void Function(String stickerId)? onStickerSent;
   final TextEditingController? typingController;
@@ -36,7 +36,8 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
   bool _showStickerPicker = false;
   bool _uploadingImage = false;
 
-  TextEditingController get _controller => widget.typingController ?? _localController;
+  TextEditingController get _controller =>
+      widget.typingController ?? _localController;
 
   @override
   void dispose() {
@@ -45,11 +46,6 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
   }
 
   Future<void> _sendPhoto() async {
-    if (widget.chatId.isEmpty) {
-      _showSnackBar('Сначала отправь текстовое сообщение, чтобы создать чат.');
-      return;
-    }
-
     final image = await ImagePicker().pickImage(
       source: ImageSource.gallery,
       maxWidth: 1920,
@@ -60,8 +56,8 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
 
     setState(() => _uploadingImage = true);
     try {
-      final url = await StorageService.uploadChatImage(File(image.path), widget.chatId);
-      widget.onImageUpload(url);
+      await widget.onImageUpload(File(image.path));
+      if (mounted) setState(() => _showAttachmentMenu = false);
     } catch (_) {
       _showSnackBar('Не удалось отправить фото.');
     } finally {
@@ -72,6 +68,7 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
   void _sendTextMessage() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+
     widget.onSendMessage(text, 'text');
     _controller.clear();
     setState(() {});
@@ -110,10 +107,14 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
               children: [
                 IconButton(
                   icon: Icon(
-                    _showAttachmentMenu ? Icons.close : Icons.add_circle_outline,
+                    _showAttachmentMenu
+                        ? Icons.close
+                        : Icons.add_circle_outline,
                     color: DarkKickColors.neonPurple,
                   ),
-                  onPressed: () => setState(() => _showAttachmentMenu = !_showAttachmentMenu),
+                  onPressed: () => setState(
+                    () => _showAttachmentMenu = !_showAttachmentMenu,
+                  ),
                 ),
                 Expanded(
                   child: Container(
@@ -131,7 +132,10 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
                       decoration: const InputDecoration(
                         hintText: 'Сообщение...',
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 11,
+                        ),
                       ),
                       onSubmitted: (_) => _sendTextMessage(),
                     ),
@@ -148,7 +152,8 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
                       color: DarkKickColors.neonPurple,
                       boxShadow: [
                         BoxShadow(
-                          color: DarkKickColors.neonPurple.withValues(alpha: 0.35),
+                          color:
+                              DarkKickColors.neonPurple.withValues(alpha: 0.35),
                           blurRadius: 14,
                         ),
                       ],
@@ -182,7 +187,9 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
           _AttachmentButton(
             icon: Icons.emoji_emotions_outlined,
             label: 'Стикер',
-            onTap: () => setState(() => _showStickerPicker = !_showStickerPicker),
+            onTap: () => setState(
+              () => _showStickerPicker = !_showStickerPicker,
+            ),
           ),
           _AttachmentButton(
             icon: Icons.bolt_outlined,

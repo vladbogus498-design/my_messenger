@@ -1,37 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Message {
-  final String id;
-  final String chatId;
-  final String senderId;
-  final String text;
-  final String type; // 'text', 'image', 'voice', 'sticker'
-  final String? imageUrl;
-  final String? voiceAudioBase64; // base64 закодированное голосовое сообщение
-  final int? voiceDuration; // длительность голосового сообщения в секундах
-  final String? stickerId; // ID стикера
-  final bool isEncrypted; // флаг шифрования
-  final DateTime timestamp;
-  final String? replyToId;
-  final String? replyToText;
-  final bool isForwarded;
-  final String? originalSender;
-  final Map<String, String> reactions; // реакции: {userId: emoji}
-  final bool isTyping; // статус "печатает"
-  final String status; // 'sent', 'delivered', 'read' - статус прочтения
-
-  Message({
+  const Message({
     required this.id,
     required this.chatId,
     required this.senderId,
     required this.text,
     required this.type,
+    required this.timestamp,
     this.imageUrl,
     this.voiceAudioBase64,
     this.voiceDuration,
     this.stickerId,
+    this.stickerUrl,
     this.isEncrypted = false,
-    required this.timestamp,
     this.replyToId,
     this.replyToText,
     this.isForwarded = false,
@@ -39,9 +21,37 @@ class Message {
     this.reactions = const {},
     this.isTyping = false,
     this.status = 'sent',
+    this.readBy = const [],
   });
 
+  final String id;
+  final String chatId;
+  final String senderId;
+  final String text;
+  final String type;
+  final String? imageUrl;
+  final String? voiceAudioBase64;
+  final int? voiceDuration;
+  final String? stickerId;
+  final String? stickerUrl;
+  final bool isEncrypted;
+
+  // Backward compatible name used by the current UI.
+  final DateTime timestamp;
+  DateTime get createdAt => timestamp;
+
+  final String? replyToId;
+  final String? replyToText;
+  final bool isForwarded;
+  final String? originalSender;
+  final Map<String, String> reactions;
+  final bool isTyping;
+  final String status;
+  final List<String> readBy;
+
   factory Message.fromMap(Map<String, dynamic> data, String id) {
+    final createdAt = data['createdAt'] ?? data['timestamp'];
+
     return Message(
       id: id,
       chatId: data['chatId'] ?? '',
@@ -52,17 +62,17 @@ class Message {
       voiceAudioBase64: data['voiceAudioBase64'],
       voiceDuration: data['voiceDuration'],
       stickerId: data['stickerId'],
+      stickerUrl: data['stickerUrl'] ?? data['stickerId'],
       isEncrypted: data['isEncrypted'] ?? false,
-      timestamp: data['timestamp'] is Timestamp
-          ? (data['timestamp'] as Timestamp).toDate()
-          : (data['timestamp'] as DateTime? ?? DateTime.now()),
+      timestamp: _readDate(createdAt),
       replyToId: data['replyToId'],
       replyToText: data['replyToText'],
       isForwarded: data['isForwarded'] ?? false,
       originalSender: data['originalSender'],
-      reactions: Map<String, String>.from(data['reactions'] ?? {}),
+      reactions: Map<String, String>.from(data['reactions'] ?? const {}),
       isTyping: data['isTyping'] ?? false,
       status: data['status'] ?? 'sent',
+      readBy: List<String>.from(data['readBy'] ?? const []),
     );
   }
 
@@ -72,30 +82,33 @@ class Message {
       'senderId': senderId,
       'text': text,
       'type': type,
-      'imageUrl': imageUrl,
+      if (imageUrl != null) 'imageUrl': imageUrl,
       if (voiceAudioBase64 != null) 'voiceAudioBase64': voiceAudioBase64,
       if (voiceDuration != null) 'voiceDuration': voiceDuration,
       if (stickerId != null) 'stickerId': stickerId,
+      if (stickerUrl != null) 'stickerUrl': stickerUrl,
       'isEncrypted': isEncrypted,
       'timestamp': timestamp,
-      'replyToId': replyToId,
-      'replyToText': replyToText,
+      'createdAt': timestamp,
+      if (replyToId != null) 'replyToId': replyToId,
+      if (replyToText != null) 'replyToText': replyToText,
       'isForwarded': isForwarded,
-      'originalSender': originalSender,
+      if (originalSender != null) 'originalSender': originalSender,
       'reactions': reactions,
       'isTyping': isTyping,
       'status': status,
+      'readBy': readBy,
     };
   }
 
-  // Метод для добавления реакции
   Message copyWithReaction(String userId, String emoji) {
     final newReactions = Map<String, String>.from(reactions);
     if (newReactions[userId] == emoji) {
-      newReactions.remove(userId); // убираем реакцию если уже есть
+      newReactions.remove(userId);
     } else {
-      newReactions[userId] = emoji; // добавляем/меняем реакцию
+      newReactions[userId] = emoji;
     }
+
     return Message(
       id: id,
       chatId: chatId,
@@ -103,6 +116,11 @@ class Message {
       text: text,
       type: type,
       imageUrl: imageUrl,
+      voiceAudioBase64: voiceAudioBase64,
+      voiceDuration: voiceDuration,
+      stickerId: stickerId,
+      stickerUrl: stickerUrl,
+      isEncrypted: isEncrypted,
       timestamp: timestamp,
       replyToId: replyToId,
       replyToText: replyToText,
@@ -111,10 +129,13 @@ class Message {
       reactions: newReactions,
       isTyping: isTyping,
       status: status,
-      voiceAudioBase64: voiceAudioBase64,
-      voiceDuration: voiceDuration,
-      stickerId: stickerId,
-      isEncrypted: isEncrypted,
+      readBy: readBy,
     );
+  }
+
+  static DateTime _readDate(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return DateTime.now();
   }
 }

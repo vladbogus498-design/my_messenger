@@ -1,63 +1,69 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Chat {
-  final String id;
-  final String name;
-  final List<String> participants;
-  final String lastMessage;
-  final String lastMessageStatus;
-  final DateTime lastMessageTime;
-  final bool isGroup;
-  final List<String> admins;
-  final String? groupName;
-
-  Chat({
+  const Chat({
     required this.id,
     required this.name,
     required this.participants,
     required this.lastMessage,
     required this.lastMessageStatus,
     required this.lastMessageTime,
+    this.lastMessageType = 'text',
+    this.lastSenderId,
+    this.lastMessageId,
+    this.lastMessageReadBy = const [],
     this.isGroup = false,
     this.admins = const [],
     this.groupName,
   });
 
+  final String id;
+  final String name;
+  final List<String> participants;
+  final String lastMessage;
+  final String lastMessageStatus;
+  final DateTime lastMessageTime;
+  final String lastMessageType;
+  final String? lastSenderId;
+  final String? lastMessageId;
+  final List<String> lastMessageReadBy;
+  final bool isGroup;
+  final List<String> admins;
+  final String? groupName;
+
   factory Chat.fromFirestore(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
-    
-    // Обработка lastMessage: может быть объектом {text: '', timestamp: Timestamp} или строкой
-    String lastMessageText = '';
-    DateTime lastMessageTime;
-    
-    if (data['lastMessage'] is Map) {
-      // Новая структура: lastMessage = {text: '', timestamp: Timestamp}
-      final lastMsg = data['lastMessage'] as Map<String, dynamic>;
-      lastMessageText = lastMsg['text'] ?? '';
-      final lastMsgTs = lastMsg['timestamp'];
-      if (lastMsgTs != null && lastMsgTs is Timestamp) {
-        lastMessageTime = lastMsgTs.toDate();
-      } else {
-        // Fallback если timestamp null
-        lastMessageTime = data['lastMessageTime'] != null
-            ? (data['lastMessageTime'] as Timestamp).toDate()
-            : DateTime.now().subtract(Duration(days: 365));
-      }
-    } else {
-      // Старая структура: lastMessage = строка, lastMessageTime = Timestamp
-      lastMessageText = data['lastMessage'] ?? '';
-      lastMessageTime = data['lastMessageTime'] != null
-          ? (data['lastMessageTime'] as Timestamp).toDate()
-          : DateTime.now().subtract(Duration(days: 365)); // Fallback для null
-    }
-    
+    final legacyLastMessage = data['lastMessage'];
+    final rawLastMessage = legacyLastMessage is Map<String, dynamic>
+        ? (legacyLastMessage['text'] ?? '').toString()
+        : (legacyLastMessage ?? '').toString();
+    final lastMessageType = data['lastMessageType'] ?? 'text';
+    final lastMessage = _previewText(rawLastMessage, lastMessageType);
+
+    final legacyLastMessageAt = legacyLastMessage is Map<String, dynamic>
+        ? legacyLastMessage['timestamp']
+        : null;
+    final lastMessageAt = data['lastMessageAt'] ??
+        data['updatedAt'] ??
+        legacyLastMessageAt ??
+        data['lastMessageTime'] ??
+        data['createdAt'];
+    final lastMessageReadBy =
+        List<String>.from(data['lastMessageReadBy'] ?? const []);
+    final lastMessageStatus = data['lastMessageStatus'] ??
+        (lastMessageReadBy.length > 1 ? 'read' : 'sent');
+
     return Chat(
       id: doc.id,
       name: data['name'] ?? 'Chat',
-      participants: List<String>.from(data['participants'] ?? []),
-      lastMessage: lastMessageText,
-      lastMessageStatus: data['lastMessageStatus'] ?? 'sent',
-      lastMessageTime: lastMessageTime,
+      participants: List<String>.from(data['participants'] ?? const []),
+      lastMessage: lastMessage,
+      lastMessageStatus: lastMessageStatus,
+      lastMessageTime: _readDate(lastMessageAt),
+      lastMessageType: lastMessageType,
+      lastSenderId: data['lastSenderId'],
+      lastMessageId: data['lastMessageId'],
+      lastMessageReadBy: lastMessageReadBy,
       isGroup: data['isGroup'] ?? false,
       admins: List<String>.from(data['admins'] ?? const []),
       groupName: data['groupName'],
@@ -69,7 +75,6 @@ class Chat {
     return 'Chat{id: $id, name: $name, participants: $participants}';
   }
 
-  // Для дебага
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -78,9 +83,33 @@ class Chat {
       'lastMessage': lastMessage,
       'lastMessageStatus': lastMessageStatus,
       'lastMessageTime': lastMessageTime.toString(),
+      'lastMessageType': lastMessageType,
+      'lastSenderId': lastSenderId,
+      'lastMessageId': lastMessageId,
+      'lastMessageReadBy': lastMessageReadBy,
       'isGroup': isGroup,
       'admins': admins,
       'groupName': groupName,
     };
+  }
+
+  static DateTime _readDate(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return DateTime.now().subtract(const Duration(days: 365));
+  }
+
+  static String _previewText(String text, String type) {
+    if (text.isNotEmpty) return text;
+    switch (type) {
+      case 'image':
+        return 'Фото';
+      case 'sticker':
+        return 'Стикер';
+      case 'voice':
+        return 'Голосовое сообщение';
+      default:
+        return 'Сообщений пока нет';
+    }
   }
 }

@@ -10,7 +10,11 @@ class StorageService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Загрузка изображения чата
-  static Future<String> uploadChatImage(File imageFile, String chatId) async {
+  static Future<String> uploadChatImage(
+    File imageFile,
+    String chatId, {
+    required String messageId,
+  }) async {
     try {
       final userId = _auth.currentUser?.uid;
       if (userId == null) throw Exception('User not authenticated');
@@ -32,8 +36,11 @@ class StorageService {
         throw Exception('Invalid chatId');
       }
 
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = 'chat_$chatId/${userId}_$timestamp.jpg';
+      if (messageId.contains('/')) {
+        throw Exception('Invalid messageId');
+      }
+
+      final fileName = 'chats/$chatId/images/$messageId.jpg';
       final ref = _storage.ref().child(fileName);
 
       await ref.putFile(imageFile);

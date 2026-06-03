@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/chat_service.dart';
+import '../services/storage_service.dart';
 import '../services/voice_message_service.dart';
 import '../models/message.dart';
 import '../models/chat.dart';
@@ -153,7 +155,11 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           otherUserId: widget.otherUserId!,
           chatName: widget.chatName,
         );
-        _actualChatId = chatId;
+        if (mounted) {
+          setState(() => _actualChatId = chatId);
+        } else {
+          _actualChatId = chatId;
+        }
         appLogger.d('Chat ensured/created: $chatId');
         return chatId;
       } catch (e) {
@@ -196,14 +202,24 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     }
   }
 
-  Future<void> _sendImageMessage(String imageUrl) async {
+  Future<void> _sendImageMessage(File imageFile) async {
     try {
       final chatId = await _ensureChatExists();
+      await ChatService.setSendingPhotoStatus(chatId, true);
+
+      final messageId = ChatService.createMessageId(chatId);
+      final imageUrl = await StorageService.uploadChatImage(
+        imageFile,
+        chatId,
+        messageId: messageId,
+      );
+
       await ChatService.sendMessage(
         chatId: chatId,
-        text: '[Photo]',
+        text: '',
         type: 'image',
         imageUrl: imageUrl,
+        messageId: messageId,
         replyToId: _replyingTo?.id,
         replyToText: _replyingTo?.text,
         encrypt: false,
@@ -342,6 +358,16 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
   bool _isMyMessage(String senderId) {
     return senderId == _currentUser?.uid;
+  }
+
+  String _messageStatusForCurrentUser(Message message) {
+    final currentUid = _currentUser?.uid;
+    if (currentUid == null || message.senderId != currentUid) {
+      return message.status;
+    }
+
+    final isReadByOther = message.readBy.any((uid) => uid != currentUid);
+    return isReadByOther ? 'read' : 'sent';
   }
 
   // Удалено - используем виджет MessageStatusIcon
@@ -777,7 +803,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                             if (isMyMessage) ...[
                               SizedBox(width: 4),
                               MessageStatusIcon(
-                                status: message.status,
+                                status: _messageStatusForCurrentUser(message),
                                 isOwnMessage: _isMyMessage(message.senderId),
                               ),
                             ],
@@ -958,9 +984,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                         return Center(
                           child: Text('Ошибка загрузки сообщений: ${snapshot.error}'),
                         );
-                      }
-                      final docs = snapshot.data?.docs ?? [];
-                      if (docs.isEmpty) {
+                       }
+                       final docs = snapshot.data?.docs ?? [];
+                       WidgetsBinding.instance.addPostFrameCallback((_) {
+                         _markMessagesAsRead();
+                       });
+                       if (docs.isEmpty) {
                         return const _ChatEmptyState(
                           icon: Icons.chat_bubble_outline,
                           title: 'Диалог пуст',
