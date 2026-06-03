@@ -1,37 +1,40 @@
+import 'dart:convert';
 import 'dart:io';
-import 'package:firebase_storage/firebase_storage.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
-import '../utils/logger.dart';
+import 'package:http/http.dart' as http;
+
 import '../utils/input_validator.dart';
+import '../utils/logger.dart';
 import '../utils/rate_limiter.dart';
 
 class StorageService {
-  static final FirebaseStorage _storage = FirebaseStorage.instance;
+  static const String _cloudName = 'do4bvuj43';
+  static const String _uploadPreset = 'darkkick_uploads';
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Загрузка изображения чата
+  static Uri get _uploadUri => Uri.https(
+        'api.cloudinary.com',
+        '/v1_1/$_cloudName/image/upload',
+      );
+
   static Future<String> uploadChatImage(
     File imageFile,
     String chatId, {
     required String messageId,
   }) async {
-    try {
-      final userId = _auth.currentUser?.uid;
-      if (userId == null) throw Exception('User not authenticated');
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('User not authenticated');
 
-      // Rate limiting: проверка лимита на загрузку файлов
+    try {
       if (!AppRateLimiters.uploadLimiter.tryRequest('upload_file_$userId')) {
-        throw Exception('Превышен лимит загрузки файлов. Попробуйте позже.');
+        throw Exception('Превышен лимит загрузки файлов. Попробуй позже.');
       }
 
-      // Валидация размера файла
       final fileSize = await imageFile.length();
       final sizeError = InputValidator.validateFileSize(fileSize, isImage: true);
-      if (sizeError != null) {
-        throw Exception(sizeError);
-      }
+      if (sizeError != null) throw Exception(sizeError);
 
-      // Валидация chatId
       if (!InputValidator.isValidChatId(chatId)) {
         throw Exception('Invalid chatId');
       }
@@ -40,59 +43,73 @@ class StorageService {
         throw Exception('Invalid messageId');
       }
 
-      final fileName = 'chats/$chatId/images/$messageId.jpg';
-      final ref = _storage.ref().child(fileName);
-
-      await ref.putFile(imageFile);
-      final downloadUrl = await ref.getDownloadURL();
-      return downloadUrl;
+      return _uploadUnsignedImage(
+        imageFile,
+        folder: 'darkkick/chats/$chatId/images',
+        publicId: messageId,
+      );
     } catch (e) {
-      appLogger.e('Error uploading chat image for chatId: $chatId', error: e);
+      appLogger.e('Error uploading chat image to Cloudinary: $chatId', error: e);
       rethrow;
     }
   }
 
-  // Загрузка аватара пользователя
   static Future<String> uploadUserAvatar(File imageFile) async {
-      final userId = _auth.currentUser?.uid;
-      if (userId == null) throw Exception('User not authenticated');
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('User not authenticated');
 
     try {
-      // Rate limiting: проверка лимита на загрузку файлов
       if (!AppRateLimiters.uploadLimiter.tryRequest('upload_avatar_$userId')) {
-        throw Exception('Превышен лимит загрузки файлов. Попробуйте позже.');
+        throw Exception('Превышен лимит загрузки файлов. Попробуй позже.');
       }
 
-      // Валидация размера файла
       final fileSize = await imageFile.length();
       final sizeError = InputValidator.validateFileSize(fileSize, isImage: true);
-      if (sizeError != null) {
-        throw Exception(sizeError);
-      }
+      if (sizeError != null) throw Exception(sizeError);
 
-      final fileName = 'avatars/$userId.jpg';
-      final ref = _storage.ref().child(fileName);
-
-      await ref.putFile(imageFile);
-      final downloadUrl = await ref.getDownloadURL();
-      return downloadUrl;
+      return _uploadUnsignedImage(
+        imageFile,
+        folder: 'darkkick/avatars',
+        publicId: userId,
+      );
     } catch (e) {
-      appLogger.e('Error uploading avatar for userId: $userId', error: e);
+      appLogger.e('Error uploading avatar to Cloudinary: $userId', error: e);
       rethrow;
     }
   }
 
-  // Удаление аватара
   static Future<void> deleteUserAvatar() async {
-      final userId = _auth.currentUser?.uid;
-      if (userId == null) return;
+    // Unsigned Cloudinary uploads cannot delete assets safely from the client.
+    // Deleting requires a signed backend/API secret, which must not be in APK.
+    appLogger.w('Cloudinary unsigned upload does not support client-side delete');
+  }
 
-    try {
-      final fileName = 'avatars/$userId.jpg';
-      final ref = _storage.ref().child(fileName);
-      await ref.delete();
-    } catch (e) {
-      appLogger.e('Error deleting avatar for userId: $userId', error: e);
+  static Future<String> _uploadUnsignedImage(
+    File imageFile, {
+    required String folder,
+    required String publicId,
+  }) async {
+    final request = http.MultipartRequest('POST', _uploadUri)
+      ..fields['upload_preset'] = _uploadPreset
+      ..fields['folder'] = folder
+      ..fields['public_id'] = publicId
+      ..files.add(await http.MultipartFile.fromPath('file', imageFile.path));
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        'Cloudinary upload failed: ${response.statusCode} ${response.body}',
+      );
     }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final secureUrl = data['secure_url'] as String?;
+    if (secureUrl == null || secureUrl.isEmpty) {
+      throw Exception('Cloudinary response does not contain secure_url');
+    }
+
+    return secureUrl;
   }
 }
