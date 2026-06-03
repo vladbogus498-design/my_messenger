@@ -6,13 +6,19 @@ workflows:
     scripts:
       - name: Force Build with Fix
         script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
+          echo "=== Flutter version ==="
+          flutter --version
           echo "=== Checking required assets ==="
           test -f assets/images/auth_bg.png || (echo "Missing assets/images/auth_bg.png" && exit 1)
           test -f assets/images/auth_angel.png || (echo "Missing assets/images/auth_angel.png" && exit 1)
-          echo "=== IGNORING ANDROID VERSION WARNINGS ==="
+          echo "=== Preparing Flutter packages ==="
           flutter clean
           flutter pub get
-          flutter build apk --release --no-shrink --no-pub
+          test -f .dart_tool/package_config.json || (echo "Missing .dart_tool/package_config.json after pub get" && exit 1)
+          echo "=== Building Android release APK ==="
+          flutter build apk --release --no-shrink
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
     publishing:

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'auth/auth_screen.dart';
+import 'auth/auth_credentials_screen.dart';
 import 'screens/chats_screen.dart';
 import 'screens/improved_splash_screen.dart';
 import 'widgets/otp_verification_widgets.dart';
@@ -12,12 +14,25 @@ import 'services/bot_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
   
-  // Запуск периодической очистки rate limiters
+  if (kIsWeb) {
+    // Подключаем твой Firebase конфиг для браузера на ПК
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: "AIzaSyBoQAh2PbD8skQ7ZQOJca49KTXrVVLwxro",
+        authDomain: "darkkickchat-765e0.firebaseapp.com",
+        projectId: "darkkickchat-765e0",
+        storageBucket: "darkkickchat-765e0.firebasestorage.app",
+        messagingSenderId: "366138349689",
+        appId: "1:366138349689:web:8c0111db70ea9b56961ca8",
+      ),
+    );
+  } else {
+    // Обычная инициализация для мобилок
+    await Firebase.initializeApp();
+  }
+  
   AppRateLimiters.startCleanup();
-  
-  // Создаем бота при запуске приложения
   BotService.ensureBotExists();
   
   runApp(
@@ -41,9 +56,16 @@ class MyApp extends ConsumerWidget {
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: themeMode,
-      home: const ImprovedSplashScreen(),
+      // На ПК сразу открываем форму входа, на телефоне — сплеш
+      home: kIsWeb ? const AuthScreen() : const ImprovedSplashScreen(),
       routes: {
         '/auth': (context) => const AuthScreen(),
+        '/auth/sign-in': (context) => const AuthCredentialsScreen(
+              initialMode: AuthCredentialsMode.signIn,
+            ),
+        '/auth/register': (context) => const AuthCredentialsScreen(
+              initialMode: AuthCredentialsMode.register,
+            ),
         '/main': (context) => const ChatScreen(),
         '/email-verification': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as String?;
