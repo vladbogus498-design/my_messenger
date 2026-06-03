@@ -9,8 +9,9 @@ import '../providers/chats_provider.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/navigation_animations.dart';
 import '../utils/time_formatter.dart';
+import '../utils/user_formatters.dart';
 import 'new_chat_screen.dart';
-import 'profile_screen.dart';
+import 'settings_screen.dart';
 import 'single_chat_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -32,7 +33,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void initState() {
     super.initState();
     _searchController.addListener(() {
-      setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
+      setState(
+        () => _searchQuery = _searchController.text.trim().toLowerCase(),
+      );
     });
   }
 
@@ -60,7 +63,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             title: 'Люди',
             subtitle: 'Поиск людей и контакты будут в этом разделе.',
           ),
-          const ProfileScreen(showBackButton: false),
+          const SettingsScreen(showBackButton: false),
         ],
       ),
       bottomNavigationBar: _buildBottomNavBar(),
@@ -139,7 +142,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         child: Row(
           children: [
             const SizedBox(width: 14),
-            const Icon(Icons.search, color: DarkKickColors.textTertiary, size: 20),
+            const Icon(
+              Icons.search,
+              color: DarkKickColors.textTertiary,
+              size: 20,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -164,7 +171,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             else
               const Padding(
                 padding: EdgeInsets.only(right: 14),
-                child: Icon(Icons.tune, color: DarkKickColors.neonPurple, size: 20),
+                child: Icon(
+                  Icons.tune,
+                  color: DarkKickColors.neonPurple,
+                  size: 20,
+                ),
               ),
           ],
         ),
@@ -247,7 +258,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           final isSelected = _selectedFilterIndex == index;
           return Expanded(
             child: Padding(
-              padding: EdgeInsets.only(right: index == filters.length - 1 ? 0 : 7),
+              padding: EdgeInsets.only(
+                right: index == filters.length - 1 ? 0 : 7,
+              ),
               child: GestureDetector(
                 onTap: () => setState(() => _selectedFilterIndex = index),
                 child: AnimatedContainer(
@@ -255,16 +268,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   height: 34,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: isSelected ? DarkKickColors.cardSoft : Colors.transparent,
+                    color: isSelected
+                        ? DarkKickColors.cardSoft
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(17),
                     border: Border.all(
-                      color: isSelected ? DarkKickColors.stroke : DarkKickColors.divider,
+                      color: isSelected
+                          ? DarkKickColors.stroke
+                          : DarkKickColors.divider,
                     ),
                   ),
                   child: Text(
                     filters[index],
                     style: TextStyle(
-                      color: isSelected ? Colors.white : DarkKickColors.textTertiary,
+                      color: isSelected
+                          ? Colors.white
+                          : DarkKickColors.textTertiary,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -321,7 +340,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     if (_searchQuery.isEmpty) return filtered;
     return filtered
-        .where((chat) => _fallbackTitle(chat).toLowerCase().contains(_searchQuery))
+        .where(
+          (chat) => _fallbackTitle(chat).toLowerCase().contains(_searchQuery),
+        )
         .toList();
   }
 
@@ -365,9 +386,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             label: 'Люди',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Профиль',
+            icon: Icon(Icons.settings_outlined),
+            activeIcon: Icon(Icons.settings),
+            label: 'Настройки',
           ),
         ],
       ),
@@ -405,18 +426,31 @@ class _ChatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final otherUserId = chat.isDirect ? chat.otherParticipantId(currentUserId) : null;
+    final otherUserId = chat.isDirect
+        ? chat.otherParticipantId(currentUserId)
+        : null;
 
     return StreamBuilder<_PeerMeta>(
       stream: _peerMetaStream(otherUserId),
       builder: (context, snapshot) {
         final meta = snapshot.data;
-        final title = chat.isDirect ? meta?.name ?? fallbackTitle : fallbackTitle;
+        final title = chat.isDirect
+            ? meta?.name ?? fallbackTitle
+            : fallbackTitle;
         final photoUrl = chat.isDirect ? meta?.photoUrl : null;
+        final presence = meta == null || !chat.isDirect
+            ? null
+            : UserFormatters.compactPresence(
+                isOnline: meta.isOnline,
+                lastSeen: meta.lastSeen,
+              );
         final unread = chat.unreadFor(currentUserId);
         final shouldShowStatus =
-            unread == 0 && currentUserId != null && chat.lastSenderId == currentUserId;
-        final isReadByOther = currentUserId != null &&
+            unread == 0 &&
+            currentUserId != null &&
+            chat.lastSenderId == currentUserId;
+        final isReadByOther =
+            currentUserId != null &&
             chat.lastMessageReadBy.any((uid) => uid != currentUserId);
 
         return Material(
@@ -470,6 +504,21 @@ class _ChatTile extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 4),
+                        if (presence != null) ...[
+                          Text(
+                            presence,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: meta!.isOnline
+                                  ? DarkKickColors.online
+                                  : DarkKickColors.textTertiary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                        ],
                         Text(
                           chat.lastMessage,
                           maxLines: 1,
@@ -686,25 +735,44 @@ class _AvatarFallback extends StatelessWidget {
 }
 
 class _PeerMeta {
-  const _PeerMeta({required this.name, this.photoUrl});
+  const _PeerMeta({
+    required this.name,
+    this.photoUrl,
+    this.isOnline = false,
+    this.lastSeen,
+  });
 
   final String name;
   final String? photoUrl;
+  final bool isOnline;
+  final DateTime? lastSeen;
 }
 
 Stream<_PeerMeta>? _peerMetaStream(String? uid) {
   if (uid == null || uid.isEmpty) return null;
 
-  return FirebaseFirestore.instance.collection('users').doc(uid).snapshots().map(
-    (doc) {
-      final data = doc.data() ?? const <String, dynamic>{};
-      final email = (data['email'] ?? '').toString();
-      final fallback = email.contains('@') ? email.split('@').first : 'Пользователь';
-      final name = (data['name'] ?? fallback).toString();
-      final photoUrl = data['photoURL']?.toString();
-      return _PeerMeta(name: name, photoUrl: photoUrl);
-    },
-  );
+  return FirebaseFirestore.instance
+      .collection('users')
+      .doc(uid)
+      .snapshots()
+      .map((doc) {
+        final data = doc.data() ?? const <String, dynamic>{};
+        final email = (data['email'] ?? '').toString();
+        final fallback = email.contains('@')
+            ? email.split('@').first
+            : 'Пользователь';
+        final name = (data['name'] ?? fallback).toString();
+        final photoUrl = data['photoURL']?.toString();
+        final lastSeen = data['lastSeen'] is Timestamp
+            ? (data['lastSeen'] as Timestamp).toDate()
+            : null;
+        return _PeerMeta(
+          name: name,
+          photoUrl: photoUrl,
+          isOnline: data['isOnline'] == true,
+          lastSeen: lastSeen,
+        );
+      });
 }
 
 class _StoryItem extends StatelessWidget {
@@ -746,10 +814,7 @@ class _StoryItem extends StatelessWidget {
 }
 
 class _IconFrame extends StatelessWidget {
-  const _IconFrame({
-    required this.icon,
-    required this.onTap,
-  });
+  const _IconFrame({required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback onTap;

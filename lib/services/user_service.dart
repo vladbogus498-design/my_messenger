@@ -1,45 +1,59 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import '../models/user_model.dart';
-import '../utils/logger.dart';
 import '../utils/input_validator.dart';
+import '../utils/logger.dart';
 import '../utils/rate_limiter.dart';
 
 class UserService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Получить данные пользователя
+  static Stream<UserModel?> watchUserData(String userId) {
+    if (!InputValidator.isValidUserId(userId)) {
+      return const Stream<UserModel?>.empty();
+    }
+
+    return _firestore.collection('users').doc(userId).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return UserModel.fromFirestore(doc);
+    });
+  }
+
   static Future<UserModel?> getUserData(String userId) async {
     try {
-      // Валидация userId
       if (!InputValidator.isValidUserId(userId)) {
         appLogger.w('Invalid userId in getUserData');
         return null;
       }
 
       final doc = await _firestore.collection('users').doc(userId).get();
-      if (doc.exists) {
-        final data = doc.data()!;
-        return UserModel(
-          uid: userId,
-          email: data['email'] ?? '',
-          name: data['name'] ?? '',
-          photoURL: data['photoURL'],
-          bio: data['bio'],
-          createdAt: data['createdAt'] != null
-              ? (data['createdAt'] as Timestamp).toDate()
-              : null,
-        );
-      }
-      return null;
+      if (!doc.exists) return null;
+      return UserModel.fromFirestore(doc);
     } catch (e) {
       appLogger.e('Error getting user data for userId: $userId', error: e);
       return null;
     }
   }
 
-  // Обновить данные пользователя
+  static Future<void> setPresence({required bool isOnline}) async {
+    final user = _auth.currentUser;
+    if (user == null || !InputValidator.isValidUserId(user.uid)) return;
+
+    try {
+      await _firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'email': (user.email ?? '').toLowerCase().trim(),
+        'emailLower': (user.email ?? '').toLowerCase().trim(),
+        'isOnline': isOnline,
+        'lastSeen': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      appLogger.e('Error updating user presence', error: e);
+    }
+  }
+
   static Future<void> updateUserData({
     String? name,
     String? bio,
@@ -49,34 +63,32 @@ class UserService {
     if (userId == null) return;
 
     try {
-      // Валидация и санитизация входных данных
       final updates = <String, dynamic>{};
       if (name != null) {
         final nameError = InputValidator.validateName(name);
-        if (nameError != null) {
-          throw Exception(nameError);
-        }
+        if (nameError != null) throw Exception(nameError);
         final sanitizedName = InputValidator.sanitizeName(name);
         updates['name'] = sanitizedName;
         updates['nameLower'] = sanitizedName.toLowerCase();
       }
       if (bio != null) {
         final bioError = InputValidator.validateBio(bio);
-        if (bioError != null) {
-          throw Exception(bioError);
-        }
+        if (bioError != null) throw Exception(bioError);
         updates['bio'] = InputValidator.sanitizeBio(bio);
       }
       if (photoURL != null) {
-        // Валидация URL
         final uri = Uri.tryParse(photoURL);
-        if (uri == null || !uri.hasAbsolutePath) {
+        if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
           throw Exception('Invalid photoURL format');
         }
         updates['photoURL'] = photoURL;
       }
 
-      await _firestore.collection('users').doc(userId).update(updates);
+      if (updates.isEmpty) return;
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .set(updates, SetOptions(merge: true));
       appLogger.d('User data updated for userId: $userId');
     } catch (e) {
       appLogger.e('Error updating user data for userId: $userId', error: e);
@@ -84,66 +96,46 @@ class UserService {
     }
   }
 
-  // Поиск пользователей по тэгу/имени
   static Future<List<UserModel>> searchUsersByTag(String tag) async {
     try {
-      // Rate limiting: проверка лимита на поиск
       final userId = _auth.currentUser?.uid ?? 'anonymous';
       if (!AppRateLimiters.searchLimiter.tryRequest('search_users_$userId')) {
         appLogger.w('Search rate limit exceeded for user: $userId');
         return [];
       }
 
-      // Санитизация поискового запроса (защита от NoSQL injection)
-      final sanitizedTag = InputValidator.sanitizeSearchQuery(tag);
-      if (sanitizedTag.isEmpty) {
-        return [];
-      }
+      final sanitizedTag = InputValidator.sanitizeSearchQuery(
+        tag,
+      ).toLowerCase();
+      if (sanitizedTag.isEmpty) return [];
 
       final snapshot = await _firestore
           .collection('users')
-          .where('name', isGreaterThanOrEqualTo: sanitizedTag)
-          .where('name', isLessThan: '$sanitizedTag\uf8ff')
+          .where('nameLower', isGreaterThanOrEqualTo: sanitizedTag)
+          .where('nameLower', isLessThan: '$sanitizedTag\uf8ff')
           .limit(20)
           .get();
 
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return UserModel(
-          uid: doc.id,
-          email: data['email'] ?? '',
-          name: data['name'] ?? '',
-          photoURL: data['photoURL'],
-          bio: data['bio'],
-          createdAt: data['createdAt'] != null
-              ? (data['createdAt'] as Timestamp).toDate()
-              : null,
-        );
-      }).toList();
+      return snapshot.docs.map(UserModel.fromFirestore).toList();
     } catch (e) {
       appLogger.e('Error searching users by tag: $tag', error: e);
       return [];
     }
   }
 
-  // Создать/обновить профиль пользователя при регистрации
   static Future<void> createUserProfile(
-      String uid, String email, String name) async {
+    String uid,
+    String email,
+    String name,
+  ) async {
     try {
-      // Валидация входных данных
-      if (!InputValidator.isValidUserId(uid)) {
-        throw Exception('Invalid userId');
-      }
-      
+      if (!InputValidator.isValidUserId(uid)) throw Exception('Invalid userId');
+
       final emailError = InputValidator.validateEmail(email);
-      if (emailError != null) {
-        throw Exception(emailError);
-      }
+      if (emailError != null) throw Exception(emailError);
 
       final nameError = InputValidator.validateName(name);
-      if (nameError != null) {
-        throw Exception(nameError);
-      }
+      if (nameError != null) throw Exception(nameError);
 
       final sanitizedName = InputValidator.sanitizeName(name);
 
@@ -153,9 +145,12 @@ class UserService {
         'name': sanitizedName,
         'nameLower': sanitizedName.toLowerCase(),
         'emailLower': email.toLowerCase().trim(),
+        'bio': '',
+        'photoURL': null,
+        'isOnline': true,
+        'lastSeen': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
-      });
-      // Не логируем email в открытом виде (безопасность)
+      }, SetOptions(merge: true));
       appLogger.i('User profile created: uid=$uid');
     } catch (e) {
       appLogger.e('Error creating user profile: uid=$uid', error: e);
@@ -168,7 +163,6 @@ class UserService {
     String? fallbackName,
   }) async {
     try {
-      // Валидация userId
       if (!InputValidator.isValidUserId(user.uid)) {
         appLogger.e('Invalid userId in ensureUserProfile');
         return;
@@ -176,19 +170,27 @@ class UserService {
 
       final docRef = _firestore.collection('users').doc(user.uid);
       final doc = await docRef.get();
-      if (doc.exists) return;
+      if (doc.exists) {
+        await docRef.set({
+          'uid': user.uid,
+          if (user.email != null) 'email': user.email!.toLowerCase().trim(),
+          if (user.email != null)
+            'emailLower': user.email!.toLowerCase().trim(),
+          if (user.photoURL != null) 'photoURL': user.photoURL,
+        }, SetOptions(merge: true));
+        return;
+      }
 
       final email = user.email ?? '';
       final phone = user.phoneNumber ?? '';
-      final generatedName = user.displayName ??
+      final generatedName =
+          user.displayName ??
           fallbackName ??
           (email.isNotEmpty
               ? email.split('@').first
               : phone.isNotEmpty
-                  ? phone
-                  : 'Пользователь');
-
-      // Санитизация имени
+              ? phone
+              : 'Пользователь');
       final sanitizedName = InputValidator.sanitizeName(generatedName);
 
       await docRef.set({
@@ -198,6 +200,10 @@ class UserService {
         'phone': phone.trim(),
         'name': sanitizedName,
         'nameLower': sanitizedName.toLowerCase(),
+        'bio': '',
+        'photoURL': user.photoURL,
+        'isOnline': true,
+        'lastSeen': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       });
       appLogger.d('User profile ensured for uid: ${user.uid}');

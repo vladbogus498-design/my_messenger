@@ -1,312 +1,532 @@
-import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../models/user_model.dart';
+import '../services/chat_service.dart';
 import '../services/user_service.dart';
-import '../services/storage_service.dart';
-import '../utils/logger.dart';
+import '../theme/darkkick_colors.dart';
+import '../utils/navigation_animations.dart';
+import '../utils/user_formatters.dart';
+import 'single_chat_screen.dart';
 
-class UserProfileScreen extends StatefulWidget {
-  final String? userId; // Если null, используется текущий пользователь
-  final bool isMyProfile;
-
+class UserProfileScreen extends StatelessWidget {
   const UserProfileScreen({
-    Key? key,
+    super.key,
     this.userId,
     this.isMyProfile = false,
-  }) : super(key: key);
+    this.chatId,
+  });
 
-  @override
-  _UserProfileScreenState createState() => _UserProfileScreenState();
-}
+  final String? userId;
+  final bool isMyProfile;
+  final String? chatId;
 
-class _UserProfileScreenState extends State<UserProfileScreen> {
-  UserModel? _user;
-  bool _isLoading = true;
-  bool _isEditing = false;
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _bioController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  String get _targetUserId {
-    return widget.userId ?? _auth.currentUser?.uid ?? '';
-  }
-
-  bool get _isMyProfile {
-    return widget.isMyProfile || _auth.currentUser?.uid == _targetUserId;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUserData();
-  }
-
-  Future<void> _loadUserData() async {
-    setState(() => _isLoading = true);
-    try {
-      final targetUserId = _targetUserId;
-      if (targetUserId.isEmpty) {
-        appLogger.w('Cannot load user data: no userId provided and user not authenticated');
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      final user = await UserService.getUserData(targetUserId);
-      if (user != null) {
-        setState(() {
-          _user = user;
-          _nameController.text = user.name;
-          _bioController.text = user.bio ?? '';
-        });
-      } else {
-        appLogger.w('User data not found for userId: $targetUserId');
-      }
-    } catch (e) {
-      appLogger.e('Error loading user data for userId: ${_targetUserId}', error: e);
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _uploadAvatar() async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 85,
-      );
-
-      if (image != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Загружаем аватар...')),
-        );
-
-        final imageUrl =
-            await StorageService.uploadUserAvatar(File(image.path));
-        await UserService.updateUserData(photoURL: imageUrl);
-
-        await _loadUserData();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Аватар обновлен! ✅')),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка загрузки аватара: $e')),
-      );
-    }
-  }
-
-  Future<void> _saveProfile() async {
-    try {
-      await UserService.updateUserData(
-        name: _nameController.text.trim(),
-        bio: _bioController.text.trim(),
-      );
-
-      setState(() => _isEditing = false);
-      await _loadUserData();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Профиль сохранен! ✅')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка сохранения: $e')),
-      );
-    }
-  }
+  String get _targetUserId =>
+      userId ?? FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: Colors.grey[900],
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_user == null) {
-      return Scaffold(
-        backgroundColor: Colors.grey[900],
-        appBar: AppBar(
-          title: Text('Профиль'),
-          backgroundColor: Colors.black,
-        ),
-        body: Center(
-          child: Text('Пользователь не найден',
-              style: TextStyle(color: Colors.white)),
-        ),
-      );
-    }
+    final targetUserId = _targetUserId;
 
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: DarkKickColors.darkBackground,
       appBar: AppBar(
-        title: Text(_isEditing ? 'Редактирование' : 'Профиль'),
-        backgroundColor: Colors.black,
-        actions: _isMyProfile
-            ? [
-                if (_isEditing)
-                  IconButton(
-                    icon: Icon(Icons.check),
-                    onPressed: _saveProfile,
-                  )
-                else
-                  IconButton(
-                    icon: Icon(Icons.edit),
-                    onPressed: () => setState(() => _isEditing = true),
-                  ),
-              ]
-            : null,
+        backgroundColor: DarkKickColors.darkBackground,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(
+          'Профиль',
+          style: GoogleFonts.spaceGrotesk(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            SizedBox(height: 20),
-            // Аватар
-            GestureDetector(
-              onTap: _isMyProfile && !_isEditing ? _uploadAvatar : null,
-              child: Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Colors.deepPurple,
-                    backgroundImage: _user!.photoURL != null
-                        ? NetworkImage(_user!.photoURL!)
-                        : null,
-                    child: _user!.photoURL == null
-                        ? Text(
-                            _user!.name[0].toUpperCase(),
-                            style: TextStyle(fontSize: 36, color: Colors.white),
-                          )
-                        : null,
-                  ),
-                  if (_isMyProfile && !_isEditing)
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: Colors.blue,
-                        child: Icon(Icons.camera_alt, size: 20),
-                      ),
+      body: targetUserId.isEmpty
+          ? const _UserEmptyState()
+          : StreamBuilder<UserModel?>(
+              stream: UserService.watchUserData(targetUserId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: DarkKickColors.neonPurple,
                     ),
-                ],
-              ),
-            ),
-            SizedBox(height: 16),
+                  );
+                }
 
-            // Имя
-            if (_isEditing && _isMyProfile)
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
-                child: TextField(
-                  controller: _nameController,
-                  style: TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Имя',
-                    labelStyle: TextStyle(color: Colors.grey),
-                    border: OutlineInputBorder(),
+                final user = snapshot.data;
+                if (user == null) return const _UserEmptyState();
+
+                return DefaultTabController(
+                  length: 2,
+                  child: SafeArea(
+                    top: false,
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: ListView(
+                            padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
+                            children: [
+                              _ProfileHeader(user: user),
+                              const SizedBox(height: 18),
+                              _ProfileActions(
+                                user: user,
+                                chatId: chatId,
+                                isMyProfile:
+                                    isMyProfile ||
+                                    FirebaseAuth.instance.currentUser?.uid ==
+                                        user.uid,
+                              ),
+                              const SizedBox(height: 18),
+                              _InfoCard(user: user),
+                              const SizedBox(height: 20),
+                              const TabBar(
+                                labelColor: Colors.white,
+                                unselectedLabelColor:
+                                    DarkKickColors.textTertiary,
+                                indicatorColor: DarkKickColors.neonPurple,
+                                tabs: [
+                                  Tab(text: 'Фото'),
+                                  Tab(text: 'Инфо'),
+                                ],
+                              ),
+                              SizedBox(
+                                height: 250,
+                                child: TabBarView(
+                                  children: [
+                                    _PhotoGrid(chatId: chatId),
+                                    const _AboutTab(),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              )
-            else
-              Text(
-                _user!.name,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-            SizedBox(height: 8),
-
-            // Email
-            Text(
-              _user!.email,
-              style: TextStyle(color: Colors.grey, fontSize: 14),
+                );
+              },
             ),
+    );
+  }
+}
 
-            SizedBox(height: 16),
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.user});
 
-            // Био
-            if (_isEditing && _isMyProfile)
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
-                child: TextField(
-                  controller: _bioController,
-                  maxLines: 3,
-                  style: TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Описание профиля',
-                    labelStyle: TextStyle(color: Colors.grey),
-                    border: OutlineInputBorder(),
-                    hintText: 'Расскажите о себе...',
-                    hintStyle: TextStyle(color: Colors.grey[600]),
-                  ),
-                ),
+  final UserModel user;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = UserFormatters.chatPresence(
+      isOnline: user.isOnline,
+      lastSeen: user.lastSeen,
+    );
+
+    return Column(
+      children: [
+        _LargeAvatar(user: user),
+        const SizedBox(height: 16),
+        Text(
+          user.name,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.spaceGrotesk(
+            color: Colors.white,
+            fontSize: 27,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          status,
+          style: TextStyle(
+            color: user.isOnline
+                ? DarkKickColors.online
+                : DarkKickColors.textTertiary,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '@${user.username ?? user.tag ?? user.email.split('@').first}',
+          style: const TextStyle(
+            color: DarkKickColors.textTertiary,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          (user.bio ?? '').trim().isEmpty
+              ? 'Пользователь Darkkick. Без лишнего шума.'
+              : user.bio!.trim(),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: DarkKickColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LargeAvatar extends StatelessWidget {
+  const _LargeAvatar({required this.user});
+
+  final UserModel user;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = user.name.trim().isEmpty
+        ? '?'
+        : user.name.trim()[0].toUpperCase();
+
+    return Container(
+      width: 118,
+      height: 118,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: DarkKickColors.stroke, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: DarkKickColors.neonPurple.withValues(alpha: 0.32),
+            blurRadius: 28,
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: user.photoURL != null && user.photoURL!.isNotEmpty
+            ? Image.network(
+                user.photoURL!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _AvatarFallback(initial: initial),
               )
-            else if (_user!.bio != null && _user!.bio!.isNotEmpty)
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  _user!.bio!,
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                  textAlign: TextAlign.center,
-                ),
-              ),
+            : _AvatarFallback(initial: initial),
+      ),
+    );
+  }
+}
 
-            SizedBox(height: 30),
+class _AvatarFallback extends StatelessWidget {
+  const _AvatarFallback({required this.initial});
 
-            // Информация
-            Container(
-              margin: EdgeInsets.symmetric(horizontal: 20),
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[800],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  _buildInfoRow('ID пользователя', _user!.uid.substring(0, 8)),
-                  Divider(),
-                  _buildInfoRow(
-                      'Зарегистрирован',
-                      _user!.createdAt != null
-                          ? '${_user!.createdAt!.day}.${_user!.createdAt!.month}.${_user!.createdAt!.year}'
-                          : 'Неизвестно'),
-                ],
-              ),
-            ),
-          ],
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: DarkKickColors.cardSoft,
+      child: Center(
+        child: Text(
+          initial,
+          style: GoogleFonts.spaceGrotesk(
+            color: Colors.white,
+            fontSize: 42,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+class _ProfileActions extends StatelessWidget {
+  const _ProfileActions({
+    required this.user,
+    required this.chatId,
+    required this.isMyProfile,
+  });
+
+  final UserModel user;
+  final String? chatId;
+  final bool isMyProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.chat_bubble_outline,
+            label: isMyProfile ? 'Это вы' : 'Написать',
+            onTap: isMyProfile ? null : () => _openChat(context),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.phone_outlined,
+            label: 'Позвонить',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Звонки появятся позже')),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openChat(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final id =
+        chatId ??
+        await ChatService.createChat(
+          otherUserId: user.uid,
+          chatName: user.name,
+        );
+    navigator.pushReplacement(
+      NavigationAnimations.slideFadeRoute(
+        SingleChatScreen(
+          chatId: id,
+          chatName: user.name,
+          otherUserId: user.uid,
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: DarkKickColors.panel,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: DarkKickColors.divider),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: DarkKickColors.neonPurple),
+              const SizedBox(height: 7),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({required this.user});
+
+  final UserModel user;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: DarkKickColors.panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: DarkKickColors.divider),
+      ),
+      child: Column(
         children: [
-          Text(label, style: TextStyle(color: Colors.grey, fontSize: 14)),
-          Spacer(),
-          Text(value, style: TextStyle(color: Colors.white, fontSize: 14)),
+          _InfoRow(
+            icon: Icons.email_outlined,
+            label: 'Email',
+            value: user.email.isEmpty ? 'Скрыт' : user.email,
+          ),
+          const Divider(color: DarkKickColors.divider),
+          _InfoRow(
+            icon: Icons.calendar_month_outlined,
+            label: 'Дата регистрации',
+            value: UserFormatters.registrationDate(user.createdAt),
+          ),
+          const Divider(color: DarkKickColors.divider),
+          _InfoRow(
+            icon: Icons.circle,
+            label: 'Статус',
+            value: UserFormatters.chatPresence(
+              isOnline: user.isOnline,
+              lastSeen: user.lastSeen,
+            ),
+            iconColor: user.isOnline
+                ? DarkKickColors.online
+                : DarkKickColors.textTertiary,
+          ),
         ],
       ),
     );
   }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.iconColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? iconColor;
 
   @override
-  void dispose() {
-    _nameController.dispose();
-    _bioController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor ?? DarkKickColors.neonPurple, size: 18),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: DarkKickColors.textTertiary),
+            ),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PhotoGrid extends StatelessWidget {
+  const _PhotoGrid({required this.chatId});
+
+  final String? chatId;
+
+  @override
+  Widget build(BuildContext context) {
+    final id = chatId;
+    if (id == null || id.isEmpty) {
+      return const _ProfileTabEmpty(
+        text: 'Фотографии появятся после переписки',
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('chats')
+          .doc(id)
+          .collection('messages')
+          .where('type', isEqualTo: 'image')
+          .snapshots(),
+      builder: (context, snapshot) {
+        final docs = snapshot.data?.docs ?? [];
+        final urls = docs
+            .map((doc) => doc.data()['imageUrl']?.toString() ?? '')
+            .where((url) => url.isNotEmpty)
+            .toList();
+
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            urls.isEmpty) {
+          return const Center(
+            child: CircularProgressIndicator(color: DarkKickColors.neonPurple),
+          );
+        }
+        if (urls.isEmpty) {
+          return const _ProfileTabEmpty(text: 'В этом диалоге пока нет фото');
+        }
+
+        return GridView.builder(
+          padding: const EdgeInsets.only(top: 16),
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+          ),
+          itemCount: urls.length,
+          itemBuilder: (context, index) {
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(urls[index], fit: BoxFit.cover),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _AboutTab extends StatelessWidget {
+  const _AboutTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _ProfileTabEmpty(
+      text: 'Здесь будут общие медиа и быстрые действия личного чата',
+    );
+  }
+}
+
+class _ProfileTabEmpty extends StatelessWidget {
+  const _ProfileTabEmpty({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: DarkKickColors.textSecondary),
+      ),
+    );
+  }
+}
+
+class _UserEmptyState extends StatelessWidget {
+  const _UserEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Пользователь не найден',
+        style: TextStyle(color: DarkKickColors.textSecondary),
+      ),
+    );
   }
 }

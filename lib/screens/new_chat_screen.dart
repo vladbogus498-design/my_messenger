@@ -48,7 +48,13 @@ class _NewChatScreenState extends State<NewChatScreen> {
 
     try {
       final currentUid = _auth.currentUser?.uid;
-      final fields = ['nameLower', 'usernameLower', 'tagLower', 'emailLower', 'phone'];
+      final fields = [
+        'nameLower',
+        'usernameLower',
+        'tagLower',
+        'emailLower',
+        'phone',
+      ];
       final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
       for (final field in fields) {
@@ -132,7 +138,10 @@ class _NewChatScreenState extends State<NewChatScreen> {
                 child: Row(
                   children: [
                     const SizedBox(width: 14),
-                    const Icon(Icons.search, color: DarkKickColors.textTertiary),
+                    const Icon(
+                      Icons.search,
+                      color: DarkKickColors.textTertiary,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: TextField(
@@ -148,7 +157,10 @@ class _NewChatScreenState extends State<NewChatScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.arrow_forward, color: DarkKickColors.neonPurple),
+                      icon: const Icon(
+                        Icons.arrow_forward,
+                        color: DarkKickColors.neonPurple,
+                      ),
                       onPressed: _loading ? null : _search,
                     ),
                   ],
@@ -167,7 +179,9 @@ class _NewChatScreenState extends State<NewChatScreen> {
               ),
             Expanded(
               child: _results.isEmpty
-                  ? _SearchEmptyState(hasQuery: _controller.text.trim().isNotEmpty)
+                  ? _SearchEmptyState(
+                      hasQuery: _controller.text.trim().isNotEmpty,
+                    )
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                       itemCount: _results.length,
@@ -203,8 +217,10 @@ class _SearchUser {
 
   factory _SearchUser.fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
-    final name = (data['name'] ?? data['username'] ?? 'Пользователь').toString();
-    final tag = (data['tag'] ?? data['username'] ?? data['email'] ?? '').toString();
+    final name = (data['name'] ?? data['username'] ?? 'Пользователь')
+        .toString();
+    final tag = (data['tag'] ?? data['username'] ?? data['email'] ?? '')
+        .toString();
     return _SearchUser(
       uid: doc.id,
       displayName: name,
@@ -215,17 +231,18 @@ class _SearchUser {
 }
 
 class _UserResultTile extends StatelessWidget {
-  const _UserResultTile({
-    required this.user,
-    required this.onTap,
-  });
+  const _UserResultTile({required this.user, required this.onTap});
 
   final _SearchUser user;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final initial = user.displayName.isEmpty ? '?' : user.displayName[0].toUpperCase();
+    final initial = user.displayName.isEmpty
+        ? '?'
+        : user.displayName[0].toUpperCase();
+    final photoUrl = user.photoURL?.trim();
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
     return Material(
       color: Colors.transparent,
@@ -244,16 +261,16 @@ class _UserResultTile extends StatelessWidget {
               CircleAvatar(
                 radius: 24,
                 backgroundColor: DarkKickColors.cardSoft,
-                backgroundImage: user.photoURL == null ? null : NetworkImage(user.photoURL!),
-                child: user.photoURL == null
-                    ? Text(
+                backgroundImage: hasPhoto ? NetworkImage(photoUrl) : null,
+                child: hasPhoto
+                    ? null
+                    : Text(
                         initial,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
                         ),
-                      )
-                    : null,
+                      ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -281,7 +298,10 @@ class _UserResultTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chat_bubble_outline, color: DarkKickColors.neonPurple),
+              const Icon(
+                Icons.chat_bubble_outline,
+                color: DarkKickColors.neonPurple,
+              ),
             ],
           ),
         ),
@@ -303,7 +323,11 @@ class _SearchEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.person_search, color: DarkKickColors.neonPurple, size: 46),
+            const Icon(
+              Icons.person_search,
+              color: DarkKickColors.neonPurple,
+              size: 46,
+            ),
             const SizedBox(height: 14),
             Text(
               hasQuery ? 'Никого не нашли' : 'Найди человека',

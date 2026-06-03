@@ -16,6 +16,7 @@ import '../widgets/message_status_icon.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/time_formatter.dart';
 import '../utils/navigation_animations.dart';
+import '../utils/user_formatters.dart';
 import '../utils/logger.dart';
 import '../models/typing_status.dart';
 
@@ -51,6 +52,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   StreamSubscription? _typingStatusSubscription;
   String? _otherUserId;
   String? _peerName;
+  String? _peerPhotoUrl;
+  bool _peerIsOnline = false;
+  DateTime? _peerLastSeen;
 
   @override
   void initState() {
@@ -102,14 +106,22 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           .get();
       final data = userDoc.data() ?? const <String, dynamic>{};
       final email = (data['email'] ?? '').toString();
-      final fallback =
-          email.contains('@') ? email.split('@').first : widget.chatName;
+      final fallback = email.contains('@')
+          ? email.split('@').first
+          : widget.chatName;
       final name = (data['name'] ?? fallback).toString();
+      final photoUrl = data['photoURL']?.toString();
+      final lastSeen = data['lastSeen'] is Timestamp
+          ? (data['lastSeen'] as Timestamp).toDate()
+          : null;
 
       if (!mounted) return;
       setState(() {
         _otherUserId = otherUserId;
         _peerName = name;
+        _peerPhotoUrl = photoUrl;
+        _peerIsOnline = data['isOnline'] == true;
+        _peerLastSeen = lastSeen;
       });
     } catch (e) {
       appLogger.e('Error loading peer profile: $otherUserId', error: e);
@@ -120,10 +132,11 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     // Слушатели работают только для существующих чатов
     final chatId = _actualChatId ?? widget.chatId;
     if (chatId.isEmpty) return;
-    
+
     // Используем единый поток для всех статусов
-    _typingStatusSubscription = ChatService.getTypingStatus(chatId)
-        .listen((status) {
+    _typingStatusSubscription = ChatService.getTypingStatus(chatId).listen((
+      status,
+    ) {
       if (mounted) {
         setState(() {
           _typingStatus = TypingStatus(
@@ -196,7 +209,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     if (_actualChatId != null && _actualChatId!.isNotEmpty) {
       return _actualChatId!;
     }
-    
+
     // Если это новый чат и есть получатель, создаем чат через ChatService
     if (widget.chatId.isEmpty && widget.otherUserId != null) {
       try {
@@ -219,13 +232,13 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         throw Exception('Не удалось создать чат: $e');
       }
     }
-    
+
     // Если chatId был передан, используем его
     if (widget.chatId.isNotEmpty) {
       _actualChatId = widget.chatId;
       return _actualChatId!;
     }
-    
+
     throw Exception('Cannot create chat: missing otherUserId');
   }
 
@@ -234,7 +247,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     try {
       // Создаем чат при отправке первого сообщения, если его еще нет
       final chatId = await _ensureChatExists();
-      
+
       await ChatService.sendMessage(
         chatId: chatId,
         text: text,
@@ -247,9 +260,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     } catch (e) {
       appLogger.e('Error sending message in chat: ${widget.chatId}', error: e);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка отправки: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ошибка отправки: $e')));
       }
     }
   }
@@ -286,15 +299,17 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         await ChatService.setSendingPhotoStatus(_actualChatId!, false);
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка отправки фото: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ошибка отправки фото: $e')));
       }
     }
   }
 
   Future<void> _sendVoiceMessage(
-      String base64Audio, int durationSeconds) async {
+    String base64Audio,
+    int durationSeconds,
+  ) async {
     try {
       final chatId = await _ensureChatExists();
       await ChatService.sendMessage(
@@ -310,7 +325,10 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       _cancelAction(); // Clear preview immediately
       _scrollToBottom();
     } catch (e) {
-      appLogger.e('Error sending voice message in chat: ${widget.chatId}', error: e);
+      appLogger.e(
+        'Error sending voice message in chat: ${widget.chatId}',
+        error: e,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка отправки голосового: $e')),
@@ -333,9 +351,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     } catch (e) {
       appLogger.e('Error sending sticker in chat: ${widget.chatId}', error: e);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка отправки стикера: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ошибка отправки стикера: $e')));
       }
     }
   }
@@ -362,16 +380,20 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     await _playbackCompleteSubscription?.cancel();
 
     setState(() => _playingVoiceMessageId = messageId);
-    
+
     // Play voice message and listen for completion
     await VoiceMessageService.playVoiceMessage(
-        message.voiceAudioBase64!, messageId);
-    
+      message.voiceAudioBase64!,
+      messageId,
+    );
+
     // Listen for playback completion via VoiceMessageService callback
     // The service already handles completion internally, we just need to update UI
     final completionStream = VoiceMessageService.onPlaybackComplete;
     if (completionStream != null) {
-      _playbackCompleteSubscription = completionStream.listen((completedMessageId) {
+      _playbackCompleteSubscription = completionStream.listen((
+        completedMessageId,
+      ) {
         if (mounted && completedMessageId == messageId) {
           setState(() {
             if (_playingVoiceMessageId == messageId) {
@@ -392,11 +414,14 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       _cancelAction(); // Clear preview immediately with animation
       _scrollToBottom();
     } catch (e) {
-      appLogger.e('Error forwarding message in chat: ${widget.chatId}', error: e);
+      appLogger.e(
+        'Error forwarding message in chat: ${widget.chatId}',
+        error: e,
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка пересылки: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ошибка пересылки: $e')));
       }
     }
   }
@@ -447,10 +472,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                 color: colorScheme.secondaryContainer.withOpacity(0.6),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
-                entry.value,
-                style: const TextStyle(fontSize: 12),
-              ),
+              child: Text(entry.value, style: const TextStyle(fontSize: 12)),
             ),
           );
         }).toList(),
@@ -477,10 +499,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
     return Container(
       padding: EdgeInsets.all(8),
-      child: Text(
-        emoji,
-        style: TextStyle(fontSize: 64),
-      ),
+      child: Text(emoji, style: TextStyle(fontSize: 64)),
     );
   }
 
@@ -491,8 +510,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       child: _replyingTo != null
           ? _buildReplyPreview(_replyingTo!)
           : _forwardingMessage != null
-              ? _buildForwardPreview(_forwardingMessage!)
-              : SizedBox(),
+          ? _buildForwardPreview(_forwardingMessage!)
+          : SizedBox(),
     );
   }
 
@@ -613,8 +632,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
             height: 16,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor:
-                  AlwaysStoppedAnimation<Color>(colorScheme.secondary),
+              valueColor: AlwaysStoppedAnimation<Color>(colorScheme.secondary),
             ),
           ),
         ],
@@ -651,8 +669,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     final bubbleColor = isMyMessage
         ? DarkKickColors.neonPurple
         : DarkKickColors.panel;
-    final textColor =
-        isMyMessage ? colorScheme.onPrimary : colorScheme.onSurface;
+    final textColor = isMyMessage
+        ? colorScheme.onPrimary
+        : colorScheme.onSurface;
     final metaTextColor = isMyMessage
         ? colorScheme.onPrimary.withOpacity(0.8)
         : colorScheme.onSurfaceVariant;
@@ -660,8 +679,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 12),
       child: Row(
-        mainAxisAlignment:
-            isMyMessage ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMyMessage
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         children: [
           Flexible(
             child: Column(
@@ -688,7 +708,10 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                 GestureDetector(
                   onLongPress: () => _showMessageMenu(message),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 13,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: bubbleColor,
                       borderRadius: BorderRadius.only(
@@ -703,7 +726,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                       boxShadow: isMyMessage
                           ? [
                               BoxShadow(
-                                color: DarkKickColors.neonPurple.withValues(alpha: 0.22),
+                                color: DarkKickColors.neonPurple.withValues(
+                                  alpha: 0.22,
+                                ),
                                 blurRadius: 14,
                               ),
                             ]
@@ -719,12 +744,14 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                             margin: EdgeInsets.only(bottom: 8),
                             decoration: BoxDecoration(
                               color: isMyMessage
-                                  ? colorScheme.primaryContainer
-                                      .withOpacity(0.35)
+                                  ? colorScheme.primaryContainer.withOpacity(
+                                      0.35,
+                                    )
                                   : colorScheme.surface.withOpacity(
                                       theme.brightness == Brightness.dark
                                           ? 0.3
-                                          : 0.6),
+                                          : 0.6,
+                                    ),
                               borderRadius: BorderRadius.circular(8),
                               border: Border(
                                 left: BorderSide(
@@ -763,14 +790,21 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                                         width: 200,
                                         height: 150,
                                         color: colorScheme.surfaceVariant,
-                                        child: Center(child: CircularProgressIndicator()),
+                                        child: Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
                                       ),
-                                      errorWidget: (context, url, error) => Container(
-                                        width: 200,
-                                        height: 150,
-                                        color: colorScheme.errorContainer,
-                                        child: Icon(Icons.error, color: colorScheme.onErrorContainer),
-                                      ),
+                                      errorWidget: (context, url, error) =>
+                                          Container(
+                                            width: 200,
+                                            height: 150,
+                                            color: colorScheme.errorContainer,
+                                            child: Icon(
+                                              Icons.error,
+                                              color:
+                                                  colorScheme.onErrorContainer,
+                                            ),
+                                          ),
                                     ),
                                     Positioned(
                                       top: 4,
@@ -778,10 +812,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                                       child: Container(
                                         padding: EdgeInsets.all(4),
                                         decoration: BoxDecoration(
-                                          color: colorScheme.scrim
-                                              .withOpacity(0.35),
-                                          borderRadius:
-                                              BorderRadius.circular(4),
+                                          color: colorScheme.scrim.withOpacity(
+                                            0.35,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         child: Icon(
                                           Icons.photo,
@@ -813,8 +849,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                                 children: [
                                   Icon(
                                     _playingVoiceMessageId == message.id &&
-                                            VoiceMessageService
-                                                .isPlayingMessage(message.id)
+                                            VoiceMessageService.isPlayingMessage(
+                                              message.id,
+                                            )
                                         ? Icons.pause
                                         : Icons.play_arrow,
                                     color: textColor,
@@ -824,7 +861,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                                   Text(
                                     '${(message.voiceDuration ?? 0) ~/ 60}:${((message.voiceDuration ?? 0) % 60).toString().padLeft(2, '0')}',
                                     style: TextStyle(
-                                        color: textColor, fontSize: 16),
+                                      color: textColor,
+                                      fontSize: 16,
+                                    ),
                                   ),
                                   SizedBox(width: 8),
                                   Icon(Icons.mic, color: textColor, size: 16),
@@ -854,9 +893,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                           children: [
                             Text(
                               TimeFormatter.formatMessageTime(
-                                  message.timestamp),
+                                message.timestamp,
+                              ),
                               style: TextStyle(
-                                  color: metaTextColor, fontSize: 12),
+                                color: metaTextColor,
+                                fontSize: 12,
+                              ),
                             ),
                             if (isMyMessage) ...[
                               SizedBox(width: 4),
@@ -881,10 +923,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     );
   }
 
-
   Widget _buildPinnedMessageCard(String chatId) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('chats').doc(chatId).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatId)
+          .snapshots(),
       builder: (context, snapshot) {
         final pinned = snapshot.data?.data()?['pinnedMessage'];
         if (pinned == null) return const SizedBox.shrink();
@@ -895,10 +939,10 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         final label = text.isNotEmpty
             ? text
             : type == 'image'
-                ? 'Фото'
-                : type == 'sticker'
-                    ? 'Стикер'
-                    : 'Сообщение';
+            ? 'Фото'
+            : type == 'sticker'
+            ? 'Стикер'
+            : 'Сообщение';
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
@@ -990,8 +1034,10 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
               },
             ),
             Divider(),
-            Text('Добавить реакцию:',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              'Добавить реакцию:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -1014,7 +1060,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   void _showUserProfile() async {
     // Используем otherUserId если он передан, иначе получаем из участников чата напрямую
     String? otherUserId = widget.otherUserId ?? _otherUserId;
-    
+
     if (otherUserId == null) {
       // Получаем ID другого пользователя из участников чата напрямую через Firestore
       final chatId = _actualChatId ?? widget.chatId;
@@ -1024,12 +1070,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
               .collection('chats')
               .doc(chatId)
               .get();
-          
+
           if (chatDoc.exists) {
             final participants = List<String>.from(
-              chatDoc.data()?['participants'] ?? []
+              chatDoc.data()?['participants'] ?? [],
             );
-            
+
             if (participants.isNotEmpty) {
               otherUserId = participants.firstWhere(
                 (id) => id != _currentUser?.uid,
@@ -1038,7 +1084,10 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
             }
           }
         } catch (e) {
-          appLogger.e('Error getting chat participants for chat: ${widget.chatId}', error: e);
+          appLogger.e(
+            'Error getting chat participants for chat: ${widget.chatId}',
+            error: e,
+          );
         }
       }
     }
@@ -1046,14 +1095,115 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     if (!mounted || otherUserId == null || otherUserId.isEmpty) return;
 
     Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => UserProfileScreen(
-            userId: otherUserId!,
-            isMyProfile: false,
-          ),
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileScreen(
+          userId: otherUserId!,
+          isMyProfile: false,
+          chatId: _actualChatId ?? widget.chatId,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatAppBarTitle() {
+    final otherUserId = widget.otherUserId ?? _otherUserId;
+    final fallbackName = _peerName ?? widget.chatName;
+
+    Widget titleContent({
+      required String name,
+      required String? photoUrl,
+      required bool isOnline,
+      required DateTime? lastSeen,
+    }) {
+      final status = _typingStatus.recordingVoiceUsers.isNotEmpty
+          ? 'Записывает голосовое...'
+          : _typingStatus.sendingPhotoUsers.isNotEmpty
+          ? 'Отправляет фото...'
+          : _typingStatus.typingUsers.isNotEmpty
+          ? 'Печатает...'
+          : UserFormatters.chatPresence(isOnline: isOnline, lastSeen: lastSeen);
+
+      return GestureDetector(
+        onTap: _showUserProfile,
+        child: Row(
+          children: [
+            _ChatAppBarAvatar(
+              name: name,
+              photoUrl: photoUrl,
+              isOnline: isOnline,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    status,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isOnline
+                          ? DarkKickColors.online
+                          : DarkKickColors.textTertiary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       );
+    }
+
+    if (otherUserId == null || otherUserId.isEmpty) {
+      return titleContent(
+        name: fallbackName,
+        photoUrl: _peerPhotoUrl,
+        isOnline: _peerIsOnline,
+        lastSeen: _peerLastSeen,
+      );
+    }
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(otherUserId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() ?? const <String, dynamic>{};
+        final email = (data['email'] ?? '').toString();
+        final loadedName = (data['name'] ?? '').toString();
+        final name = loadedName.isNotEmpty
+            ? loadedName
+            : email.contains('@')
+            ? email.split('@').first
+            : fallbackName;
+        final lastSeen = data['lastSeen'] is Timestamp
+            ? (data['lastSeen'] as Timestamp).toDate()
+            : _peerLastSeen;
+
+        return titleContent(
+          name: name,
+          photoUrl: data['photoURL']?.toString() ?? _peerPhotoUrl,
+          isOnline: data['isOnline'] == true,
+          lastSeen: lastSeen,
+        );
+      },
+    );
   }
 
   @override
@@ -1069,30 +1219,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: GestureDetector(
-          onTap: () => _showUserProfile(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_peerName ?? widget.chatName),
-              if (_typingStatus.recordingVoiceUsers.isNotEmpty)
-                _AnimatedStatusRow(
-                  icon: Icons.mic,
-                  text: 'Записывает голосовое...',
-                )
-              else if (_typingStatus.sendingPhotoUsers.isNotEmpty)
-                _AnimatedStatusRow(
-                  icon: Icons.photo,
-                  text: 'Отправляет фото...',
-                )
-              else if (_typingStatus.typingUsers.isNotEmpty)
-                _AnimatedStatusRow(
-                  icon: Icons.edit,
-                  text: 'Печатает...',
-                ),
-            ],
-          ),
-        ),
+        titleSpacing: 0,
+        title: _buildChatAppBarTitle(),
         // use theme default color
       ),
       body: Column(
@@ -1124,14 +1252,16 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                       }
                       if (snapshot.hasError) {
                         return Center(
-                          child: Text('Ошибка загрузки сообщений: ${snapshot.error}'),
+                          child: Text(
+                            'Ошибка загрузки сообщений: ${snapshot.error}',
+                          ),
                         );
-                       }
-                       final docs = snapshot.data?.docs ?? [];
-                       WidgetsBinding.instance.addPostFrameCallback((_) {
-                         _markMessagesAsRead();
-                       });
-                       if (docs.isEmpty) {
+                      }
+                      final docs = snapshot.data?.docs ?? [];
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _markMessagesAsRead();
+                      });
+                      if (docs.isEmpty) {
                         return const _ChatEmptyState(
                           icon: Icons.chat_bubble_outline,
                           title: 'Диалог пуст',
@@ -1204,31 +1334,82 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 }
 
-class _AnimatedStatusRow extends StatelessWidget {
-  const _AnimatedStatusRow({
-    required this.icon,
-    required this.text,
+class _ChatAppBarAvatar extends StatelessWidget {
+  const _ChatAppBarAvatar({
+    required this.name,
+    required this.photoUrl,
+    required this.isOnline,
   });
 
-  final IconData icon;
-  final String text;
+  final String name;
+  final String? photoUrl;
+  final bool isOnline;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
-        Icon(icon, size: 12, color: colorScheme.onSurfaceVariant),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            color: colorScheme.onSurfaceVariant,
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: DarkKickColors.stroke),
+          ),
+          child: ClipOval(
+            child: photoUrl != null && photoUrl!.isNotEmpty
+                ? Image.network(
+                    photoUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        _ChatAppBarAvatarFallback(initial: initial),
+                  )
+                : _ChatAppBarAvatarFallback(initial: initial),
+          ),
+        ),
+        Positioned(
+          right: -1,
+          bottom: -1,
+          child: Container(
+            width: 11,
+            height: 11,
+            decoration: BoxDecoration(
+              color: isOnline ? DarkKickColors.online : DarkKickColors.offline,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: DarkKickColors.darkBackground,
+                width: 2,
+              ),
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ChatAppBarAvatarFallback extends StatelessWidget {
+  const _ChatAppBarAvatarFallback({required this.initial});
+
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: DarkKickColors.cardSoft,
+      child: Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
     );
   }
 }
