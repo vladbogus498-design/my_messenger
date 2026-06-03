@@ -1,80 +1,132 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../theme/darkkick_colors.dart';
+import 'auth_credentials_screen.dart';
 
-/// Экран авторизации: фоновый арт + кнопки внизу (макет Figma).
 class AuthScreen extends StatelessWidget {
   const AuthScreen({super.key});
 
-  static const Color _background = Color(0xFF07050C);
-  static const Color _neonPurpleBorder = Color(0xFF7B2CBF);
-  static const Color _accentPurple = Color(0xFF9D4EDD);
+  void _openSignIn(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const AuthCredentialsScreen(
+          initialMode: AuthCredentialsMode.signIn,
+        ),
+      ),
+    );
+  }
+
+  void _openRegister(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const AuthCredentialsScreen(
+          initialMode: AuthCredentialsMode.register,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: DarkKickColors.deepBackground,
       body: Stack(
+        fit: StackFit.expand,
         children: [
           Positioned.fill(
-            child: ShaderMask(
-              shaderCallback: (Rect bounds) {
-                return const LinearGradient(
+            child: Image.asset(
+              'assets/images/auth_bg.png',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.white,
-                    Colors.white,
-                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.08),
+                    Colors.black.withValues(alpha: 0.12),
+                    DarkKickColors.deepBackground.withValues(alpha: 0.8),
+                    DarkKickColors.deepBackground,
                   ],
-                  stops: [0.0, 0.55, 1.0],
-                ).createShader(bounds);
-              },
-              blendMode: BlendMode.dstIn,
-              child: Image.asset(
-                'assets/images/auth_bg.png',
-                fit: BoxFit.cover,
+                  stops: const [0, 0.48, 0.76, 1],
+                ),
               ),
             ),
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 18),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 480),
-                  _OutlineAuthButton(
+                  const Spacer(),
+                  Text(
+                    'DARKKICK',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.spaceGrotesk(
+                      color: Colors.white,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 7,
+                      shadows: [
+                        Shadow(
+                          color: DarkKickColors.neonPurple.withValues(alpha: 0.75),
+                          blurRadius: 22,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        const TextSpan(text: 'БЕЗ ГРАНИЦ. БЕЗ СЛЕЖКИ. ЭТО '),
+                        TextSpan(
+                          text: 'DARKKICK.',
+                          style: TextStyle(color: DarkKickColors.electricPurple),
+                        ),
+                      ],
+                    ),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.spaceGrotesk(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 34),
+                  _NeonButton(
                     label: 'Войти',
-                    borderColor: _neonPurpleBorder,
-                    onPressed: () {},
+                    onPressed: () => _openSignIn(context),
                   ),
-                  const SizedBox(height: 16),
-                  _OutlineAuthButton(
+                  const SizedBox(height: 14),
+                  _GhostButton(
                     label: 'Создать аккаунт',
-                    borderColor: Colors.white.withOpacity(0.15),
-                    onPressed: () {},
+                    onPressed: () => _openRegister(context),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 36),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         'Сделано с нуля одним человеком.',
-                        style: TextStyle(
+                        style: GoogleFonts.spaceGrotesk(
                           fontSize: 11,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.white.withOpacity(0.4),
+                          color: Colors.white.withValues(alpha: 0.42),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 8),
                       Icon(
-                        Icons.bolt,
-                        size: 14,
-                        color: _accentPurple,
+                        Icons.auto_awesome,
+                        size: 17,
+                        color: DarkKickColors.neonPurple.withValues(alpha: 0.9),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
                 ],
               ),
             ),
@@ -85,48 +137,63 @@ class AuthScreen extends StatelessWidget {
   }
 }
 
-class _OutlineAuthButton extends StatelessWidget {
-  const _OutlineAuthButton({
+class _NeonButton extends StatelessWidget {
+  const _NeonButton({
     required this.label,
-    required this.borderColor,
     required this.onPressed,
   });
 
   final String label;
-  final Color borderColor;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
+    return DecoratedBox(
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        splashColor: Colors.white.withOpacity(0.12),
-        highlightColor: Colors.white.withOpacity(0.06),
-        child: Ink(
-          height: 54,
-          decoration: BoxDecoration(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: borderColor,
-              width: 1.5,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2B0D65), Color(0xFF7B2CBF), Color(0xFF3C0D78)],
         ),
+        boxShadow: [
+          BoxShadow(
+            color: DarkKickColors.neonPurple.withValues(alpha: 0.62),
+            blurRadius: 22,
+            spreadRadius: 1,
+          ),
+        ],
       ),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+}
+
+class _GhostButton extends StatelessWidget {
+  const _GhostButton({
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        backgroundColor: Colors.black.withValues(alpha: 0.14),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Text(label),
     );
   }
 }

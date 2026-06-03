@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'auth_credentials_screen.dart';
 
 /// Welcome slide for DarkKick Messenger authentication flow (Slide 1)
 /// Displays branding, neon aesthetic, and action buttons to proceed with authentication
@@ -131,7 +132,16 @@ class AuthWelcomeSlide extends StatelessWidget {
                       ],
                     ),
                     child: ElevatedButton(
-                      onPressed: onSignInPressed ?? () {},
+                      onPressed: onSignInPressed ??
+                          () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const AuthCredentialsScreen(
+                                  initialMode: AuthCredentialsMode.signIn,
+                                ),
+                              ),
+                            );
+                          },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
@@ -154,7 +164,16 @@ class AuthWelcomeSlide extends StatelessWidget {
 
                   // Create Account button with outline
                   OutlinedButton(
-                    onPressed: onCreateAccountPressed ?? () {},
+                    onPressed: onCreateAccountPressed ??
+                        () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const AuthCredentialsScreen(
+                                initialMode: AuthCredentialsMode.register,
+                              ),
+                            ),
+                          );
+                        },
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(
                         color: Colors.white.withOpacity(0.15),

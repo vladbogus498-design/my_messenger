@@ -1,236 +1,128 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'ui_constants.dart';
+import 'darkkick_colors.dart';
 
 class AppTheme {
-  static const Color _darkBackground = Color(0xFF0A0A0A);
-  static const Color _darkSurface = Color(0xFF111111);
-  static const Color _primaryRed = Color(0xFFE50914);
-  static const Color _secondaryPurple = Color(0xFF7A1FCA);
-  static const Color _lightBackground = Color(0xFFF5F6FA);
-  static const Color _lightSurface = Color(0xFFFFFFFF);
-
   static ThemeData dark() {
     final base = ThemeData.dark(useMaterial3: true);
-    final colorScheme = ColorScheme(
+    final textTheme = GoogleFonts.spaceGroteskTextTheme(base.textTheme).apply(
+      bodyColor: DarkKickColors.textPrimary,
+      displayColor: DarkKickColors.textPrimary,
+    );
+
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: DarkKickColors.neonPurple,
       brightness: Brightness.dark,
-      primary: _primaryRed,
+      primary: DarkKickColors.neonPurple,
       onPrimary: Colors.white,
-      secondary: _secondaryPurple,
+      secondary: DarkKickColors.electricPurple,
       onSecondary: Colors.white,
-      error: Colors.redAccent,
+      error: const Color(0xFFFF5C7A),
       onError: Colors.white,
-      background: _darkBackground,
-      onBackground: Colors.white,
-      surface: _darkSurface,
-      onSurface: Colors.white70,
-      surfaceTint: _secondaryPurple,
-      primaryContainer: _primaryRed.withOpacity(0.15),
+      surface: DarkKickColors.panel,
+      onSurface: DarkKickColors.textPrimary,
+      surfaceTint: DarkKickColors.neonPurple,
+      primaryContainer: DarkKickColors.darkPurple,
       onPrimaryContainer: Colors.white,
-      secondaryContainer: _secondaryPurple.withOpacity(0.18),
-      onSecondaryContainer: Colors.white,
-      errorContainer: Colors.redAccent.withOpacity(0.2),
+      secondaryContainer: DarkKickColors.cardSoft,
+      onSecondaryContainer: DarkKickColors.textPrimary,
+      errorContainer: const Color(0xFF3A0D18),
       onErrorContainer: Colors.white,
       scrim: Colors.black87,
-      shadow: Colors.black54,
+      shadow: Colors.black87,
       inverseSurface: Colors.white,
-      onInverseSurface: Colors.black87,
-      outline: Colors.white24,
+      onInverseSurface: Colors.black,
+      outline: DarkKickColors.stroke,
+      outlineVariant: DarkKickColors.divider,
     );
-
-    final textTheme =
-        GoogleFonts.montserratTextTheme(base.textTheme).apply(bodyColor: Colors.white);
 
     return base.copyWith(
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: _darkBackground,
+      scaffoldBackgroundColor: DarkKickColors.darkBackground,
       textTheme: textTheme,
       appBarTheme: AppBarTheme(
-        backgroundColor: _darkSurface,
+        backgroundColor: DarkKickColors.darkBackground,
+        foregroundColor: DarkKickColors.textPrimary,
+        centerTitle: true,
         elevation: 0,
-        foregroundColor: Colors.white,
-        titleTextStyle: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+        titleTextStyle: textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.4,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: DarkKickColors.card,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: DarkKickColors.divider),
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: _primaryRed,
+          backgroundColor: DarkKickColors.neonPurple,
           foregroundColor: Colors.white,
-          elevation: UIConstants.elevationMedium,
-          padding: const EdgeInsets.symmetric(
-            horizontal: UIConstants.paddingXLarge,
-            vertical: UIConstants.paddingLarge,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(UIConstants.borderRadiusMedium),
-          ),
-          shadowColor: _primaryRed.withOpacity(0.4),
+          elevation: 0,
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.white,
-          side: BorderSide(color: Colors.white24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: _secondaryPurple,
-          textStyle: textTheme.labelLarge,
-        ),
+        style: TextButton.styleFrom(foregroundColor: DarkKickColors.neonPurple),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
-        labelStyle: TextStyle(color: Colors.white70),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: UIConstants.paddingLarge,
-          vertical: UIConstants.paddingLarge,
-        ),
+        fillColor: DarkKickColors.panel,
+        hintStyle: const TextStyle(color: DarkKickColors.textTertiary),
+        labelStyle: const TextStyle(color: DarkKickColors.textSecondary),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(UIConstants.borderRadiusMedium),
-          borderSide: BorderSide(color: Colors.white12),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: DarkKickColors.divider),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: DarkKickColors.divider),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(UIConstants.borderRadiusMedium),
-          borderSide: BorderSide(color: _primaryRed),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: DarkKickColors.neonPurple),
         ),
       ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: _darkSurface,
-        selectedItemColor: _primaryRed,
-        unselectedItemColor: Colors.white54,
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: DarkKickColors.darkBackground,
+        selectedItemColor: DarkKickColors.neonPurple,
+        unselectedItemColor: DarkKickColors.textTertiary,
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
       ),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: _secondaryPurple,
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: DarkKickColors.neonPurple,
         foregroundColor: Colors.white,
-        elevation: 4,
-      ),
-      dialogTheme: DialogTheme(
-        backgroundColor: _darkSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        titleTextStyle:
-            textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
-        contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white70),
-      ),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: _secondaryPurple,
-        contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  static ThemeData light() {
-    final base = ThemeData.light(useMaterial3: true);
-    final colorScheme = ColorScheme(
-      brightness: Brightness.light,
-      primary: _primaryRed,
-      onPrimary: Colors.white,
-      secondary: _secondaryPurple,
-      onSecondary: Colors.white,
-      error: Colors.redAccent,
-      onError: Colors.white,
-      background: _lightBackground,
-      onBackground: Colors.black87,
-      surface: _lightSurface,
-      onSurface: Colors.black87,
-      surfaceTint: _secondaryPurple,
-      primaryContainer: _primaryRed.withOpacity(0.12),
-      onPrimaryContainer: Colors.black,
-      secondaryContainer: _secondaryPurple.withOpacity(0.12),
-      onSecondaryContainer: Colors.black,
-      errorContainer: Colors.redAccent.withOpacity(0.15),
-      onErrorContainer: Colors.black,
-      scrim: Colors.black54,
-      shadow: Colors.black26,
-      inverseSurface: Colors.black,
-      onInverseSurface: Colors.white,
-      outline: Colors.black26,
-    );
-
-    final textTheme = GoogleFonts.montserratTextTheme(base.textTheme);
-
-    return base.copyWith(
-      colorScheme: colorScheme,
-      scaffoldBackgroundColor: _lightBackground,
-      textTheme: textTheme,
-      appBarTheme: AppBarTheme(
-        backgroundColor: _lightSurface,
         elevation: 0,
-        foregroundColor: Colors.black87,
-        titleTextStyle: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _primaryRed,
-          foregroundColor: Colors.white,
-          elevation: 2,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.black87,
-          side: BorderSide(color: Colors.black26),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: _secondaryPurple,
-          textStyle: textTheme.labelLarge,
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.black.withOpacity(0.04),
-        labelStyle: TextStyle(color: Colors.black54),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: UIConstants.paddingLarge,
-          vertical: UIConstants.paddingLarge,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(UIConstants.borderRadiusMedium),
-          borderSide: BorderSide(color: Colors.black12),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(UIConstants.borderRadiusMedium),
-          borderSide: BorderSide(color: _primaryRed),
-        ),
-      ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: _lightSurface,
-        selectedItemColor: _primaryRed,
-        unselectedItemColor: Colors.black54,
-        showUnselectedLabels: true,
-        type: BottomNavigationBarType.fixed,
-      ),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: _secondaryPurple,
-        foregroundColor: Colors.white,
-        elevation: 4,
-      ),
-      dialogTheme: DialogTheme(
-        backgroundColor: _lightSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        titleTextStyle:
-            textTheme.titleLarge?.copyWith(color: Colors.black87, fontWeight: FontWeight.w600),
-        contentTextStyle:
-            textTheme.bodyMedium?.copyWith(color: Colors.black.withOpacity(0.7)),
+      dividerTheme: const DividerThemeData(
+        color: DarkKickColors.divider,
+        thickness: 1,
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: _secondaryPurple,
+        backgroundColor: DarkKickColors.cardSoft,
         contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
+
+  static ThemeData light() => dark();
 }
-
-
