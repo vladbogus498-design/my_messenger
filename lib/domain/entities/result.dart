@@ -12,7 +12,7 @@ sealed class Result<T> {
   };
 
   /// Map with handling both success and failure
-  Result<R> maybeMap<R>({
+  R maybeMap<R>({
     required R Function(T) success,
     required R Function(AppFailure) failure,
   }) => switch (this) {

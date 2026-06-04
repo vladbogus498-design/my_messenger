@@ -1,9 +1,9 @@
-import 'package:pointycastle/asymmetric/api.dart';
-import 'package:pointycastle/asymmetric/rsa.dart';
-import 'package:pointycastle/random/fortuna_random.dart';
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:encrypt/encrypt.dart' as encrypt;
+import 'package:pointycastle/export.dart';
+
 import '../../data/datasources/secure/platform_secure_key_storage.dart';
 import '../../domain/failures/app_failure.dart';
 import '../../domain/entities/result.dart';
@@ -54,13 +54,16 @@ class SecurityServiceImpl implements SecurityService {
       final random = FortunaRandom();
 
       // Seed with entropy
-      random.seed(_generateEntropy(32));
+      random.seed(KeyParameter(_generateEntropy(32)));
 
       keyGen.init(
-        RSAKeyGeneratorParameters(
-          BigInt.from(65537), // exponent
-          _rsaKeySize,
-          64, // certainty
+        ParametersWithRandom(
+          RSAKeyGeneratorParameters(
+            BigInt.from(65537), // exponent
+            _rsaKeySize,
+            64, // certainty
+          ),
+          random,
         ),
       );
 
