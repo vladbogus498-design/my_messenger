@@ -105,7 +105,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
     try {
       final userDoc = await FirebaseFirestore.instance
-          .collection('users')
+          .collection('publicProfiles')
           .doc(otherUserId)
           .get();
       final data = userDoc.data() ?? const <String, dynamic>{};
@@ -1282,7 +1282,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
-          .collection('users')
+          .collection('publicProfiles')
           .doc(otherUserId)
           .snapshots(),
       builder: (context, snapshot) {

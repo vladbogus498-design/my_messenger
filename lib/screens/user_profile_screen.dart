@@ -30,6 +30,8 @@ class UserProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final targetUserId = _targetUserId;
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final canReadPrivateProfile = isMyProfile || currentUid == targetUserId;
 
     return Scaffold(
       backgroundColor: DarkKickColors.darkBackground,
@@ -52,7 +54,9 @@ class UserProfileScreen extends StatelessWidget {
       body: targetUserId.isEmpty
           ? const _UserEmptyState()
           : StreamBuilder<UserModel?>(
-              stream: UserService.watchUserData(targetUserId),
+              stream: canReadPrivateProfile
+                  ? UserService.watchUserData(targetUserId)
+                  : UserService.watchPublicUserData(targetUserId),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting &&
                     !snapshot.hasData) {

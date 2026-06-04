@@ -49,6 +49,11 @@ class FirebaseRemoteDataSource implements RemoteDataSource {
   }) : _firestore = firestore,
        _auth = auth;
 
+  static String _directChatId(List<String> participants) {
+    final sortedParticipants = [...participants]..sort();
+    return sortedParticipants.join('_');
+  }
+
   // ==== AUTH ====
   @override
   Future<Result<UserCredential>> signInWithEmail(
@@ -200,16 +205,39 @@ class FirebaseRemoteDataSource implements RemoteDataSource {
   @override
   Future<Result<void>> createChat(Chat chat) async {
     try {
-      await _firestore.collection('chats').doc(chat.id).set({
+      final userId = _auth.currentUser?.uid;
+      if (userId == null || !chat.participants.contains(userId)) {
+        return Failure(
+          AuthenticationFailure(message: 'User is not a chat participant'),
+        );
+      }
+
+      final isDirect = !chat.isGroup && chat.participants.length == 2;
+      final chatId = isDirect ? _directChatId(chat.participants) : chat.id;
+      final now = FieldValue.serverTimestamp();
+
+      await _firestore.collection('chats').doc(chatId).set({
+        'type': isDirect ? 'direct' : 'group',
         'name': chat.name,
+        'isGroup': !isDirect,
         'participants': chat.participants,
-        'lastMessage': {'text': chat.lastMessage, 'timestamp': Timestamp.now()},
-        'lastMessageTime': Timestamp.now(),
-        'isGroup': chat.isGroup,
+        'lastMessage': chat.lastMessage,
+        'lastMessageType': chat.lastMessageType,
+        'lastMessageAt': now,
+        'lastMessageTime': now,
+        'lastMessageStatus': chat.lastMessageStatus,
+        'lastMessageReadBy': chat.lastMessageReadBy,
+        'lastSenderId': chat.lastSenderId,
+        'unreadCount': chat.unreadCount,
+        'typing': chat.typing,
+        'pinnedMessage': chat.pinnedMessage,
         'admins': chat.admins,
         'groupName': chat.groupName,
+        'createdAt': now,
+        'updatedAt': now,
+        'createdBy': userId,
       });
-      appLogger.d('Chat created: ${chat.id}');
+      appLogger.d('Chat created: $chatId');
       return const Success(null);
     } on FirebaseException catch (e) {
       appLogger.e('Error creating chat', error: e);
@@ -317,8 +345,10 @@ class FirebaseRemoteDataSource implements RemoteDataSource {
           });
     } catch (e) {
       appLogger.e('Error watching chats', error: e);
-      yield Failure(
-        UnexpectedFailure(message: 'Failed to watch chats', originalError: e),
+      return Stream.value(
+        Failure(
+          UnexpectedFailure(message: 'Failed to watch chats', originalError: e),
+        ),
       );
     }
   }
@@ -490,10 +520,12 @@ class FirebaseRemoteDataSource implements RemoteDataSource {
           });
     } catch (e) {
       appLogger.e('Error watching messages', error: e);
-      yield Failure(
-        UnexpectedFailure(
-          message: 'Failed to watch messages',
-          originalError: e,
+      return Stream.value(
+        Failure(
+          UnexpectedFailure(
+            message: 'Failed to watch messages',
+            originalError: e,
+          ),
         ),
       );
     }

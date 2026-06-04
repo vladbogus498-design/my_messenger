@@ -21,6 +21,19 @@ class UserService {
     });
   }
 
+  static Stream<UserModel?> watchPublicUserData(String userId) {
+    if (!InputValidator.isValidUserId(userId)) {
+      return const Stream<UserModel?>.empty();
+    }
+
+    return _firestore.collection('publicProfiles').doc(userId).snapshots().map((
+      doc,
+    ) {
+      if (!doc.exists) return null;
+      return UserModel.fromFirestore(doc);
+    });
+  }
+
   static Future<UserModel?> getUserData(String userId) async {
     try {
       if (!InputValidator.isValidUserId(userId)) {
@@ -37,6 +50,28 @@ class UserService {
     }
   }
 
+  static Future<UserModel?> getPublicUserData(String userId) async {
+    try {
+      if (!InputValidator.isValidUserId(userId)) {
+        appLogger.w('Invalid userId in getPublicUserData');
+        return null;
+      }
+
+      final doc = await _firestore
+          .collection('publicProfiles')
+          .doc(userId)
+          .get();
+      if (!doc.exists) return null;
+      return UserModel.fromFirestore(doc);
+    } catch (e) {
+      appLogger.e(
+        'Error getting public user data for userId: $userId',
+        error: e,
+      );
+      return null;
+    }
+  }
+
   static Future<void> setPresence({required bool isOnline}) async {
     final user = _auth.currentUser;
     if (user == null || !InputValidator.isValidUserId(user.uid)) return;
@@ -49,6 +84,14 @@ class UserService {
         'isOnline': isOnline,
         'lastSeen': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      await _upsertPublicProfile(user.uid, {
+        'uid': user.uid,
+        'name':
+            user.displayName ??
+            (user.email?.split('@').first ?? 'Пользователь'),
+        'isOnline': isOnline,
+        'lastSeen': FieldValue.serverTimestamp(),
+      });
     } catch (e) {
       appLogger.e('Error updating user presence', error: e);
     }
@@ -90,6 +133,8 @@ class UserService {
           .collection('users')
           .doc(userId)
           .set(updates, SetOptions(merge: true));
+      final freshDoc = await _firestore.collection('users').doc(userId).get();
+      await _upsertPublicProfile(userId, freshDoc.data() ?? updates);
       if (photoURL != null) {
         try {
           await _auth.currentUser?.updatePhotoURL(photoURL);
@@ -118,7 +163,7 @@ class UserService {
       if (sanitizedTag.isEmpty) return [];
 
       final snapshot = await _firestore
-          .collection('users')
+          .collection('publicProfiles')
           .where('nameLower', isGreaterThanOrEqualTo: sanitizedTag)
           .where('nameLower', isLessThan: '$sanitizedTag\uf8ff')
           .limit(20)
@@ -159,6 +204,16 @@ class UserService {
         'lastSeen': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      await _upsertPublicProfile(uid, {
+        'uid': uid,
+        'name': sanitizedName,
+        'nameLower': sanitizedName.toLowerCase(),
+        'bio': '',
+        'photoURL': null,
+        'isOnline': true,
+        'lastSeen': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
       appLogger.i('User profile created: uid=$uid');
     } catch (e) {
       appLogger.e('Error creating user profile: uid=$uid', error: e);
@@ -179,13 +234,15 @@ class UserService {
       final docRef = _firestore.collection('users').doc(user.uid);
       final doc = await docRef.get();
       if (doc.exists) {
-        await docRef.set({
+        final updates = {
           'uid': user.uid,
           if (user.email != null) 'email': user.email!.toLowerCase().trim(),
           if (user.email != null)
             'emailLower': user.email!.toLowerCase().trim(),
           if (user.photoURL != null) 'photoURL': user.photoURL,
-        }, SetOptions(merge: true));
+        };
+        await docRef.set({...updates}, SetOptions(merge: true));
+        await _upsertPublicProfile(user.uid, {...?doc.data(), ...updates});
         return;
       }
 
@@ -214,9 +271,55 @@ class UserService {
         'lastSeen': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       });
+      await _upsertPublicProfile(user.uid, {
+        'uid': user.uid,
+        'name': sanitizedName,
+        'nameLower': sanitizedName.toLowerCase(),
+        'bio': '',
+        'photoURL': user.photoURL,
+        'isOnline': true,
+        'lastSeen': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
       appLogger.d('User profile ensured for uid: ${user.uid}');
     } catch (e) {
       appLogger.e('Error ensuring user profile for uid: ${user.uid}', error: e);
     }
+  }
+
+  static Future<void> _upsertPublicProfile(
+    String uid,
+    Map<String, dynamic> source,
+  ) async {
+    final rawName = (source['name'] ?? 'Пользователь').toString().trim();
+    final name = rawName.isEmpty ? 'Пользователь' : rawName;
+    final publicData = <String, dynamic>{
+      'uid': uid,
+      'name': name,
+      'nameLower': name.toLowerCase(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      if (source['username'] != null) 'username': source['username'],
+      if (source['username'] != null)
+        'usernameLower': source['username'].toString().toLowerCase(),
+      if (source['tag'] != null) 'tag': source['tag'],
+      if (source['tag'] != null)
+        'tagLower': source['tag'].toString().toLowerCase(),
+      if (source.containsKey('bio')) 'bio': source['bio'] ?? '',
+      if (source.containsKey('photoURL')) 'photoURL': source['photoURL'],
+      if (source.containsKey('avatarUpdatedAt'))
+        'avatarUpdatedAt': source['avatarUpdatedAt'],
+      if (source.containsKey('publicKey')) 'publicKey': source['publicKey'],
+      if (source.containsKey('publicKeyUpdatedAt'))
+        'publicKeyUpdatedAt': source['publicKeyUpdatedAt'],
+      if (source.containsKey('isOnline'))
+        'isOnline': source['isOnline'] == true,
+      if (source.containsKey('lastSeen')) 'lastSeen': source['lastSeen'],
+      if (source.containsKey('createdAt')) 'createdAt': source['createdAt'],
+    };
+
+    await _firestore
+        .collection('publicProfiles')
+        .doc(uid)
+        .set(publicData, SetOptions(merge: true));
   }
 }

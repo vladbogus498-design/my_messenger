@@ -765,7 +765,7 @@ Stream<_PeerMeta>? _peerMetaStream(String? uid) {
   if (uid == null || uid.isEmpty) return null;
 
   return FirebaseFirestore.instance
-      .collection('users')
+      .collection('publicProfiles')
       .doc(uid)
       .snapshots()
       .map((doc) {

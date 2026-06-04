@@ -5,11 +5,11 @@ import '../datasources/local/hive_local_datasource.dart';
 import '../datasources/remote/firebase_remote_datasource.dart';
 import '../datasources/secure/platform_secure_key_storage.dart';
 import '../repositories/chat_repository_impl.dart';
-import '../domain/services/security_service.dart';
-import '../domain/failures/app_failure.dart';
-import '../domain/entities/result.dart';
-import '../models/chat.dart';
-import '../models/message.dart';
+import '../../domain/services/security_service.dart';
+import '../../domain/failures/app_failure.dart';
+import '../../domain/entities/result.dart';
+import '../../models/chat.dart';
+import '../../models/message.dart';
 
 // ==== INFRASTRUCTURE PROVIDERS ====
 
@@ -45,7 +45,7 @@ final remoteDataSourceProvider = Provider((ref) {
 });
 
 /// Security service
-final securityServiceProvider = FutureProvider((ref) async {
+final securityServiceProvider = FutureProvider<SecurityService>((ref) async {
   final storage = await ref.watch(secureKeyStorageProvider.future);
   return SecurityServiceImpl(keyStorage: storage);
 });
@@ -53,54 +53,47 @@ final securityServiceProvider = FutureProvider((ref) async {
 // ==== REPOSITORY PROVIDERS ====
 
 /// Chat repository
-final chatRepositoryProvider = Provider((ref) {
+final chatRepositoryProvider = FutureProvider<ChatRepositoryImpl>((ref) async {
   final remote = ref.watch(remoteDataSourceProvider);
-  final localAsync = ref.watch(localDataSourceProvider);
-  
-  // This will require handling of async local datasource
-  // In production, you'd initialize local on app startup
-  return localAsync.whenData((local) {
-    return ChatRepositoryImpl(
-      remoteDataSource: remote,
-      localDataSource: local,
-    );
-  });
+  final local = await ref.watch(localDataSourceProvider.future);
+
+  return ChatRepositoryImpl(remoteDataSource: remote, localDataSource: local);
 });
 
 // ==== FEATURE PROVIDERS ====
 
 /// Get user chats with offline support
-final userChatsProvider = StreamProvider.family<List<Chat>, String>((ref, userId) async* {
-  final chatRepoAsync = ref.watch(chatRepositoryProvider);
-  
-  await for (final chatRepo in chatRepoAsync.stream) {
-    // Use streaming to get live updates
-    await for (final result in chatRepo.watchChats(userId)) {
-      switch (result) {
-        case Success(:final value):
-          yield value;
-        case Failure(:final failure):
-          yield const [];
-          ref.read(errorNotifierProvider.notifier).setError(failure);
-      }
+final userChatsProvider = StreamProvider.family<List<Chat>, String>((
+  ref,
+  userId,
+) async* {
+  final chatRepo = await ref.watch(chatRepositoryProvider.future);
+
+  await for (final result in chatRepo.watchChats(userId)) {
+    switch (result) {
+      case Success(:final value):
+        yield value;
+      case Failure(:final failure):
+        yield const [];
+        ref.read(errorNotifierProvider.notifier).setError(failure);
     }
   }
 });
 
 /// Get messages for a specific chat
-final chatMessagesProvider =
-    StreamProvider.family<List<Message>, String>((ref, chatId) async* {
-  final chatRepoAsync = ref.watch(chatRepositoryProvider);
-  
-  await for (final chatRepo in chatRepoAsync.stream) {
-    await for (final result in chatRepo.watchMessages(chatId)) {
-      switch (result) {
-        case Success(:final value):
-          yield value;
-        case Failure(:final failure):
-          yield const [];
-          ref.read(errorNotifierProvider.notifier).setError(failure);
-      }
+final chatMessagesProvider = StreamProvider.family<List<Message>, String>((
+  ref,
+  chatId,
+) async* {
+  final chatRepo = await ref.watch(chatRepositoryProvider.future);
+
+  await for (final result in chatRepo.watchMessages(chatId)) {
+    switch (result) {
+      case Success(:final value):
+        yield value;
+      case Failure(:final failure):
+        yield const [];
+        ref.read(errorNotifierProvider.notifier).setError(failure);
     }
   }
 });
@@ -120,10 +113,11 @@ class ErrorNotifier extends StateNotifier<AppFailure?> {
   }
 }
 
-final errorNotifierProvider =
-    StateNotifierProvider<ErrorNotifier, AppFailure?>((ref) {
-  return ErrorNotifier();
-});
+final errorNotifierProvider = StateNotifierProvider<ErrorNotifier, AppFailure?>(
+  (ref) {
+    return ErrorNotifier();
+  },
+);
 
 /// Loading state for operations
 final loadingProvider = StateProvider((ref) {
@@ -131,73 +125,66 @@ final loadingProvider = StateProvider((ref) {
 });
 
 /// Send message mutation
-final sendMessageProvider = FutureProvider.family<void, (String, Message)>(
-  (ref, params) async {
-    final (chatId, message) = params;
-    ref.read(loadingProvider.notifier).state = true;
-    
-    try {
-      final chatRepoAsync = ref.watch(chatRepositoryProvider);
-      final chatRepo = await chatRepoAsync.future;
-      
-      final result = await chatRepo.sendMessage(chatId, message);
-      
-      result.fold(
-        onSuccess: (_) {
-          ref.read(errorNotifierProvider.notifier).clearError();
-        },
-        onFailure: (failure) {
-          ref.read(errorNotifierProvider.notifier).setError(failure);
-        },
-      );
-    } finally {
-      ref.read(loadingProvider.notifier).state = false;
-    }
-  },
-);
+final sendMessageProvider = FutureProvider.family<void, (String, Message)>((
+  ref,
+  params,
+) async {
+  final (chatId, message) = params;
+  ref.read(loadingProvider.notifier).state = true;
+
+  try {
+    final chatRepo = await ref.watch(chatRepositoryProvider.future);
+
+    final result = await chatRepo.sendMessage(chatId, message);
+
+    result.fold(
+      onSuccess: (_) {
+        ref.read(errorNotifierProvider.notifier).clearError();
+      },
+      onFailure: (failure) {
+        ref.read(errorNotifierProvider.notifier).setError(failure);
+      },
+    );
+  } finally {
+    ref.read(loadingProvider.notifier).state = false;
+  }
+});
 
 /// Create chat mutation
-final createChatProvider = FutureProvider.family<void, Chat>(
-  (ref, chat) async {
-    ref.read(loadingProvider.notifier).state = true;
-    
-    try {
-      final chatRepoAsync = ref.watch(chatRepositoryProvider);
-      final chatRepo = await chatRepoAsync.future;
-      
-      final result = await chatRepo.createChat(chat);
-      
-      result.fold(
-        onSuccess: (_) {
-          ref.read(errorNotifierProvider.notifier).clearError();
-        },
-        onFailure: (failure) {
-          ref.read(errorNotifierProvider.notifier).setError(failure);
-        },
-      );
-    } finally {
-      ref.read(loadingProvider.notifier).state = false;
-    }
-  },
-);
+final createChatProvider = FutureProvider.family<void, Chat>((ref, chat) async {
+  ref.read(loadingProvider.notifier).state = true;
+
+  try {
+    final chatRepo = await ref.watch(chatRepositoryProvider.future);
+
+    final result = await chatRepo.createChat(chat);
+
+    result.fold(
+      onSuccess: (_) {
+        ref.read(errorNotifierProvider.notifier).clearError();
+      },
+      onFailure: (failure) {
+        ref.read(errorNotifierProvider.notifier).setError(failure);
+      },
+    );
+  } finally {
+    ref.read(loadingProvider.notifier).state = false;
+  }
+});
 
 /// Initialize security - generate keys if needed
-final initializeSecurityProvider = FutureProvider((ref) async {
-  final securityAsync = ref.watch(securityServiceProvider);
-  
-  return securityAsync.whenData((security) async {
-    final hasKeys = await security.hasActiveKeyPair();
-    
-    switch (hasKeys) {
-      case Success(value: true):
-        return true;
-      case Success(value: false):
-        // Generate new keys
-        final genResult = await security.generateAndStoreKeyPair();
-        return genResult.isSuccess;
-      case Failure(:final failure):
-        ref.read(errorNotifierProvider.notifier).setError(failure);
-        return false;
-    }
-  });
+final initializeSecurityProvider = FutureProvider<bool>((ref) async {
+  final security = await ref.watch(securityServiceProvider.future);
+  final hasKeys = await security.hasActiveKeyPair();
+
+  switch (hasKeys) {
+    case Success(value: true):
+      return true;
+    case Success(value: false):
+      final genResult = await security.generateAndStoreKeyPair();
+      return genResult.isSuccess;
+    case Failure(:final failure):
+      ref.read(errorNotifierProvider.notifier).setError(failure);
+      return false;
+  }
 });

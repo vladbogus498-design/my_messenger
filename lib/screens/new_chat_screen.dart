@@ -49,18 +49,12 @@ class _NewChatScreenState extends State<NewChatScreen> {
 
     try {
       final currentUid = _auth.currentUser?.uid;
-      final fields = [
-        'nameLower',
-        'usernameLower',
-        'tagLower',
-        'emailLower',
-        'phone',
-      ];
+      final fields = ['nameLower', 'usernameLower', 'tagLower'];
       final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
       for (final field in fields) {
         final snapshot = await _firestore
-            .collection('users')
+            .collection('publicProfiles')
             .where(field, isGreaterThanOrEqualTo: query)
             .where(field, isLessThan: '$query\uf8ff')
             .limit(12)

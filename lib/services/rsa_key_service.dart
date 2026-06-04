@@ -12,9 +12,7 @@ class RSAKeyService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(
-      encryptedSharedPreferences: true,
-    ),
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
     iOptions: IOSOptions(
       accessibility: KeychainAccessibility.first_unlock_this_device,
     ),
@@ -34,10 +32,12 @@ class RSAKeyService {
     secureRandom.seed(KeyParameter(Uint8List.fromList(seeds)));
 
     final keyGen = RSAKeyGenerator()
-      ..init(ParametersWithRandom(
-        RSAKeyGeneratorParameters(BigInt.parse('65537'), 2048, 64),
-        secureRandom,
-      ));
+      ..init(
+        ParametersWithRandom(
+          RSAKeyGeneratorParameters(BigInt.parse('65537'), 2048, 64),
+          secureRandom,
+        ),
+      );
 
     final keyPair = keyGen.generateKeyPair();
     // Приводим типы к RSAPublicKey и RSAPrivateKey
@@ -56,8 +56,8 @@ class RSAKeyService {
     }
 
     try {
-    // Конвертируем приватный ключ в PEM формат
-    final keyBytes = _encodeRSAPrivateKeyToPEM(privateKey);
+      // Конвертируем приватный ключ в PEM формат
+      final keyBytes = _encodeRSAPrivateKeyToPEM(privateKey);
       await _secureStorage.write(
         key: 'rsa_private_key_$userId',
         value: keyBytes,
@@ -78,7 +78,9 @@ class RSAKeyService {
     }
 
     try {
-      final keyString = await _secureStorage.read(key: 'rsa_private_key_$userId');
+      final keyString = await _secureStorage.read(
+        key: 'rsa_private_key_$userId',
+      );
       if (keyString == null) {
         appLogger.d('No private key found for user: $userId');
         return null;
@@ -95,23 +97,54 @@ class RSAKeyService {
 
   // Публикация публичного ключа в Firestore
   static Future<void> publishPublicKey(RSAPublicKey publicKey) async {
-    final userId = _auth.currentUser?.uid;
+    final user = _auth.currentUser;
+    final userId = user?.uid;
     if (userId == null) throw Exception('User not authenticated');
 
     final publicKeyPEM = _encodeRSAPublicKeyToPEM(publicKey);
 
     try {
+      final userRef = _firestore.collection('users').doc(userId);
+      final publicProfileRef = _firestore
+          .collection('publicProfiles')
+          .doc(userId);
+      final userDoc = await userRef.get();
+      final existingData = userDoc.data() ?? const <String, dynamic>{};
+      final email = (existingData['email'] ?? user?.email ?? '')
+          .toString()
+          .toLowerCase()
+          .trim();
+      final rawName = (existingData['name'] ?? user?.displayName ?? '')
+          .toString()
+          .trim();
+      final fallbackName = email.isNotEmpty ? email.split('@').first : 'User';
+      final name = rawName.isEmpty ? fallbackName : rawName;
+      final now = FieldValue.serverTimestamp();
+      final keyData = {'publicKey': publicKeyPEM, 'publicKeyUpdatedAt': now};
+      final userData = userDoc.exists
+          ? keyData
+          : {
+              'uid': userId,
+              'email': email,
+              'emailLower': email,
+              'name': name,
+              'nameLower': name.toLowerCase(),
+              ...keyData,
+            };
+      final batch = _firestore.batch();
       // Пытаемся обновить, если документа нет - создаем
-      await _firestore.collection('users').doc(userId).update({
-        'publicKey': publicKeyPEM,
-        'publicKeyUpdatedAt': FieldValue.serverTimestamp(),
-      });
+      batch.set(userRef, userData, SetOptions(merge: true));
+      batch.set(publicProfileRef, {
+        'uid': userId,
+        'name': name,
+        'nameLower': name.toLowerCase(),
+        ...keyData,
+      }, SetOptions(merge: true));
+      await batch.commit();
     } catch (e) {
       // Если документа нет, создаем его
-      await _firestore.collection('users').doc(userId).set({
-        'publicKey': publicKeyPEM,
-        'publicKeyUpdatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      appLogger.e('Error publishing public key', error: e);
+      rethrow;
     }
     appLogger.i('Public key published to Firestore for user: $userId');
   }
@@ -119,7 +152,10 @@ class RSAKeyService {
   // Получение публичного ключа пользователя из Firestore
   static Future<RSAPublicKey?> getUserPublicKey(String userId) async {
     try {
-      final doc = await _firestore.collection('users').doc(userId).get();
+      final doc = await _firestore
+          .collection('publicProfiles')
+          .doc(userId)
+          .get();
       if (!doc.exists) return null;
 
       final publicKeyPEM = doc.data()?['publicKey'] as String?;
@@ -193,10 +229,7 @@ class RSAKeyService {
 
   // Кодирование публичного ключа в простой формат
   static String _encodeRSAPublicKeyToPEM(RSAPublicKey key) {
-    final keyData = {
-      'n': key.n.toString(),
-      'e': key.exponent.toString(),
-    };
+    final keyData = {'n': key.n.toString(), 'e': key.exponent.toString()};
     final jsonString = jsonEncode(keyData);
     final dataBase64 = base64Encode(utf8.encode(jsonString));
     return '-----BEGIN RSA PUBLIC KEY-----\n$dataBase64\n-----END RSA PUBLIC KEY-----';

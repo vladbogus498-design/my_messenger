@@ -6,38 +6,34 @@ sealed class Result<T> {
   const Result();
 
   /// Map result to another type
-  Result<R> map<R>(R Function(T) f) =>
-      maybeMap(
-        success: (value) => Success(f(value)),
-        failure: (failure) => Failure(failure),
-      );
+  Result<R> map<R>(R Function(T) f) => switch (this) {
+    Success(value: final value) => Success<R>(f(value)),
+    Failure(failure: final failure) => Failure<R>(failure),
+  };
 
   /// Map with handling both success and failure
   Result<R> maybeMap<R>({
     required R Function(T) success,
     required R Function(AppFailure) failure,
-  }) =>
-      switch (this) {
-        Success(value: final value) => Success(success(value)),
-        Failure(failure: final f) => Failure(failure(f)),
-      };
+  }) => switch (this) {
+    Success(value: final value) => success(value),
+    Failure(failure: final failureValue) => failure(failureValue),
+  };
 
   /// Fold result into a single value
   R fold<R>({
     required R Function(T) onSuccess,
     required R Function(AppFailure) onFailure,
-  }) =>
-      switch (this) {
-        Success(value: final value) => onSuccess(value),
-        Failure(failure: final failure) => onFailure(failure),
-      };
+  }) => switch (this) {
+    Success(value: final value) => onSuccess(value),
+    Failure(failure: final failure) => onFailure(failure),
+  };
 
   /// Get value or throw
-  T getOrThrow() =>
-      switch (this) {
-        Success(value: final value) => value,
-        Failure(failure: final failure) => throw failure,
-      };
+  T getOrThrow() => switch (this) {
+    Success(value: final value) => value,
+    Failure(failure: final failure) => throw failure,
+  };
 
   /// Check if success
   bool get isSuccess => this is Success;

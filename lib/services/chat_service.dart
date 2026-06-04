@@ -86,6 +86,11 @@ class ChatService {
         .id;
   }
 
+  static String _directChatId(String userId, String otherUserId) {
+    final participants = [userId, otherUserId]..sort();
+    return participants.join('_');
+  }
+
   static Future<void> sendMessage({
     required String chatId,
     required String text,
@@ -434,11 +439,21 @@ class ChatService {
       throw Exception('Cannot create chat with yourself');
     }
 
+    final directChatId = _directChatId(userId, otherUserId);
+
     try {
       if (!AppRateLimiters.chatCreationLimiter.tryRequest(
         'create_chat_$userId',
       )) {
         throw Exception('Превышен лимит создания чатов. Попробуй позже.');
+      }
+
+      final deterministicChatRef = _firestore
+          .collection('chats')
+          .doc(directChatId);
+      final deterministicChat = await deterministicChatRef.get();
+      if (deterministicChat.exists) {
+        return deterministicChatRef.id;
       }
 
       final existingChats = await _firestore
@@ -461,7 +476,7 @@ class ChatService {
 
       final now = FieldValue.serverTimestamp();
       final participants = [userId, otherUserId];
-      final chatRef = _firestore.collection('chats').doc();
+      final chatRef = deterministicChatRef;
       final batch = _firestore.batch();
 
       batch.set(chatRef, {
@@ -484,18 +499,6 @@ class ChatService {
         'updatedAt': now,
         'createdBy': userId,
       });
-
-      for (final participant in participants) {
-        batch.set(
-          _firestore
-              .collection('users')
-              .doc(participant)
-              .collection('chats')
-              .doc(chatRef.id),
-          {'chatId': chatRef.id, 'createdAt': now},
-          SetOptions(merge: true),
-        );
-      }
 
       await batch.commit();
       appLogger.d('Chat created successfully: ${chatRef.id}');

@@ -18,10 +18,7 @@ class GroupChatService {
       'isGroup': true,
       'participants': participantIds, // Все участники добавлены
       'admins': [creatorId],
-      'lastMessage': {
-        'text': 'Группа создана',
-        'timestamp': now,
-      },
+      'lastMessage': {'text': 'Группа создана', 'timestamp': now},
       'lastMessageStatus': 'sent',
       'lastMessageType': 'system',
       'lastMessageAt': now,
@@ -37,10 +34,10 @@ class GroupChatService {
       'createdBy': creatorId,
       'avatarUrl': null,
     });
-    
+
     final chatId = docRef.id;
     appLogger.d('Group chat created: $chatId');
-    
+
     await docRef.collection('messages').add({
       'text': 'Группа "$name" создана',
       'type': 'system',
@@ -48,31 +45,18 @@ class GroupChatService {
       'timestamp': now,
       'status': 'delivered',
     });
-    
+
     // Создаем записи в подколлекциях пользователей для сохранения группы
     try {
       final batch = _fs.batch();
-      
+
       // Добавляем группу в список чатов каждого участника
-      for (final participantId in participantIds) {
-        batch.set(
-          _fs.collection('users').doc(participantId).collection('chats').doc(chatId),
-          {
-            'chatId': chatId,
-            'addedAt': now,
-            'isGroup': true,
-          },
-          SetOptions(merge: true),
-        );
-      }
-      
       await batch.commit();
-      appLogger.d('User chat references created for group: $chatId');
     } catch (e) {
       // Не критично, если не удалось создать ссылки
       appLogger.w('Failed to create user chat references for group', error: e);
     }
-    
+
     // Fetch the created document to return as Chat object
     final doc = await docRef.get();
     if (!doc.exists) {
@@ -107,7 +91,9 @@ class GroupChatService {
   }
 
   static Future<void> addParticipants(
-      String chatId, List<String> userIds) async {
+    String chatId,
+    List<String> userIds,
+  ) async {
     await _fs.collection('chats').doc(chatId).update({
       'participants': FieldValue.arrayUnion(userIds),
     });

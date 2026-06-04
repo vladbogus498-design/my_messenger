@@ -56,8 +56,8 @@ class Chat {
     return unreadCount[uid] ?? 0;
   }
 
-  factory Chat.fromFirestore(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
+  factory Chat.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? const <String, dynamic>{};
     final isGroup = data['isGroup'] ?? data['type'] == 'group';
     final type = data['type'] ?? (isGroup ? 'group' : 'direct');
     final legacyLastMessage = data['lastMessage'];
@@ -69,15 +69,18 @@ class Chat {
     final legacyLastMessageAt = legacyLastMessage is Map<String, dynamic>
         ? legacyLastMessage['timestamp']
         : null;
-    final lastMessageAt = data['lastMessageAt'] ??
+    final lastMessageAt =
+        data['lastMessageAt'] ??
         data['updatedAt'] ??
         legacyLastMessageAt ??
         data['lastMessageTime'] ??
         data['createdAt'];
     final updatedAt = data['updatedAt'] ?? lastMessageAt;
-    final lastMessageReadBy =
-        List<String>.from(data['lastMessageReadBy'] ?? const []);
-    final lastMessageStatus = data['lastMessageStatus'] ??
+    final lastMessageReadBy = List<String>.from(
+      data['lastMessageReadBy'] ?? const [],
+    );
+    final lastMessageStatus =
+        data['lastMessageStatus'] ??
         (lastMessageReadBy.length > 1 ? 'read' : 'sent');
 
     return Chat(

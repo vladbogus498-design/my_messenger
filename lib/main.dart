@@ -9,7 +9,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'utils/rate_limiter.dart';
-import 'services/bot_service.dart';
 import 'services/user_service.dart';
 
 void main() async {
@@ -33,7 +32,6 @@ void main() async {
   }
 
   AppRateLimiters.startCleanup();
-  BotService.ensureBotExists();
 
   runApp(const ProviderScope(child: MyApp()));
 }

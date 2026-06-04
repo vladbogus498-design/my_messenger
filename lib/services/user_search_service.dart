@@ -7,27 +7,28 @@ class UserSearchService {
 
   static Future<List<UserModel>> searchUnified(String query) async {
     if (query.isEmpty) return [];
-    
+
     // Санитизация поискового запроса (защита от NoSQL injection)
     final sanitizedQuery = InputValidator.sanitizeSearchQuery(query);
     if (sanitizedQuery.isEmpty) return [];
-    
+
+    final normalizedQuery = sanitizedQuery.toLowerCase();
     final byName = await _fs
-        .collection('users')
-        .where('username', isGreaterThanOrEqualTo: sanitizedQuery)
-        .where('username', isLessThan: sanitizedQuery + '\uf8ff')
+        .collection('publicProfiles')
+        .where('nameLower', isGreaterThanOrEqualTo: normalizedQuery)
+        .where('nameLower', isLessThan: '$normalizedQuery\uf8ff')
         .limit(20)
         .get();
-    final byEmail = await _fs
-        .collection('users')
-        .where('email', isGreaterThanOrEqualTo: sanitizedQuery)
-        .where('email', isLessThan: sanitizedQuery + '\uf8ff')
+    final byUsername = await _fs
+        .collection('publicProfiles')
+        .where('usernameLower', isGreaterThanOrEqualTo: normalizedQuery)
+        .where('usernameLower', isLessThan: '$normalizedQuery\uf8ff')
         .limit(20)
         .get();
-    final byPhone = await _fs
-        .collection('users')
-        .where('phone', isGreaterThanOrEqualTo: sanitizedQuery)
-        .where('phone', isLessThan: sanitizedQuery + '\uf8ff')
+    final byTag = await _fs
+        .collection('publicProfiles')
+        .where('tagLower', isGreaterThanOrEqualTo: normalizedQuery)
+        .where('tagLower', isLessThan: '$normalizedQuery\uf8ff')
         .limit(20)
         .get();
 
@@ -35,10 +36,10 @@ class UserSearchService {
     for (final d in byName.docs) {
       all.add(UserModel.fromMap({...d.data(), 'uid': d.id}));
     }
-    for (final d in byEmail.docs) {
+    for (final d in byUsername.docs) {
       all.add(UserModel.fromMap({...d.data(), 'uid': d.id}));
     }
-    for (final d in byPhone.docs) {
+    for (final d in byTag.docs) {
       all.add(UserModel.fromMap({...d.data(), 'uid': d.id}));
     }
     // de-dup by uid

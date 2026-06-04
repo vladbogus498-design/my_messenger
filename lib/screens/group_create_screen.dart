@@ -27,7 +27,7 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     if (uid == null) {
       return Scaffold(
         appBar: AppBar(title: Text('Создать группу')),
@@ -76,7 +76,7 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
-                  .collection('users')
+                  .collection('publicProfiles')
                   .where(FieldPath.documentId, isNotEqualTo: uid)
                   .snapshots(),
               builder: (_, snap) {
@@ -116,10 +116,15 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
                       },
                       title: Text(name, style: GoogleFonts.montserrat()),
                       subtitle: email.isNotEmpty
-                          ? Text(email, style: GoogleFonts.montserrat(fontSize: 12))
+                          ? Text(
+                              email,
+                              style: GoogleFonts.montserrat(fontSize: 12),
+                            )
                           : null,
                       secondary: CircleAvatar(
-                        child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?'),
+                        child: Text(
+                          name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        ),
                       ),
                     );
                   },

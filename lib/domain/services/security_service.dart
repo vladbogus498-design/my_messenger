@@ -4,7 +4,7 @@ import 'package:pointycastle/random/fortuna_random.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:encrypt/encrypt.dart' as encrypt;
-import '../datasources/secure/platform_secure_key_storage.dart';
+import '../../data/datasources/secure/platform_secure_key_storage.dart';
 import '../../domain/failures/app_failure.dart';
 import '../../domain/entities/result.dart';
 import '../../utils/logger.dart';
@@ -22,7 +22,10 @@ abstract class SecurityService {
   Future<Result<void>> deleteAllKeys();
 
   // Encryption/Decryption
-  Future<Result<String>> encryptMessage(String plainText, String recipientUserId);
+  Future<Result<String>> encryptMessage(
+    String plainText,
+    String recipientUserId,
+  );
   Future<Result<String>> decryptMessage(String encryptedText);
 
   // Verification
@@ -35,7 +38,7 @@ class SecurityServiceImpl implements SecurityService {
   final SecureKeyStorage _keyStorage;
 
   SecurityServiceImpl({required SecureKeyStorage keyStorage})
-      : _keyStorage = keyStorage;
+    : _keyStorage = keyStorage;
 
   static const int _rsaKeySize = 2048;
 
@@ -49,7 +52,7 @@ class SecurityServiceImpl implements SecurityService {
       // Generate RSA key pair using PointyCastle
       final keyGen = RSAKeyGenerator();
       final random = FortunaRandom();
-      
+
       // Seed with entropy
       random.seed(_generateEntropy(32));
 
@@ -87,7 +90,9 @@ class SecurityServiceImpl implements SecurityService {
   }
 
   @override
-  Future<Result<String?>> getPrivateKey({required bool requireBiometric}) async {
+  Future<Result<String?>> getPrivateKey({
+    required bool requireBiometric,
+  }) async {
     try {
       final key = await _keyStorage.loadPrivateKey(
         requireBiometric: requireBiometric,
@@ -137,10 +142,7 @@ class SecurityServiceImpl implements SecurityService {
     } catch (e) {
       appLogger.e('Error deleting keys', error: e);
       return Failure(
-        SecurityFailure(
-          message: 'Failed to delete keys',
-          originalError: e,
-        ),
+        SecurityFailure(message: 'Failed to delete keys', originalError: e),
       );
     }
   }
@@ -158,8 +160,9 @@ class SecurityServiceImpl implements SecurityService {
       final iv = encrypt.IV.fromSecureRandom(16);
 
       // Encrypt message with AES
-      final encrypter =
-          encrypt.Encrypter(encrypt.AES(aesKey, mode: encrypt.AESMode.cbc));
+      final encrypter = encrypt.Encrypter(
+        encrypt.AES(aesKey, mode: encrypt.AESMode.cbc),
+      );
       final encrypted = encrypter.encrypt(plainText, iv: iv);
 
       // In production: Fetch recipient's public key from server
@@ -211,8 +214,9 @@ class SecurityServiceImpl implements SecurityService {
         final encryptedMsg = encrypt.Encrypted.fromBase64(encryptedMsgStr);
 
         // Decrypt message with AES
-        final encrypter =
-            encrypt.Encrypter(encrypt.AES(aesKey, mode: encrypt.AESMode.cbc));
+        final encrypter = encrypt.Encrypter(
+          encrypt.AES(aesKey, mode: encrypt.AESMode.cbc),
+        );
         final decrypted = encrypter.decrypt(encryptedMsg, iv: iv);
 
         appLogger.d('Message decrypted successfully');
