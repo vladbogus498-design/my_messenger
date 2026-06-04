@@ -24,7 +24,10 @@ class ChatService {
           .where('participants', arrayContains: userId)
           .get();
 
-      final chats = snapshot.docs.map(Chat.fromFirestore).toList();
+      final chats = snapshot.docs
+          .map(Chat.fromFirestore)
+          .where((chat) => chat.participants.contains(userId))
+          .toList();
       chats.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return chats;
     } catch (e) {

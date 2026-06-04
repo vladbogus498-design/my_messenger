@@ -184,8 +184,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildStoriesList(List<Chat> chats) {
-    final personalChats = chats.where((chat) => chat.isDirect).take(8).toList();
     final currentUserId = _currentUserId;
+    final personalChats = currentUserId == null
+        ? const <Chat>[]
+        : chats
+              .where(
+                (chat) =>
+                    chat.isDirect && chat.participants.contains(currentUserId),
+              )
+              .take(8)
+              .toList();
 
     return SizedBox(
       height: 86,
@@ -329,7 +337,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   List<Chat> _filterChats(List<Chat> chats) {
-    var filtered = chats;
+    final currentUserId = _currentUserId;
+    var filtered = currentUserId == null
+        ? const <Chat>[]
+        : chats
+              .where((chat) => chat.participants.contains(currentUserId))
+              .toList();
     if (_selectedFilterIndex == 1) {
       filtered = filtered.where((chat) => chat.isDirect).toList();
     } else if (_selectedFilterIndex == 2) {

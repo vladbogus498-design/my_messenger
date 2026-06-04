@@ -20,7 +20,10 @@ abstract class ChatRepository {
   // Mutations
   Future<Result<void>> createChat(Chat chat);
   Future<Result<void>> sendMessage(String chatId, Message message);
-  Future<Result<void>> updateUserProfile(String userId, Map<String, dynamic> updates);
+  Future<Result<void>> updateUserProfile(
+    String userId,
+    Map<String, dynamic> updates,
+  );
   Future<Result<void>> deleteMessage(String chatId, String messageId);
 
   // Streams for realtime updates
@@ -36,23 +39,31 @@ class ChatRepositoryImpl implements ChatRepository {
   ChatRepositoryImpl({
     required RemoteDataSource remoteDataSource,
     required LocalDataSource localDataSource,
-  })  : _remoteDataSource = remoteDataSource,
-        _localDataSource = localDataSource;
+  }) : _remoteDataSource = remoteDataSource,
+       _localDataSource = localDataSource;
 
   // ==== QUERIES ====
 
   @override
   Future<Result<List<Chat>>> getChats(String userId) async {
     try {
+      if (userId.isEmpty) {
+        return const Success([]);
+      }
+
       // 1. Try to get from local cache first (offline-first)
       final localChats = await _localDataSource.getAllChats();
-      if (localChats.isNotEmpty) {
-        appLogger.d('Loaded ${localChats.length} chats from local cache');
+      final ownedLocalChats = localChats
+          .map(_chatFromMap)
+          .where((chat) => chat.participants.contains(userId))
+          .toList();
+      if (ownedLocalChats.isNotEmpty) {
+        appLogger.d(
+          'Loaded ${ownedLocalChats.length} owned chats from local cache',
+        );
         // Return local data while syncing remote
         _syncChatsInBackground(userId);
-        return Success(
-          localChats.map((data) => _chatFromMap(data)).toList(),
-        );
+        return Success(ownedLocalChats);
       }
 
       // 2. Get from remote if cache is empty
@@ -70,10 +81,7 @@ class ChatRepositoryImpl implements ChatRepository {
     } catch (e) {
       appLogger.e('Error getting chats', error: e);
       return Failure(
-        UnexpectedFailure(
-          message: 'Failed to load chats',
-          originalError: e,
-        ),
+        UnexpectedFailure(message: 'Failed to load chats', originalError: e),
       );
     }
   }
@@ -103,10 +111,7 @@ class ChatRepositoryImpl implements ChatRepository {
     } catch (e) {
       appLogger.e('Error getting chat: $chatId', error: e);
       return Failure(
-        UnexpectedFailure(
-          message: 'Failed to load chat',
-          originalError: e,
-        ),
+        UnexpectedFailure(message: 'Failed to load chat', originalError: e),
       );
     }
   }
@@ -147,10 +152,7 @@ class ChatRepositoryImpl implements ChatRepository {
     } catch (e) {
       appLogger.e('Error getting messages', error: e);
       return Failure(
-        UnexpectedFailure(
-          message: 'Failed to load messages',
-          originalError: e,
-        ),
+        UnexpectedFailure(message: 'Failed to load messages', originalError: e),
       );
     }
   }
@@ -158,8 +160,7 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<Result<Message?>> getMessage(String chatId, String messageId) async {
     try {
-      final localMessage =
-          await _localDataSource.getMessage(chatId, messageId);
+      final localMessage = await _localDataSource.getMessage(chatId, messageId);
       if (localMessage != null) {
         return Success(Message.fromMap(localMessage, messageId));
       }
@@ -181,10 +182,7 @@ class ChatRepositoryImpl implements ChatRepository {
     } catch (e) {
       appLogger.e('Error getting message', error: e);
       return Failure(
-        UnexpectedFailure(
-          message: 'Failed to load message',
-          originalError: e,
-        ),
+        UnexpectedFailure(message: 'Failed to load message', originalError: e),
       );
     }
   }
@@ -212,10 +210,7 @@ class ChatRepositoryImpl implements ChatRepository {
     } catch (e) {
       appLogger.e('Error getting user', error: e);
       return Failure(
-        UnexpectedFailure(
-          message: 'Failed to load user',
-          originalError: e,
-        ),
+        UnexpectedFailure(message: 'Failed to load user', originalError: e),
       );
     }
   }
@@ -235,10 +230,7 @@ class ChatRepositoryImpl implements ChatRepository {
     } catch (e) {
       appLogger.e('Error creating chat', error: e);
       return Failure(
-        UnexpectedFailure(
-          message: 'Failed to create chat',
-          originalError: e,
-        ),
+        UnexpectedFailure(message: 'Failed to create chat', originalError: e),
       );
     }
   }
@@ -261,10 +253,7 @@ class ChatRepositoryImpl implements ChatRepository {
       appLogger.e('Error sending message', error: e);
       // Don't remove from local - will retry later
       return Failure(
-        UnexpectedFailure(
-          message: 'Failed to send message',
-          originalError: e,
-        ),
+        UnexpectedFailure(message: 'Failed to send message', originalError: e),
       );
     }
   }
@@ -320,16 +309,22 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Stream<Result<List<Chat>>> watchChats(String userId) {
+    if (userId.isEmpty) {
+      return Stream.value(const Success([]));
+    }
+
     return _remoteDataSource.watchChats(userId).asyncMap((result) async {
       // Also save to local cache
       if (result.isSuccess) {
         final chats = result.fold(
-          onSuccess: (c) => c,
+          onSuccess: (c) =>
+              c.where((chat) => chat.participants.contains(userId)).toList(),
           onFailure: (f) => <Chat>[],
         );
         for (final chat in chats) {
           await _localDataSource.saveChat(chat.id, chat.toMap());
         }
+        return Success(chats);
       }
       return result;
     });

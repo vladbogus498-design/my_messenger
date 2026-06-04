@@ -62,7 +62,7 @@ class MyApp extends ConsumerWidget {
         '/auth/register': (context) => const AuthCredentialsScreen(
           initialMode: AuthCredentialsMode.register,
         ),
-        '/main': (context) => const ChatScreen(),
+        '/main': (context) => const PresenceAwareHome(child: ChatScreen()),
         '/email-verification': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as String?;
           return EmailVerificationScreen(email: args ?? '');

@@ -1,73 +1,56 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
-import '../models/chat.dart';
 
-/// Провайдер для получения списка чатов пользователя
-final chatsProvider = StreamProvider<List<Chat>>((ref) {
-  final userId = FirebaseAuth.instance.currentUser?.uid;
-  if (userId == null) {
-    return Stream.value([]);
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../models/chat.dart';
+import 'auth_provider.dart';
+
+final chatsProvider = StreamProvider.autoDispose<List<Chat>>((ref) {
+  final userId = ref
+      .watch(authStateProvider)
+      .maybeWhen(data: (user) => user?.uid, orElse: () => null);
+  if (userId == null || userId.isEmpty) {
+    return Stream.value(const <Chat>[]);
   }
 
-  final firestore = FirebaseFirestore.instance;
-  return firestore
+  return FirebaseFirestore.instance
       .collection('chats')
       .where('participants', arrayContains: userId)
       .snapshots()
-      .map((snapshot) {
-    final chats = snapshot.docs.map((doc) => Chat.fromFirestore(doc)).toList();
-    chats.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return chats;
-  });
+      .map((snapshot) => _ownedSortedChats(snapshot.docs, userId));
 });
 
-/// Провайдер для управления слушателями чатов
 class ChatsNotifier extends StateNotifier<AsyncValue<List<Chat>>> {
-  ChatsNotifier() : super(const AsyncValue.loading()) {
+  ChatsNotifier(this._currentUserId) : super(const AsyncValue.loading()) {
     _init();
   }
 
+  final String? _currentUserId;
   StreamSubscription<List<Chat>>? _chatsSubscription;
-  String? _currentUserId;
 
   void _init() {
-    _currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    if (_currentUserId == null) {
+    final userId = _currentUserId;
+    if (userId == null || userId.isEmpty) {
       state = const AsyncValue.data([]);
       return;
     }
 
-    _loadChats();
-  }
-
-  void _loadChats() {
-    if (_currentUserId == null) return;
-
-    final firestore = FirebaseFirestore.instance;
-    _chatsSubscription = firestore
+    _chatsSubscription = FirebaseFirestore.instance
         .collection('chats')
-        .where('participants', arrayContains: _currentUserId!)
+        .where('participants', arrayContains: userId)
         .snapshots()
-        .map((snapshot) {
-      final chats = snapshot.docs.map((doc) => Chat.fromFirestore(doc)).toList();
-      chats.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      return chats;
-    }).listen(
-      (chats) {
-        state = AsyncValue.data(chats);
-      },
-      onError: (error, stack) {
-        state = AsyncValue.error(error, stack);
-      },
-    );
+        .map((snapshot) => _ownedSortedChats(snapshot.docs, userId))
+        .listen(
+          (chats) => state = AsyncValue.data(chats),
+          onError: (error, stack) => state = AsyncValue.error(error, stack),
+        );
   }
 
-  /// Закрыть все слушатели
   void disposeListeners() {
     _chatsSubscription?.cancel();
     _chatsSubscription = null;
+    state = const AsyncValue.data([]);
   }
 
   @override
@@ -78,6 +61,23 @@ class ChatsNotifier extends StateNotifier<AsyncValue<List<Chat>>> {
 }
 
 final chatsNotifierProvider =
-    StateNotifierProvider<ChatsNotifier, AsyncValue<List<Chat>>>((ref) {
-  return ChatsNotifier();
-});
+    StateNotifierProvider.autoDispose<ChatsNotifier, AsyncValue<List<Chat>>>((
+      ref,
+    ) {
+      final userId = ref
+          .watch(authStateProvider)
+          .maybeWhen(data: (user) => user?.uid, orElse: () => null);
+      return ChatsNotifier(userId);
+    });
+
+List<Chat> _ownedSortedChats(
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  String userId,
+) {
+  final chats = docs
+      .map((doc) => Chat.fromFirestore(doc))
+      .where((chat) => chat.participants.contains(userId))
+      .toList();
+  chats.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  return chats;
+}

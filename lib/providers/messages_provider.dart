@@ -1,66 +1,66 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:async';
+
 import '../models/message.dart';
 import '../services/e2e_encryption_service.dart';
 import '../utils/logger.dart';
+import 'auth_provider.dart';
 
-/// Провайдер для получения сообщений чата
-final messagesProvider = StreamProvider.family<List<Message>, String>((ref, chatId) {
-  final firestore = FirebaseFirestore.instance;
-  return firestore
-      .collection('chats')
-      .doc(chatId)
-      .collection('messages')
-      .orderBy('timestamp', descending: true)
-      .snapshots()
-      .asyncMap((snapshot) async {
-    final messages = <Message>[];
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      var messageText = data['text'] ?? '';
-      final isEncrypted = data['isEncrypted'] ?? false;
-
-      // Дешифруем сообщение, если оно зашифровано
-      if (isEncrypted && messageText.isNotEmpty) {
-        try {
-          messageText = await E2EEncryptionService.decryptMessage(messageText);
-        } catch (e) {
-            appLogger.e('Error decrypting message in chat: $chatId', error: e);
-        }
+final messagesProvider = StreamProvider.autoDispose
+    .family<List<Message>, String>((ref, chatId) {
+      final userId = ref
+          .watch(authStateProvider)
+          .maybeWhen(data: (user) => user?.uid, orElse: () => null);
+      if (userId == null || userId.isEmpty || chatId.isEmpty) {
+        return Stream.value(const <Message>[]);
       }
 
-      messages.add(Message(
-        id: doc.id,
-        chatId: chatId,
-        senderId: data['senderId'] ?? '',
-        text: messageText,
-        type: data['type'] ?? 'text',
-        imageUrl: data['imageUrl'],
-        stickerUrl: data['stickerUrl'],
-        voiceUrl: data['voiceUrl'],
-        voiceAudioBase64: data['voiceAudioBase64'],
-        voiceDuration: data['voiceDuration'],
-        stickerId: data['stickerId'],
-        isEncrypted: isEncrypted,
-        timestamp: (data['timestamp'] as Timestamp).toDate(),
-        replyTo: data['replyTo'] == null
-            ? null
-            : Map<String, dynamic>.from(data['replyTo']),
-        replyToId: data['replyToId'],
-        replyToText: data['replyToText'],
-        isForwarded: data['isForwarded'] ?? false,
-        originalSender: data['originalSender'],
-        reactions: Map<String, String>.from(data['reactions'] ?? {}),
-        isTyping: data['isTyping'] ?? false,
-        status: data['status'] ?? 'sent',
-        readBy: List<String>.from(data['readBy'] ?? const []),
-      ));
-    }
-    return messages;
-  });
-});
+      final firestore = FirebaseFirestore.instance;
+      return firestore.collection('chats').doc(chatId).snapshots().asyncExpand((
+        chatDoc,
+      ) {
+        final participants = List<String>.from(
+          chatDoc.data()?['participants'] ?? const [],
+        );
+        if (!chatDoc.exists || !participants.contains(userId)) {
+          return Stream.value(const <Message>[]);
+        }
 
-// Примечание: Логика отправки сообщений унифицирована в ChatService.sendMessage
-// Этот провайдер используется только для получения сообщений
+        return firestore
+            .collection('chats')
+            .doc(chatId)
+            .collection('messages')
+            .orderBy('timestamp', descending: true)
+            .snapshots()
+            .asyncMap((snapshot) async {
+              final messages = <Message>[];
+              for (final doc in snapshot.docs) {
+                final data = doc.data();
+                var messageText = data['text'] ?? '';
+                final isEncrypted = data['isEncrypted'] ?? false;
+
+                if (isEncrypted && messageText.isNotEmpty) {
+                  try {
+                    messageText = await E2EEncryptionService.decryptMessage(
+                      messageText,
+                    );
+                  } catch (e) {
+                    appLogger.e(
+                      'Error decrypting message in chat: $chatId',
+                      error: e,
+                    );
+                  }
+                }
+
+                messages.add(
+                  Message.fromMap({
+                    ...data,
+                    'chatId': chatId,
+                    'text': messageText,
+                  }, doc.id),
+                );
+              }
+              return messages;
+            });
+      });
+    });

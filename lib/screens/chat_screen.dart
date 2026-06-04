@@ -40,16 +40,16 @@ class ChatScreen extends StatelessWidget {
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: chatsQuery,
             builder: (context, snapshot) {
-              final hasChats = snapshot.hasData && 
-                  snapshot.data!.docs.isNotEmpty;
+              final hasChats =
+                  snapshot.hasData && snapshot.data!.docs.isNotEmpty;
               if (hasChats) {
                 return IconButton(
-            icon: Icon(Icons.add_comment),
-            tooltip: 'Новый чат',
-            onPressed: () => Navigator.push(
-              context,
-              NavigationAnimations.slideFadeRoute(NewChatScreen()),
-            ),
+                  icon: Icon(Icons.add_comment),
+                  tooltip: 'Новый чат',
+                  onPressed: () => Navigator.push(
+                    context,
+                    NavigationAnimations.slideFadeRoute(NewChatScreen()),
+                  ),
                 );
               }
               return SizedBox.shrink();
@@ -63,10 +63,13 @@ class ChatScreen extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
           }
-          
+
           // Обработка ошибок запроса (например, отсутствие индекса)
           if (snapshot.hasError) {
-            appLogger.w('Error loading chats, using fallback', error: snapshot.error);
+            appLogger.w(
+              'Error loading chats, using fallback',
+              error: snapshot.error,
+            );
             // Fallback на запрос с lastMessageTime
             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
@@ -75,28 +78,34 @@ class ChatScreen extends StatelessWidget {
                   .orderBy('lastMessageTime', descending: true)
                   .snapshots(),
               builder: (context, fallbackSnapshot) {
-                if (fallbackSnapshot.connectionState == ConnectionState.waiting) {
+                if (fallbackSnapshot.connectionState ==
+                    ConnectionState.waiting) {
                   return Center(child: CircularProgressIndicator());
                 }
-                final hasChats = fallbackSnapshot.hasData && 
+                final hasChats =
+                    fallbackSnapshot.hasData &&
                     fallbackSnapshot.data!.docs.isNotEmpty;
                 if (!hasChats) {
                   return _EmptyState(
                     onCreateGroup: () => _showCreateGroupSheet(context, uid),
                   );
                 }
-                return _buildChatListWithBot(context, fallbackSnapshot.data!.docs, uid);
+                return _buildChatListWithBot(
+                  context,
+                  fallbackSnapshot.data!.docs,
+                  uid,
+                );
               },
             );
           }
-          
+
           final hasChats = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
           if (!hasChats) {
             return _EmptyState(
               onCreateGroup: () => _showCreateGroupSheet(context, uid),
             );
           }
-          
+
           return _buildChatListWithBot(context, snapshot.data!.docs, uid);
         },
       ),
@@ -104,22 +113,27 @@ class ChatScreen extends StatelessWidget {
   }
 
   /// Создает список чатов с ботом в начале
-  Widget _buildChatListWithBot(BuildContext context, List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, String uid) {
+  Widget _buildChatListWithBot(
+    BuildContext context,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    String uid,
+  ) {
     // Находим чат с ботом и отделяем его от остальных
     QueryDocumentSnapshot<Map<String, dynamic>>? botChatDoc;
     final otherChats = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-    
+
     for (final doc in docs) {
       final data = doc.data();
       final participants = List<String>.from(data['participants'] ?? []);
-      if (participants.contains(BotConfig.officialBotId) && 
+      if (!participants.contains(uid)) continue;
+      if (participants.contains(BotConfig.officialBotId) &&
           participants.length == 2) {
         botChatDoc = doc;
       } else {
         otherChats.add(doc);
       }
     }
-    
+
     // Бот всегда первый, затем остальные чаты
     return ListView.builder(
       itemCount: 1 + otherChats.length, // 1 для бота + остальные чаты
@@ -134,17 +148,17 @@ class ChatScreen extends StatelessWidget {
             return _buildBotChatTile(context, uid);
           }
         }
-        
+
         // Остальные чаты (индекс смещен на 1)
         final chatIndex = i - 1;
         final d = otherChats[chatIndex].data();
         final chatId = otherChats[chatIndex].id;
         final name = d['groupName'] ?? d['name'] ?? 'Chat';
-        
+
         // Обработка lastMessage: может быть объектом или строкой (для обратной совместимости)
         String last = '';
         DateTime? ts;
-        
+
         if (d['lastMessage'] is Map) {
           // Новая структура: lastMessage = {text: '', timestamp: Timestamp}
           final lastMsg = d['lastMessage'] as Map<String, dynamic>;
@@ -158,9 +172,11 @@ class ChatScreen extends StatelessWidget {
           last = d['lastMessage'] ?? '';
           ts = (d['lastMessageTime'] as Timestamp?)?.toDate();
         }
-        
+
         // Fallback для timestamp если null
-        ts ??= DateTime.now().subtract(Duration(days: 365)); // Старый чат без сообщений
+        ts ??= DateTime.now().subtract(
+          Duration(days: 365),
+        ); // Старый чат без сообщений
         final avatarUrl = d['avatarUrl'];
         return ListTile(
           leading: Hero(
@@ -168,26 +184,22 @@ class ChatScreen extends StatelessWidget {
             child: avatarUrl != null
                 ? CachedNetworkImage(
                     imageUrl: avatarUrl,
-                    placeholder: (context, url) => CircleAvatar(
-                      child: CircularProgressIndicator(),
-                    ),
+                    placeholder: (context, url) =>
+                        CircleAvatar(child: CircularProgressIndicator()),
                     errorWidget: (context, url, error) => CircleAvatar(
-                      child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?'),
+                      child: Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      ),
                     ),
-                    imageBuilder: (context, imageProvider) => CircleAvatar(
-                      backgroundImage: imageProvider,
-                    ),
+                    imageBuilder: (context, imageProvider) =>
+                        CircleAvatar(backgroundImage: imageProvider),
                   )
                 : CircleAvatar(
                     child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?'),
                   ),
           ),
           title: Text(name),
-          subtitle: Text(
-            last,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          subtitle: Text(last, maxLines: 1, overflow: TextOverflow.ellipsis),
           trailing: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -224,7 +236,7 @@ class ChatScreen extends StatelessWidget {
                 return; // Уже открыт этот чат
               }
             }
-            
+
             Navigator.push(
               context,
               NavigationAnimations.slideFadeRoute(
@@ -258,17 +270,20 @@ class ChatScreen extends StatelessWidget {
       }
     });
   }
-  
+
   /// Создает элемент списка для официального бота (когда чат уже существует)
-  Widget _buildBotChatTileFromDoc(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+  Widget _buildBotChatTileFromDoc(
+    BuildContext context,
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final d = doc.data();
     final chatId = doc.id;
     final name = BotConfig.botName;
-    
+
     // Обработка lastMessage
     String last = '';
     DateTime? ts;
-    
+
     if (d['lastMessage'] is Map) {
       final lastMsg = d['lastMessage'] as Map<String, dynamic>;
       last = lastMsg['text'] ?? '';
@@ -280,9 +295,9 @@ class ChatScreen extends StatelessWidget {
       last = d['lastMessage'] ?? '';
       ts = (d['lastMessageTime'] as Timestamp?)?.toDate();
     }
-    
+
     ts ??= DateTime.now().subtract(Duration(days: 365));
-    
+
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: Theme.of(context).colorScheme.primary,
@@ -292,11 +307,7 @@ class ChatScreen extends StatelessWidget {
         children: [
           Text(name),
           const SizedBox(width: 6),
-          Icon(
-            Icons.verified,
-            color: Colors.blue,
-            size: 18,
-          ),
+          Icon(Icons.verified, color: Colors.blue, size: 18),
         ],
       ),
       subtitle: Column(
@@ -304,7 +315,10 @@ class ChatScreen extends StatelessWidget {
         children: [
           Text(
             BotConfig.botDescription,
-            style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.primary),
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
           if (last.isNotEmpty)
             Text(
@@ -346,16 +360,13 @@ class ChatScreen extends StatelessWidget {
         Navigator.push(
           context,
           NavigationAnimations.slideFadeRoute(
-            SingleChatScreen(
-              chatId: chatId,
-              chatName: name,
-            ),
+            SingleChatScreen(chatId: chatId, chatName: name),
           ),
         );
       },
     );
   }
-  
+
   /// Создает элемент списка для официального бота (когда чат нужно создать)
   Widget _buildBotChatTile(BuildContext context, String uid) {
     return FutureBuilder<String?>(
@@ -369,17 +380,17 @@ class ChatScreen extends StatelessWidget {
             title: Text(BotConfig.botName),
           );
         }
-        
+
         final botChatId = snapshot.data;
         if (botChatId == null) {
           return SizedBox.shrink();
         }
-        
+
         // После создания чата перезагружаем список
         WidgetsBinding.instance.addPostFrameCallback((_) {
           // Список обновится автоматически через StreamBuilder
         });
-        
+
         return ListTile(
           leading: CircleAvatar(
             backgroundColor: Theme.of(context).colorScheme.primary,
@@ -389,11 +400,7 @@ class ChatScreen extends StatelessWidget {
             children: [
               Text(BotConfig.botName),
               const SizedBox(width: 6),
-              Icon(
-                Icons.verified,
-                color: Colors.blue,
-                size: 18,
-              ),
+              Icon(Icons.verified, color: Colors.blue, size: 18),
             ],
           ),
           subtitle: Text(
@@ -415,7 +422,7 @@ class ChatScreen extends StatelessWidget {
       },
     );
   }
-  
+
   /// Создает чат с ботом если его еще нет
   Future<String?> _ensureBotChatExists(String uid) async {
     try {
@@ -425,21 +432,23 @@ class ChatScreen extends StatelessWidget {
           .where('isGroup', isEqualTo: false)
           .where('participants', arrayContains: uid)
           .get();
-      
+
       for (final doc in existingChats.docs) {
-        final participants = List<String>.from(doc.data()['participants'] ?? []);
-        if (participants.contains(BotConfig.officialBotId) && 
+        final participants = List<String>.from(
+          doc.data()['participants'] ?? [],
+        );
+        if (participants.contains(BotConfig.officialBotId) &&
             participants.length == 2) {
           return doc.id;
         }
       }
-      
+
       // Создаем чат с ботом
       final chatId = await ChatService.createChat(
         otherUserId: BotConfig.officialBotId,
         chatName: BotConfig.botName,
       );
-      
+
       // Отправляем приветственное сообщение от бота
       await Future.delayed(Duration(milliseconds: 500));
       await ChatService.sendMessage(
@@ -448,7 +457,7 @@ class ChatScreen extends StatelessWidget {
         type: 'text',
         recipientIds: [uid],
       );
-      
+
       return chatId;
     } catch (e) {
       appLogger.e('Error ensuring bot chat exists', error: e);
@@ -499,8 +508,10 @@ class _EmptyState extends StatelessWidget {
               icon: const Icon(Icons.group_add_outlined),
               label: const Text('Создать группу'),
               style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(18),
                 ),

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
+import '../providers/chats_provider.dart';
+import '../providers/messages_provider.dart';
 import '../services/user_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/input_validator.dart';
@@ -10,10 +12,7 @@ import '../utils/input_validator.dart';
 enum AuthCredentialsMode { signIn, register }
 
 class AuthCredentialsScreen extends ConsumerStatefulWidget {
-  const AuthCredentialsScreen({
-    super.key,
-    required this.initialMode,
-  });
+  const AuthCredentialsScreen({super.key, required this.initialMode});
 
   final AuthCredentialsMode initialMode;
 
@@ -62,7 +61,9 @@ class _AuthCredentialsScreenState extends ConsumerState<AuthCredentialsScreen> {
     }
 
     if (password.length < 6) {
-      setState(() => _validationError = 'Пароль должен быть минимум 6 символов');
+      setState(
+        () => _validationError = 'Пароль должен быть минимум 6 символов',
+      );
       return;
     }
 
@@ -84,6 +85,9 @@ class _AuthCredentialsScreenState extends ConsumerState<AuthCredentialsScreen> {
     if (flowState.errorMessage != null) return;
 
     if (FirebaseAuth.instance.currentUser != null) {
+      ref.invalidate(chatsProvider);
+      ref.invalidate(chatsNotifierProvider);
+      ref.invalidate(messagesProvider);
       Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
     }
   }
@@ -179,8 +183,8 @@ class _AuthCredentialsScreenState extends ConsumerState<AuthCredentialsScreen> {
                         onPressed: flowState.isLoading
                             ? null
                             : () => setState(
-                                  () => _obscurePassword = !_obscurePassword,
-                                ),
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
                       ),
                     ),
                     if (displayError != null) ...[
@@ -189,10 +193,14 @@ class _AuthCredentialsScreenState extends ConsumerState<AuthCredentialsScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFF3B6B).withValues(alpha: 0.12),
+                          color: const Color(
+                            0xFFFF3B6B,
+                          ).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: const Color(0xFFFF3B6B).withValues(alpha: 0.35),
+                            color: const Color(
+                              0xFFFF3B6B,
+                            ).withValues(alpha: 0.35),
                           ),
                         ),
                         child: Text(

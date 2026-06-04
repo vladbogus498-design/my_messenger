@@ -11,7 +11,10 @@ import '../../../utils/logger.dart';
 abstract class RemoteDataSource {
   // Auth
   Future<Result<UserCredential>> signInWithEmail(String email, String password);
-  Future<Result<UserCredential>> registerWithEmail(String email, String password);
+  Future<Result<UserCredential>> registerWithEmail(
+    String email,
+    String password,
+  );
   Future<Result<void>> signOut();
 
   // Chats
@@ -43,8 +46,8 @@ class FirebaseRemoteDataSource implements RemoteDataSource {
   const FirebaseRemoteDataSource({
     required FirebaseFirestore firestore,
     required FirebaseAuth auth,
-  })  : _firestore = firestore,
-        _auth = auth;
+  }) : _firestore = firestore,
+       _auth = auth;
 
   // ==== AUTH ====
   @override
@@ -120,10 +123,7 @@ class FirebaseRemoteDataSource implements RemoteDataSource {
     } catch (e) {
       appLogger.e('Sign out error', error: e);
       return Failure(
-        AuthenticationFailure(
-          message: 'Failed to sign out',
-          originalError: e,
-        ),
+        AuthenticationFailure(message: 'Failed to sign out', originalError: e),
       );
     }
   }
@@ -132,6 +132,10 @@ class FirebaseRemoteDataSource implements RemoteDataSource {
   @override
   Future<Result<List<Chat>>> getChats(String userId) async {
     try {
+      if (userId.isEmpty) {
+        return const Success([]);
+      }
+
       final snapshot = await _firestore
           .collection('chats')
           .where('participants', arrayContains: userId)
@@ -140,6 +144,7 @@ class FirebaseRemoteDataSource implements RemoteDataSource {
 
       final chats = snapshot.docs
           .map((doc) => Chat.fromFirestore(doc))
+          .where((chat) => chat.participants.contains(userId))
           .toList();
 
       appLogger.d('Loaded ${chats.length} chats for user: $userId');
@@ -284,34 +289,36 @@ class FirebaseRemoteDataSource implements RemoteDataSource {
   @override
   Stream<Result<List<Chat>>> watchChats(String userId) {
     try {
+      if (userId.isEmpty) {
+        return Stream.value(const Success([]));
+      }
+
       return _firestore
           .collection('chats')
           .where('participants', arrayContains: userId)
           .orderBy('lastMessageTime', descending: true)
           .snapshots()
           .map((snapshot) {
-        try {
-          final chats = snapshot.docs
-              .map((doc) => Chat.fromFirestore(doc))
-              .toList();
-          return Success(chats);
-        } catch (e) {
-          appLogger.e('Error mapping chats', error: e);
-          return Failure(
-            UnexpectedFailure(
-              message: 'Failed to parse chats',
-              originalError: e,
-            ),
-          );
-        }
-      });
+            try {
+              final chats = snapshot.docs
+                  .map((doc) => Chat.fromFirestore(doc))
+                  .where((chat) => chat.participants.contains(userId))
+                  .toList();
+              return Success(chats);
+            } catch (e) {
+              appLogger.e('Error mapping chats', error: e);
+              return Failure(
+                UnexpectedFailure(
+                  message: 'Failed to parse chats',
+                  originalError: e,
+                ),
+              );
+            }
+          });
     } catch (e) {
       appLogger.e('Error watching chats', error: e);
       yield Failure(
-        UnexpectedFailure(
-          message: 'Failed to watch chats',
-          originalError: e,
-        ),
+        UnexpectedFailure(message: 'Failed to watch chats', originalError: e),
       );
     }
   }
@@ -358,10 +365,7 @@ class FirebaseRemoteDataSource implements RemoteDataSource {
   }
 
   @override
-  Future<Result<Message?>> getMessage(
-    String chatId,
-    String messageId,
-  ) async {
+  Future<Result<Message?>> getMessage(String chatId, String messageId) async {
     try {
       final doc = await _firestore
           .collection('chats')
@@ -469,21 +473,21 @@ class FirebaseRemoteDataSource implements RemoteDataSource {
           .orderBy('timestamp', descending: true)
           .snapshots()
           .map((snapshot) {
-        try {
-          final messages = snapshot.docs
-              .map((doc) => Message.fromMap(doc.data(), doc.id))
-              .toList();
-          return Success(messages);
-        } catch (e) {
-          appLogger.e('Error mapping messages', error: e);
-          return Failure(
-            UnexpectedFailure(
-              message: 'Failed to parse messages',
-              originalError: e,
-            ),
-          );
-        }
-      });
+            try {
+              final messages = snapshot.docs
+                  .map((doc) => Message.fromMap(doc.data(), doc.id))
+                  .toList();
+              return Success(messages);
+            } catch (e) {
+              appLogger.e('Error mapping messages', error: e);
+              return Failure(
+                UnexpectedFailure(
+                  message: 'Failed to parse messages',
+                  originalError: e,
+                ),
+              );
+            }
+          });
     } catch (e) {
       appLogger.e('Error watching messages', error: e);
       yield Failure(
@@ -584,12 +588,14 @@ class FirebaseRemoteDataSource implements RemoteDataSource {
       'user-not-found' => 'User not found',
       'wrong-password' => 'Wrong password',
       'user-disabled' => 'User account has been disabled',
-      'too-many-requests' => 'Too many sign-in attempts. Please try again later.',
+      'too-many-requests' =>
+        'Too many sign-in attempts. Please try again later.',
       'operation-not-allowed' => 'Operation not allowed',
       'email-already-in-use' => 'Email is already in use',
       'invalid-email' => 'Invalid email address',
       'weak-password' => 'Password is too weak',
-      'network-request-failed' => 'Network error. Please check your connection.',
+      'network-request-failed' =>
+        'Network error. Please check your connection.',
       _ => 'An authentication error occurred',
     };
   }

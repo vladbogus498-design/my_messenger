@@ -1,15 +1,19 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../data/providers/core_providers.dart';
 import '../models/user_model.dart';
+import '../providers/chats_provider.dart';
+import '../providers/messages_provider.dart';
 import '../services/user_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/navigation_animations.dart';
 import '../utils/user_formatters.dart';
 import 'profile_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key, this.showBackButton = true});
 
   final bool showBackButton;
@@ -29,15 +33,27 @@ class SettingsScreen extends StatelessWidget {
     ).showSnackBar(SnackBar(content: Text('$title скоро появится')));
   }
 
-  Future<void> _signOut(BuildContext context) async {
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     final navigator = Navigator.of(context);
+    ref.invalidate(chatsProvider);
+    ref.invalidate(chatsNotifierProvider);
+    ref.invalidate(messagesProvider);
+    try {
+      final localDataSource = await ref.read(localDataSourceProvider.future);
+      await localDataSource.clear();
+    } catch (_) {
+      // Local cache may be unavailable on some builds; provider reset still protects UI state.
+    }
     await UserService.setPresence(isOnline: false);
     await FirebaseAuth.instance.signOut();
+    ref.invalidate(chatsProvider);
+    ref.invalidate(chatsNotifierProvider);
+    ref.invalidate(messagesProvider);
     navigator.pushNamedAndRemoveUntil('/auth', (route) => false);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: DarkKickColors.darkBackground,
       appBar: AppBar(
@@ -116,7 +132,7 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 28),
-            _LogoutTile(onTap: () => _signOut(context)),
+            _LogoutTile(onTap: () => _signOut(context, ref)),
           ],
         ),
       ),
