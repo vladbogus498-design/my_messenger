@@ -94,7 +94,6 @@ class Message {
       if (imageUrl != null) 'imageUrl': imageUrl,
       if (stickerUrl != null) 'stickerUrl': stickerUrl,
       if (voiceUrl != null) 'voiceUrl': voiceUrl,
-      if (voiceAudioBase64 != null) 'voiceAudioBase64': voiceAudioBase64,
       if (voiceDuration != null) 'voiceDuration': voiceDuration,
       if (stickerId != null) 'stickerId': stickerId,
       'isEncrypted': isEncrypted,

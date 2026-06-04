@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/chat_service.dart';
+import '../services/media_availability_service.dart';
 import '../services/storage_service.dart';
 import '../services/voice_message_service.dart';
 import '../models/message.dart';
@@ -59,6 +60,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _messageDocs = [];
   String? _highlightedMessageId;
   Timer? _highlightTimer;
+  final Set<String> _invalidPinnedHandled = <String>{};
+
+  bool get _voiceMessagesTemporarilyDisabled => true;
 
   @override
   void initState() {
@@ -316,6 +320,17 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     String base64Audio,
     int durationSeconds,
   ) async {
+    if (_voiceMessagesTemporarilyDisabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Голосовые сообщения временно отключены'),
+          ),
+        );
+      }
+      return;
+    }
+
     try {
       final chatId = await _ensureChatExists();
       await ChatService.sendMessage(
@@ -450,6 +465,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   Future<void> _scrollToPinnedMessage(Map<String, dynamic> pinned) async {
+    final chatId = _actualChatId ?? widget.chatId;
+    if (chatId.isNotEmpty &&
+        !await _validatePinnedMessage(chatId, pinned, notify: true)) {
+      return;
+    }
+
     final messageId = (pinned['messageId'] ?? pinned['id'] ?? '').toString();
     if (messageId.isEmpty) {
       _showSnackBar('Сообщение не найдено');
@@ -498,6 +519,85 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         _highlightMessage(messageId);
       }
     });
+  }
+
+  Future<bool> _validatePinnedMessage(
+    String chatId,
+    Map<String, dynamic> pinned, {
+    required bool notify,
+  }) async {
+    final messageId = (pinned['messageId'] ?? pinned['id'] ?? '').toString();
+    if (messageId.isEmpty) {
+      await _clearInvalidPinnedMessage(chatId, messageId, null, notify: notify);
+      return false;
+    }
+
+    Map<String, dynamic>? messageData;
+    for (final doc in _messageDocs) {
+      if (doc.id == messageId) {
+        messageData = doc.data();
+        break;
+      }
+    }
+
+    if (messageData == null) {
+      final doc = await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .doc(messageId)
+          .get();
+      if (!doc.exists) {
+        await _clearInvalidPinnedMessage(
+          chatId,
+          messageId,
+          null,
+          notify: notify,
+        );
+        return false;
+      }
+      messageData = doc.data();
+    }
+
+    final type = (pinned['type'] ?? messageData?['type'] ?? '').toString();
+    if (type == 'image') {
+      final imageUrl = (pinned['imageUrl'] ?? messageData?['imageUrl'] ?? '')
+          .toString()
+          .trim();
+      if (!await MediaAvailabilityService.exists(imageUrl)) {
+        await _clearInvalidPinnedMessage(
+          chatId,
+          messageId,
+          'Закреплённое фото больше недоступно',
+          notify: notify,
+        );
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  Future<void> _clearInvalidPinnedMessage(
+    String chatId,
+    String messageId,
+    String? message, {
+    required bool notify,
+  }) async {
+    final key = '$chatId:$messageId:${message ?? 'missing'}';
+    if (!_invalidPinnedHandled.add(key)) return;
+
+    try {
+      await FirebaseFirestore.instance.collection('chats').doc(chatId).update({
+        'pinnedMessage': null,
+      });
+    } catch (e) {
+      appLogger.e('Error clearing invalid pinned message', error: e);
+    }
+
+    if (notify) {
+      _showSnackBar(message ?? 'Сообщение не найдено');
+    }
   }
 
   void _highlightMessage(String messageId) {
@@ -1027,6 +1127,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         if (pinned == null) return const SizedBox.shrink();
 
         final data = Map<String, dynamic>.from(pinned);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _validatePinnedMessage(chatId, data, notify: true);
+        });
         final text = (data['text'] ?? '').toString();
         final type = (data['type'] ?? 'text').toString();
         final label = text.isNotEmpty

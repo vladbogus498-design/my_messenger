@@ -9,284 +9,226 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
-    function isValidString(value, maxLength) {
+    function stringMax(value, maxLength) {
+      return value is string && value.size() <= maxLength;
+    }
+
+    function nonEmptyStringMax(value, maxLength) {
       return value is string
         && value.size() > 0
         && value.size() <= maxLength;
     }
 
-    function isStringMax(value, maxLength) {
-      return value is string && value.size() <= maxLength;
-    }
-
-    function isOptionalStringMax(value, maxLength) {
-      return value == null || isStringMax(value, maxLength);
-    }
-
-    function isValidEmail(email) {
-      return email is string
-        && email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
-    }
-
-    function isOptionalEmail(email) {
-      return email is string
-        && (email.size() == 0 || isValidEmail(email));
-    }
-
-    function chatData(chatId) {
-      return get(/databases/$(database)/documents/chats/$(chatId)).data;
+    function chatExists(chatId) {
+      return exists(/databases/$(database)/documents/chats/$(chatId));
     }
 
     function isChatParticipant(chatId) {
       return signedIn()
-        && request.auth.uid in chatData(chatId).participants;
+        && chatExists(chatId)
+        && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
     }
 
-    function isDirectChatId(chatId, participants) {
-      return participants.size() == 2
-        && (
-          chatId == participants[0] + '_' + participants[1]
-          || chatId == participants[1] + '_' + participants[0]
-        );
+    function requestHasCurrentUserParticipant() {
+      return signedIn()
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() >= 2
+        && request.resource.data.participants.size() <= 50
+        && request.auth.uid in request.resource.data.participants;
     }
 
-    function validUserCreate() {
+    function publicProfileFieldsOnly() {
       return request.resource.data.keys().hasOnly([
-          'uid',
-          'email',
-          'emailLower',
-          'phone',
-          'name',
-          'nameLower',
-          'bio',
-          'photoURL',
-          'avatarUpdatedAt',
-          'publicKey',
-          'publicKeyUpdatedAt',
-          'isOnline',
-          'lastSeen',
-          'createdAt'
-        ])
-        && request.resource.data.uid == request.auth.uid
-        && isOptionalEmail(request.resource.data.email)
-        && isValidString(request.resource.data.name, 100)
-        && (!('bio' in request.resource.data)
-          || isStringMax(request.resource.data.bio, 500))
-        && (!('photoURL' in request.resource.data)
-          || isOptionalStringMax(request.resource.data.photoURL, 2048))
-        && (!('publicKey' in request.resource.data)
-          || isOptionalStringMax(request.resource.data.publicKey, 8000));
-    }
-
-    function validUserUpdate() {
-      let changed = request.resource.data.diff(resource.data).affectedKeys();
-      return changed.hasOnly([
-          'uid',
-          'email',
-          'emailLower',
-          'phone',
-          'name',
-          'nameLower',
-          'bio',
-          'photoURL',
-          'avatarUpdatedAt',
-          'publicKey',
-          'publicKeyUpdatedAt',
-          'isOnline',
-          'lastSeen'
-        ])
-        && request.resource.data.uid == resource.data.uid
-        && request.resource.data.email == resource.data.email
-        && (!changed.hasAny(['emailLower'])
-          || request.resource.data.emailLower == resource.data.emailLower)
-        && (!changed.hasAny(['phone'])
-          || request.resource.data.phone == resource.data.phone)
-        && (!changed.hasAny(['name'])
-          || isValidString(request.resource.data.name, 100))
-        && (!changed.hasAny(['bio'])
-          || !('bio' in request.resource.data)
-          || isStringMax(request.resource.data.bio, 500))
-        && (!changed.hasAny(['photoURL'])
-          || !('photoURL' in request.resource.data)
-          || isOptionalStringMax(request.resource.data.photoURL, 2048))
-        && (!changed.hasAny(['publicKey'])
-          || !('publicKey' in request.resource.data)
-          || isOptionalStringMax(request.resource.data.publicKey, 8000));
+        'uid',
+        'name',
+        'nameLower',
+        'username',
+        'usernameLower',
+        'tag',
+        'tagLower',
+        'bio',
+        'photoURL',
+        'avatarUpdatedAt',
+        'publicKey',
+        'publicKeyUpdatedAt',
+        'isOnline',
+        'lastSeen',
+        'createdAt',
+        'updatedAt'
+      ]);
     }
 
     function validPublicProfileWrite(userId) {
       return isSelf(userId)
-        && request.resource.data.keys().hasOnly([
-          'uid',
-          'name',
-          'nameLower',
-          'username',
-          'usernameLower',
-          'tag',
-          'tagLower',
-          'bio',
-          'photoURL',
-          'avatarUpdatedAt',
-          'publicKey',
-          'publicKeyUpdatedAt',
-          'isOnline',
-          'lastSeen',
-          'createdAt',
-          'updatedAt'
-        ])
-        && request.resource.data.uid == userId
-        && isValidString(request.resource.data.name, 100)
+        && publicProfileFieldsOnly()
+        && (!('uid' in request.resource.data)
+          || request.resource.data.uid == userId)
+        && (!('name' in request.resource.data)
+          || nonEmptyStringMax(request.resource.data.name, 100))
+        && (!('nameLower' in request.resource.data)
+          || stringMax(request.resource.data.nameLower, 100))
+        && (!('username' in request.resource.data)
+          || stringMax(request.resource.data.username, 100))
+        && (!('usernameLower' in request.resource.data)
+          || stringMax(request.resource.data.usernameLower, 100))
+        && (!('tag' in request.resource.data)
+          || stringMax(request.resource.data.tag, 100))
+        && (!('tagLower' in request.resource.data)
+          || stringMax(request.resource.data.tagLower, 100))
         && (!('bio' in request.resource.data)
-          || isStringMax(request.resource.data.bio, 500))
+          || stringMax(request.resource.data.bio, 500))
         && (!('photoURL' in request.resource.data)
-          || isOptionalStringMax(request.resource.data.photoURL, 2048))
+          || request.resource.data.photoURL == null
+          || stringMax(request.resource.data.photoURL, 2048))
         && (!('publicKey' in request.resource.data)
-          || isOptionalStringMax(request.resource.data.publicKey, 8000));
+          || request.resource.data.publicKey == null
+          || stringMax(request.resource.data.publicKey, 8000));
     }
 
-    function validChatCreate(chatId) {
-      return signedIn()
-        && request.auth.uid in request.resource.data.participants
-        && request.resource.data.keys().hasOnly([
-          'type',
-          'name',
-          'isGroup',
-          'participants',
-          'admins',
-          'lastMessage',
-          'lastMessageType',
-          'lastMessageAt',
-          'lastMessageTime',
-          'lastMessageStatus',
-          'lastMessageReadBy',
-          'lastSenderId',
-          'unreadCount',
-          'typing',
-          'pinnedMessage',
-          'createdAt',
-          'updatedAt',
-          'createdBy'
-        ])
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.participants is list
-        && request.resource.data.participants.size() >= 2
-        && request.resource.data.participants.size() <= 50
-        && request.resource.data.type in ['direct', 'group']
-        && (
-          request.resource.data.type != 'direct'
-          || (
-            request.resource.data.participants[0]
-              != request.resource.data.participants[1]
-            && isDirectChatId(chatId, request.resource.data.participants)
-          )
-        );
-    }
-
-    function validChatUpdate() {
+    function safeChatUpdate() {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       return signedIn()
         && request.auth.uid in resource.data.participants
-        && request.resource.data.participants == resource.data.participants
-        && request.resource.data.type == resource.data.type
-        && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.keys().hasAll(resource.data.keys())
-        && changed.hasOnly([
-          'lastMessage',
-          'lastMessageType',
-          'lastMessageAt',
-          'lastMessageTime',
-          'lastMessageId',
-          'lastMessageStatus',
-          'lastMessageReadBy',
-          'lastSenderId',
-          'unreadCount',
-          'typing',
-          'pinnedMessage',
-          'updatedAt'
-        ]);
+        && !changed.hasAny(['participants', 'type', 'createdBy']);
+    }
+
+    function messageFieldsOnly() {
+      return request.resource.data.keys().hasOnly([
+        'chatId',
+        'text',
+        'type',
+        'senderId',
+        'timestamp',
+        'createdAt',
+        'imageUrl',
+        'fileUrl',
+        'stickerId',
+        'stickerUrl',
+        'voiceUrl',
+        'voiceDuration',
+        'isEncrypted',
+        'replyTo',
+        'replyToId',
+        'replyToText',
+        'isForwarded',
+        'originalSender',
+        'reactions',
+        'isTyping',
+        'status',
+        'readBy'
+      ]);
+    }
+
+    function validTextMessage() {
+      return request.resource.data.type == 'text'
+        && ('text' in request.resource.data)
+        && nonEmptyStringMax(request.resource.data.text, 10000);
+    }
+
+    function validImageMessage() {
+      return request.resource.data.type == 'image'
+        && nonEmptyStringMax(request.resource.data.imageUrl, 2048)
+        && (!('text' in request.resource.data)
+          || stringMax(request.resource.data.text, 10000));
+    }
+
+    function validStickerMessage() {
+      return request.resource.data.type == 'sticker'
+        && (
+          (('stickerId' in request.resource.data)
+            && nonEmptyStringMax(request.resource.data.stickerId, 512))
+          || (('stickerUrl' in request.resource.data)
+            && nonEmptyStringMax(request.resource.data.stickerUrl, 2048))
+        )
+        && (!('text' in request.resource.data)
+          || stringMax(request.resource.data.text, 10000));
+    }
+
+    function validVoiceMessage() {
+      return request.resource.data.type == 'voice'
+        && nonEmptyStringMax(request.resource.data.voiceUrl, 2048)
+        && (!('text' in request.resource.data)
+          || stringMax(request.resource.data.text, 10000));
+    }
+
+    function validFileMessage() {
+      return request.resource.data.type == 'file'
+        && nonEmptyStringMax(request.resource.data.fileUrl, 2048)
+        && (!('text' in request.resource.data)
+          || stringMax(request.resource.data.text, 10000));
     }
 
     function validMessagePayload() {
-      return request.resource.data.type in ['text', 'image', 'voice', 'sticker']
-        && (
-          (request.resource.data.type == 'text'
-            && isValidString(request.resource.data.text, 10000))
-          || (request.resource.data.type == 'image'
-            && isValidString(request.resource.data.imageUrl, 2048)
-            && (!('text' in request.resource.data)
-              || isStringMax(request.resource.data.text, 10000)))
-          || (request.resource.data.type == 'voice'
-            && isValidString(request.resource.data.voiceUrl, 2048)
-            && (!('text' in request.resource.data)
-              || isStringMax(request.resource.data.text, 10000)))
-          || (request.resource.data.type == 'sticker'
-            && isValidString(request.resource.data.stickerUrl, 2048)
-            && (!('text' in request.resource.data)
-              || isStringMax(request.resource.data.text, 10000)))
-        );
+      return validTextMessage()
+        || validImageMessage()
+        || validStickerMessage()
+        || validVoiceMessage()
+        || validFileMessage();
     }
 
     function validMessageCreate(chatId) {
-      return request.resource.data.keys().hasOnly([
-          'chatId',
-          'text',
-          'type',
-          'senderId',
-          'timestamp',
-          'createdAt',
-          'imageUrl',
-          'stickerUrl',
-          'voiceUrl',
-          'isEncrypted',
-          'replyTo',
-          'replyToId',
-          'replyToText',
-          'isForwarded',
-          'originalSender',
-          'reactions',
-          'isTyping',
-          'status',
-          'readBy'
-        ])
+      return isChatParticipant(chatId)
+        && messageFieldsOnly()
+        && request.resource.data.senderId == request.auth.uid
         && (!('chatId' in request.resource.data)
           || request.resource.data.chatId == chatId)
-        && request.resource.data.senderId == request.auth.uid
-        && request.resource.data.status == 'sent'
-        && request.resource.data.readBy is list
-        && request.resource.data.readBy.size() == 1
-        && request.resource.data.readBy[0] == request.auth.uid
+        && (!('readBy' in request.resource.data)
+          || request.resource.data.readBy is list)
+        && (!('status' in request.resource.data)
+          || request.resource.data.status in ['sending', 'sent', 'delivered', 'read'])
         && validMessagePayload();
     }
 
-    function validReadByUpdate(chatId) {
+    function validMessageUpdate(chatId) {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       return isChatParticipant(chatId)
-        && request.auth.uid != resource.data.senderId
-        && changed.hasOnly(['readBy', 'status'])
-        && resource.data.readBy is list
-        && request.resource.data.readBy is list
-        && request.resource.data.readBy.hasAll(resource.data.readBy)
-        && request.auth.uid in request.resource.data.readBy
+        && changed.hasOnly([
+          'readBy',
+          'status',
+          'reactions'
+        ])
+        && (!changed.hasAny(['readBy'])
+          || request.resource.data.readBy is list)
         && (!changed.hasAny(['status'])
-          || request.resource.data.status == 'read');
+          || request.resource.data.status in ['sending', 'sent', 'delivered', 'read'])
+        && (!changed.hasAny(['reactions'])
+          || validReactionsUpdate());
+    }
+
+    function validReactionsUpdate() {
+      return request.resource.data.reactions is map
+        && (
+          (('reactions' in resource.data)
+            && resource.data.reactions is map
+            && request.resource.data.reactions.diff(resource.data.reactions).affectedKeys().hasOnly([request.auth.uid]))
+          || (!('reactions' in resource.data)
+            && request.resource.data.reactions.keys().hasOnly([request.auth.uid]))
+        );
+    }
+
+    function validTypingStatusWrite(chatId) {
+      return isChatParticipant(chatId)
+        && request.resource.data.keys().hasOnly([
+          'typingUsers',
+          'sendingPhotoUsers',
+          'recordingVoiceUsers',
+          'updatedAt'
+        ])
+        && (!('typingUsers' in request.resource.data)
+          || request.resource.data.typingUsers is list)
+        && (!('sendingPhotoUsers' in request.resource.data)
+          || request.resource.data.sendingPhotoUsers is list)
+        && (!('recordingVoiceUsers' in request.resource.data)
+          || request.resource.data.recordingVoiceUsers is list);
     }
 
     match /users/{userId} {
       allow read: if isSelf(userId);
-      allow create: if isSelf(userId) && validUserCreate();
-      allow update: if isSelf(userId) && validUserUpdate();
+      allow create, update: if isSelf(userId);
       allow delete: if false;
 
       match /chats/{chatId} {
-        allow read: if isSelf(userId);
-        allow create, update: if isSelf(userId)
-          && request.resource.data.keys().hasOnly([
-            'chatId',
-            'createdAt',
-            'addedAt',
-            'isGroup'
-          ])
-          && request.resource.data.chatId == chatId;
+        allow read, create, update: if isSelf(userId);
         allow delete: if false;
       }
     }
@@ -297,24 +239,28 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /typingStatus/{chatId} {
+      allow read: if isChatParticipant(chatId);
+      allow create, update: if validTypingStatusWrite(chatId);
+      allow delete: if false;
+    }
+
     match /chats/{chatId} {
       allow get: if signedIn()
         && (
-          !exists(/databases/$(database)/documents/chats/$(chatId))
+          !chatExists(chatId)
           || request.auth.uid in resource.data.participants
         );
       allow list: if signedIn()
         && request.auth.uid in resource.data.participants;
-      allow create: if validChatCreate(chatId);
-      allow update: if validChatUpdate();
+      allow create: if requestHasCurrentUserParticipant();
+      allow update: if safeChatUpdate();
       allow delete: if false;
 
       match /messages/{messageId} {
         allow read: if isChatParticipant(chatId);
-        allow create: if isChatParticipant(chatId)
-          && request.auth.uid == request.resource.data.senderId
-          && validMessageCreate(chatId);
-        allow update: if validReadByUpdate(chatId);
+        allow create: if validMessageCreate(chatId);
+        allow update: if validMessageUpdate(chatId);
         allow delete: if false;
       }
     }

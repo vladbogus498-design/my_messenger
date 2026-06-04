@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/user_model.dart';
 import '../services/chat_service.dart';
+import '../services/media_availability_service.dart';
 import '../services/user_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/navigation_animations.dart';
@@ -441,14 +442,22 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _PhotoGrid extends StatelessWidget {
+class _PhotoGrid extends StatefulWidget {
   const _PhotoGrid({required this.chatId});
 
   final String? chatId;
 
   @override
+  State<_PhotoGrid> createState() => _PhotoGridState();
+}
+
+class _PhotoGridState extends State<_PhotoGrid> {
+  String? _lastSignature;
+  Future<List<String>>? _urlsFuture;
+
+  @override
   Widget build(BuildContext context) {
-    final id = chatId;
+    final id = widget.chatId;
     if (id == null || id.isEmpty) {
       return const _ProfileTabEmpty(
         text: 'Фотографии появятся после переписки',
@@ -463,35 +472,62 @@ class _PhotoGrid extends StatelessWidget {
           .where('type', isEqualTo: 'image')
           .snapshots(),
       builder: (context, snapshot) {
-        final docs = snapshot.data?.docs ?? [];
-        final urls = docs
+        final docs =
+            snapshot.data?.docs ??
+            const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        final rawUrls = docs
             .map((doc) => doc.data()['imageUrl']?.toString() ?? '')
             .where((url) => url.isNotEmpty)
             .toList();
+        final signature = rawUrls.join('|');
 
         if (snapshot.connectionState == ConnectionState.waiting &&
-            urls.isEmpty) {
+            rawUrls.isEmpty) {
           return const Center(
             child: CircularProgressIndicator(color: DarkKickColors.neonPurple),
           );
         }
-        if (urls.isEmpty) {
-          return const _ProfileTabEmpty(text: 'Фотографий пока нет');
+        if (_lastSignature != signature) {
+          _lastSignature = signature;
+          _urlsFuture = MediaAvailabilityService.filterExisting(rawUrls);
         }
 
-        return GridView.builder(
-          padding: const EdgeInsets.only(top: 16),
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-          ),
-          itemCount: urls.length,
-          itemBuilder: (context, index) {
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(urls[index], fit: BoxFit.cover),
+        return FutureBuilder<List<String>>(
+          future: _urlsFuture,
+          builder: (context, urlSnapshot) {
+            final urls = urlSnapshot.data ?? const <String>[];
+            if (urlSnapshot.connectionState == ConnectionState.waiting &&
+                urls.isEmpty &&
+                rawUrls.isNotEmpty) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  color: DarkKickColors.neonPurple,
+                ),
+              );
+            }
+            if (urls.isEmpty) {
+              return const _ProfileTabEmpty(text: 'Фотографий пока нет');
+            }
+
+            return GridView.builder(
+              padding: const EdgeInsets.only(top: 16),
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemCount: urls.length,
+              itemBuilder: (context, index) {
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    urls[index],
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                );
+              },
             );
           },
         );

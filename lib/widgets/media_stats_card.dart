@@ -2,16 +2,25 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../services/media_availability_service.dart';
 import '../theme/darkkick_colors.dart';
 
-class MediaStatsCard extends StatelessWidget {
+class MediaStatsCard extends StatefulWidget {
   const MediaStatsCard({super.key, this.chatId});
 
   final String? chatId;
 
   @override
+  State<MediaStatsCard> createState() => _MediaStatsCardState();
+}
+
+class _MediaStatsCardState extends State<MediaStatsCard> {
+  String? _lastSignature;
+  Future<MediaStats>? _statsFuture;
+
+  @override
   Widget build(BuildContext context) {
-    final id = chatId?.trim();
+    final id = widget.chatId?.trim();
     if (id == null || id.isEmpty) {
       return const _StatsView(stats: MediaStats.zero);
     }
@@ -28,8 +37,31 @@ class MediaStatsCard extends StatelessWidget {
         }
 
         final docs = snapshot.data?.docs ?? const [];
-        final stats = MediaStats.fromMessages(docs.map((doc) => doc.data()));
-        return _StatsView(stats: stats);
+        final signature = docs
+            .map((doc) {
+              final data = doc.data();
+              return [
+                doc.id,
+                data['type'],
+                data['imageUrl'],
+                data['fileUrl'],
+                data['voiceUrl'],
+                data['text'],
+              ].join('|');
+            })
+            .join('#');
+
+        if (_lastSignature != signature) {
+          _lastSignature = signature;
+          _statsFuture = MediaStats.fromMessages(docs.map((doc) => doc.data()));
+        }
+
+        return FutureBuilder<MediaStats>(
+          future: _statsFuture,
+          builder: (context, statsSnapshot) {
+            return _StatsView(stats: statsSnapshot.data ?? MediaStats.zero);
+          },
+        );
       },
     );
   }
@@ -51,7 +83,9 @@ class MediaStats {
   final int links;
   final int voices;
 
-  factory MediaStats.fromMessages(Iterable<Map<String, dynamic>> messages) {
+  static Future<MediaStats> fromMessages(
+    Iterable<Map<String, dynamic>> messages,
+  ) async {
     var photos = 0;
     var files = 0;
     var links = 0;
@@ -63,16 +97,21 @@ class MediaStats {
       final imageUrl = (message['imageUrl'] ?? '').toString().trim();
       final fileUrl = (message['fileUrl'] ?? '').toString().trim();
       final voiceUrl = (message['voiceUrl'] ?? '').toString().trim();
-      final voiceAudioBase64 = (message['voiceAudioBase64'] ?? '')
-          .toString()
-          .trim();
 
-      if (type == 'image' || imageUrl.isNotEmpty) photos++;
-      if (type == 'file' || fileUrl.isNotEmpty) files++;
+      if (imageUrl.isNotEmpty &&
+          (type == 'image' || message.containsKey('imageUrl')) &&
+          await MediaAvailabilityService.exists(imageUrl)) {
+        photos++;
+      }
+      if (fileUrl.isNotEmpty &&
+          (type == 'file' || message.containsKey('fileUrl')) &&
+          await MediaAvailabilityService.exists(fileUrl)) {
+        files++;
+      }
       if (_urlPattern.hasMatch(text)) links++;
-      if (type == 'voice' ||
-          voiceUrl.isNotEmpty ||
-          voiceAudioBase64.isNotEmpty) {
+      if (voiceUrl.isNotEmpty &&
+          type == 'voice' &&
+          await MediaAvailabilityService.exists(voiceUrl)) {
         voices++;
       }
     }

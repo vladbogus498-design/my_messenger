@@ -147,13 +147,13 @@ class ChatService {
         throw Exception('Sticker message requires stickerId or stickerUrl');
       }
 
-      if (type == 'voice' && voiceAudioBase64 != null) {
-        final base64Size = voiceAudioBase64.length * 3 ~/ 4;
-        final sizeError = InputValidator.validateFileSize(
-          base64Size,
-          isVoice: true,
-        );
-        if (sizeError != null) throw Exception(sizeError);
+      if (type == 'voice') {
+        if (voiceAudioBase64 != null && voiceAudioBase64.isNotEmpty) {
+          throw Exception('Voice base64 storage is disabled');
+        }
+        if (voiceUrl == null || voiceUrl.isEmpty) {
+          throw Exception('Voice message requires voiceUrl');
+        }
       }
 
       if (replyToId != null && replyToId.contains('/')) {
@@ -230,7 +230,6 @@ class ChatService {
           if (imageUrl != null) 'imageUrl': imageUrl,
           if (stickerUrl != null) 'stickerUrl': stickerUrl,
           if (voiceUrl != null) 'voiceUrl': voiceUrl,
-          if (voiceAudioBase64 != null) 'voiceAudioBase64': voiceAudioBase64,
           if (voiceDuration != null) 'voiceDuration': voiceDuration,
           if (stickerId != null) 'stickerId': stickerId,
           'isEncrypted': isEncrypted,
@@ -278,7 +277,6 @@ class ChatService {
       imageUrl: message.imageUrl,
       stickerUrl: message.stickerUrl,
       voiceUrl: message.voiceUrl,
-      voiceAudioBase64: message.voiceAudioBase64,
       voiceDuration: message.voiceDuration,
       stickerId: message.stickerId,
       isForwarded: true,
