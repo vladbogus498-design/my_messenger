@@ -454,6 +454,7 @@ class _PhotoGrid extends StatefulWidget {
 class _PhotoGridState extends State<_PhotoGrid> {
   String? _lastSignature;
   Future<List<String>>? _urlsFuture;
+  final Set<String> _hiddenUrls = <String>{};
 
   @override
   Widget build(BuildContext context) {
@@ -477,7 +478,7 @@ class _PhotoGridState extends State<_PhotoGrid> {
             const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
         final rawUrls = docs
             .map((doc) => doc.data()['imageUrl']?.toString() ?? '')
-            .where((url) => url.isNotEmpty)
+            .where((url) => url.isNotEmpty && !_hiddenUrls.contains(url))
             .toList();
         final signature = rawUrls.join('|');
 
@@ -521,16 +522,40 @@ class _PhotoGridState extends State<_PhotoGrid> {
               itemBuilder: (context, index) {
                 return ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    urls[index],
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  child: _ProfilePhotoTile(
+                    url: urls[index],
+                    onUnavailable: () {
+                      if (!mounted) return;
+                      setState(() {
+                        _hiddenUrls.add(urls[index]);
+                        _lastSignature = null;
+                      });
+                    },
                   ),
                 );
               },
             );
           },
         );
+      },
+    );
+  }
+}
+
+class _ProfilePhotoTile extends StatelessWidget {
+  const _ProfilePhotoTile({required this.url, required this.onUnavailable});
+
+  final String url;
+  final VoidCallback onUnavailable;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => onUnavailable());
+        return const SizedBox.shrink();
       },
     );
   }

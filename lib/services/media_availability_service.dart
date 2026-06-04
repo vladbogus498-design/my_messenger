@@ -27,13 +27,13 @@ class MediaAvailabilityService {
 
   static Future<List<String>> filterExisting(Iterable<String> urls) async {
     final result = <String>[];
-    final uniqueUrls = urls
-        .map((url) => url.trim())
-        .where((url) => url.isNotEmpty)
-        .toSet();
+    final availability = <String, bool>{};
 
-    for (final url in uniqueUrls) {
-      if (await exists(url)) {
+    for (final rawUrl in urls) {
+      final url = rawUrl.trim();
+      if (url.isEmpty) continue;
+      final isAvailable = availability[url] ??= await exists(url);
+      if (isAvailable) {
         result.add(url);
       }
     }

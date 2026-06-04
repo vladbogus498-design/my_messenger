@@ -343,11 +343,7 @@ class ChatService {
     if (userId == null) return;
 
     try {
-      await _firestore.collection('typingStatus').doc(chatId).set({
-        'typingUsers': isTyping
-            ? FieldValue.arrayUnion([userId])
-            : FieldValue.arrayRemove([userId]),
-      }, SetOptions(merge: true));
+      await _setTypingStatusField(chatId, 'typingUsers', isTyping, userId);
     } catch (e) {
       appLogger.e('Error setting typing status for chat: $chatId', error: e);
     }
@@ -361,11 +357,12 @@ class ChatService {
     if (userId == null) return;
 
     try {
-      await _firestore.collection('typingStatus').doc(chatId).set({
-        'sendingPhotoUsers': isSending
-            ? FieldValue.arrayUnion([userId])
-            : FieldValue.arrayRemove([userId]),
-      }, SetOptions(merge: true));
+      await _setTypingStatusField(
+        chatId,
+        'sendingPhotoUsers',
+        isSending,
+        userId,
+      );
     } catch (e) {
       appLogger.e('Error setting photo status for chat: $chatId', error: e);
     }
@@ -379,14 +376,57 @@ class ChatService {
     if (userId == null) return;
 
     try {
-      await _firestore.collection('typingStatus').doc(chatId).set({
-        'recordingVoiceUsers': isRecording
-            ? FieldValue.arrayUnion([userId])
-            : FieldValue.arrayRemove([userId]),
-      }, SetOptions(merge: true));
+      await _setTypingStatusField(
+        chatId,
+        'recordingVoiceUsers',
+        isRecording,
+        userId,
+      );
     } catch (e) {
       appLogger.e('Error setting voice status for chat: $chatId', error: e);
     }
+  }
+
+  static Future<void> _setTypingStatusField(
+    String chatId,
+    String field,
+    bool enabled,
+    String userId,
+  ) async {
+    final ref = _firestore.collection('typingStatus').doc(chatId);
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(ref);
+      final data = snapshot.data() ?? const <String, dynamic>{};
+
+      List<String> readUsers(String key) {
+        final value = data[key];
+        if (value is! List) return <String>[];
+        return value.whereType<String>().toSet().toList();
+      }
+
+      final typingUsers = readUsers('typingUsers');
+      final sendingPhotoUsers = readUsers('sendingPhotoUsers');
+      final recordingVoiceUsers = readUsers('recordingVoiceUsers');
+      final target = switch (field) {
+        'typingUsers' => typingUsers,
+        'sendingPhotoUsers' => sendingPhotoUsers,
+        'recordingVoiceUsers' => recordingVoiceUsers,
+        _ => <String>[],
+      };
+
+      if (enabled) {
+        if (!target.contains(userId)) target.add(userId);
+      } else {
+        target.remove(userId);
+      }
+
+      transaction.set(ref, {
+        'typingUsers': typingUsers,
+        'sendingPhotoUsers': sendingPhotoUsers,
+        'recordingVoiceUsers': recordingVoiceUsers,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
   }
 
   static Stream<List<String>> getTypingUsers(String chatId) {

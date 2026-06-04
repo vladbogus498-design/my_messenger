@@ -11,6 +11,7 @@ import '../services/voice_message_service.dart';
 import '../models/message.dart';
 import '../models/chat.dart';
 import 'chat_input_panel.dart';
+import 'image_viewer_screen.dart';
 import 'user_profile_screen.dart';
 import '../widgets/reaction_picker.dart';
 import '../widgets/message_status_icon.dart';
@@ -58,6 +59,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   bool _peerIsOnline = false;
   DateTime? _peerLastSeen;
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _messageDocs = [];
+  Stream<QuerySnapshot<Map<String, dynamic>>>? _messagesStream;
+  String? _messagesStreamChatId;
   String? _highlightedMessageId;
   Timer? _highlightTimer;
   final Set<String> _invalidPinnedHandled = <String>{};
@@ -183,13 +186,27 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   void _scrollToBottom() {
-    if (_scrollController.hasClients) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
       _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: Duration(milliseconds: 300),
+        _scrollController.position.minScrollExtent,
+        duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
+    });
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> _messageStreamFor(String chatId) {
+    if (_messagesStreamChatId != chatId || _messagesStream == null) {
+      _messagesStreamChatId = chatId;
+      _messagesStream = FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .orderBy('timestamp', descending: true)
+          .snapshots();
     }
+    return _messagesStream!;
   }
 
   void _startReply(Message message) {
@@ -817,6 +834,60 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     );
   }
 
+  List<ChatImageItem> _chatImageItems() {
+    return _messageDocs
+        .map((doc) {
+          final data = doc.data();
+          final type = (data['type'] ?? '').toString();
+          final imageUrl = (data['imageUrl'] ?? '').toString().trim();
+          if (type != 'image' || imageUrl.isEmpty) return null;
+          return ChatImageItem(messageId: doc.id, imageUrl: imageUrl);
+        })
+        .whereType<ChatImageItem>()
+        .toList();
+  }
+
+  void _openImageViewer(Message message) {
+    final imageUrl = message.imageUrl?.trim();
+    if (imageUrl == null || imageUrl.isEmpty) return;
+
+    final items = _chatImageItems();
+    final fallbackItems = items.isEmpty
+        ? [ChatImageItem(messageId: message.id, imageUrl: imageUrl)]
+        : items;
+    final initialIndex = fallbackItems.indexWhere(
+      (item) => item.messageId == message.id,
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ImageViewerScreen(
+          images: fallbackItems,
+          initialIndex: initialIndex < 0 ? 0 : initialIndex,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessagesList(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    return ListView.builder(
+      controller: _scrollController,
+      reverse: true,
+      itemCount: docs.length,
+      key: ValueKey('messages_list_${_actualChatId ?? widget.chatId}'),
+      itemBuilder: (_, i) {
+        final doc = docs[i];
+        final message = Message.fromMap(doc.data(), doc.id);
+        return RepaintBoundary(
+          key: _messageKey(message.id),
+          child: _buildMessageBubble(message),
+        );
+      },
+    );
+  }
+
   Widget _buildMessageBubble(Message message) {
     if (message.type == 'system') {
       final theme = Theme.of(context);
@@ -970,56 +1041,69 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                         if (message.type == 'image' && message.imageUrl != null)
                           Column(
                             children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Stack(
-                                  children: [
-                                    CachedNetworkImage(
-                                      imageUrl: message.imageUrl!,
-                                      width: 200,
-                                      height: 150,
-                                      fit: BoxFit.cover,
-                                      placeholder: (context, url) => Container(
-                                        width: 200,
-                                        height: 150,
-                                        color: colorScheme.surfaceVariant,
-                                        child: Center(
-                                          child: CircularProgressIndicator(),
+                              GestureDetector(
+                                onTap: () => _openImageViewer(message),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Stack(
+                                    children: [
+                                      Hero(
+                                        tag: 'chat-image-${message.id}',
+                                        child: CachedNetworkImage(
+                                          imageUrl: message.imageUrl!,
+                                          width: 200,
+                                          height: 150,
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) =>
+                                              Container(
+                                                width: 200,
+                                                height: 150,
+                                                color:
+                                                    colorScheme.surfaceVariant,
+                                                child: const Center(
+                                                  child:
+                                                      CircularProgressIndicator(),
+                                                ),
+                                              ),
+                                          errorWidget: (context, url, error) =>
+                                              Container(
+                                                width: 200,
+                                                height: 150,
+                                                color: DarkKickColors.panel,
+                                                alignment: Alignment.center,
+                                                child: const Text(
+                                                  'Фото недоступно',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    color: DarkKickColors
+                                                        .textSecondary,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ),
                                         ),
                                       ),
-                                      errorWidget: (context, url, error) =>
-                                          Container(
-                                            width: 200,
-                                            height: 150,
-                                            color: colorScheme.errorContainer,
-                                            child: Icon(
-                                              Icons.error,
-                                              color:
-                                                  colorScheme.onErrorContainer,
+                                      Positioned(
+                                        top: 4,
+                                        right: 4,
+                                        child: Container(
+                                          padding: EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: colorScheme.scrim
+                                                .withOpacity(0.35),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
                                             ),
                                           ),
-                                    ),
-                                    Positioned(
-                                      top: 4,
-                                      right: 4,
-                                      child: Container(
-                                        padding: EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: colorScheme.scrim.withOpacity(
-                                            0.35,
+                                          child: Icon(
+                                            Icons.photo,
+                                            size: 16,
+                                            color: colorScheme.onSurface,
                                           ),
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                        ),
-                                        child: Icon(
-                                          Icons.photo,
-                                          size: 16,
-                                          color: colorScheme.onSurface,
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                               SizedBox(height: 8),
@@ -1439,14 +1523,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           Expanded(
             child: chatId.isNotEmpty
                 ? StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: FirebaseFirestore.instance
-                        .collection('chats')
-                        .doc(chatId)
-                        .collection('messages')
-                        .orderBy('timestamp', descending: true)
-                        .snapshots(),
+                    stream: _messageStreamFor(chatId),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (_messageDocs.isNotEmpty) {
+                          return _buildMessagesList(_messageDocs);
+                        }
                         return const Center(
                           child: CircularProgressIndicator(
                             color: DarkKickColors.neonPurple,
@@ -1487,20 +1569,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                           ),
                         );
                       }
-                      return ListView.builder(
-                        controller: _scrollController,
-                        reverse: true,
-                        itemCount: docs.length,
-                        key: ValueKey('messages_list_$chatId'),
-                        itemBuilder: (_, i) {
-                          final doc = docs[i];
-                          final message = Message.fromMap(doc.data(), doc.id);
-                          return RepaintBoundary(
-                            key: _messageKey(message.id),
-                            child: _buildMessageBubble(message),
-                          );
-                        },
-                      );
+                      return _buildMessagesList(docs);
                     },
                   )
                 : Center(

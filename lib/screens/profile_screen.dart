@@ -10,7 +10,6 @@ import '../services/storage_service.dart';
 import '../services/user_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/user_formatters.dart';
-import '../widgets/media_stats_card.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, this.showBackButton = true, this.chatId});
@@ -157,7 +156,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 12),
                         _DarkInput(
                           controller: _bioController,
-                          hint: 'Био',
+                          hint: 'О себе',
                           maxLines: 3,
                         ),
                       ] else ...[
@@ -201,7 +200,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Center(
                           child: Text(
                             (user.bio ?? '').trim().isEmpty
-                                ? 'Люблю технологии, музыку и путешествия.'
+                                ? 'О себе не указано'
                                 : user.bio!.trim(),
                             textAlign: TextAlign.center,
                             style: const TextStyle(
@@ -235,8 +234,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: 'Изменить аватарку',
                         onTap: _busy ? () {} : _uploadAvatar,
                       ),
-                      const SizedBox(height: 22),
-                      MediaStatsCard(chatId: widget.chatId),
                     ],
                   ),
                 );
