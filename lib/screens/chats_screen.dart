@@ -120,10 +120,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: DarkKickColors.textPrimary),
-            onPressed: () {},
-          ),
+          const SizedBox(width: 42),
           Expanded(
             child: Text(
               'DARKKICK',
@@ -209,40 +206,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         : chats
               .where(
                 (chat) =>
-                    chat.isDirect && chat.participants.contains(currentUserId),
+                    _isDirectChat(chat) &&
+                    chat.participants.contains(currentUserId),
               )
               .take(8)
               .toList();
+
+    if (personalChats.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
       height: 86,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         scrollDirection: Axis.horizontal,
-        itemCount: personalChats.length + 1,
+        itemCount: personalChats.length,
         separatorBuilder: (_, __) => const SizedBox(width: 14),
         itemBuilder: (context, index) {
-          if (index == 0) {
-            return _StoryItem(
-              label: 'Создать',
-              child: Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: DarkKickColors.panel,
-                  border: Border.all(color: DarkKickColors.stroke),
-                ),
-                child: const Icon(Icons.add, color: Colors.white, size: 26),
-              ),
-              onTap: () => Navigator.push(
-                context,
-                NavigationAnimations.slideFadeRoute(const NewChatScreen()),
-              ),
-            );
-          }
-
-          final chat = personalChats[index - 1];
+          final chat = personalChats[index];
           return _DirectAwareStoryItem(
             chat: chat,
             currentUserId: currentUserId,
@@ -329,13 +309,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final currentUserId = _currentUserId;
 
     if (chats.isEmpty) {
-      final isChannels = _selectedFilterIndex == 3;
+      final empty = _emptyStateForFilter();
       return _EmptyState(
-        title: isChannels ? 'Каналов пока нет' : 'Здесь пока пусто',
-        subtitle: isChannels
-            ? 'В текущей модели чата нет отдельного типа канала.'
-            : 'Создай чат или измени фильтр, чтобы увидеть переписки.',
-        icon: isChannels ? Icons.campaign_outlined : Icons.chat_bubble_outline,
+        title: empty.title,
+        subtitle: empty.subtitle,
+        icon: empty.icon,
       );
     }
 
@@ -363,11 +341,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               .where((chat) => chat.participants.contains(currentUserId))
               .toList();
     if (_selectedFilterIndex == 1) {
-      filtered = filtered.where((chat) => chat.isDirect).toList();
+      filtered = filtered.where(_isDirectChat).toList();
     } else if (_selectedFilterIndex == 2) {
-      filtered = filtered.where((chat) => chat.isGroup).toList();
+      filtered = filtered.where(_isGroupChat).toList();
     } else if (_selectedFilterIndex == 3) {
-      filtered = const [];
+      filtered = filtered.where(_isChannelChat).toList();
     }
 
     if (_searchQuery.isEmpty) return filtered;
@@ -376,6 +354,45 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           (chat) => _fallbackTitle(chat).toLowerCase().contains(_searchQuery),
         )
         .toList();
+  }
+
+  bool _isDirectChat(Chat chat) {
+    final type = chat.type.toLowerCase().trim();
+    return type == 'direct' || type == 'private';
+  }
+
+  bool _isGroupChat(Chat chat) {
+    final type = chat.type.toLowerCase().trim();
+    return chat.isGroup || type == 'group';
+  }
+
+  bool _isChannelChat(Chat chat) {
+    return chat.type.toLowerCase().trim() == 'channel';
+  }
+
+  _FilterEmptyState _emptyStateForFilter() {
+    return switch (_selectedFilterIndex) {
+      1 => const _FilterEmptyState(
+        title: 'Личных чатов пока нет',
+        subtitle: 'Найди человека через верхнюю кнопку и начни диалог.',
+        icon: Icons.person_outline,
+      ),
+      2 => const _FilterEmptyState(
+        title: 'Групп пока нет',
+        subtitle: 'Групповые чаты появятся здесь, когда будут созданы.',
+        icon: Icons.groups_2_outlined,
+      ),
+      3 => const _FilterEmptyState(
+        title: 'Каналов пока нет',
+        subtitle: 'Каналы появятся здесь, если в данных будет type = channel.',
+        icon: Icons.campaign_outlined,
+      ),
+      _ => const _FilterEmptyState(
+        title: 'Здесь пока пусто',
+        subtitle: 'Создай чат через верхнюю кнопку справа.',
+        icon: Icons.chat_bubble_outline,
+      ),
+    };
   }
 
   Widget _buildLoadingState() {
@@ -924,6 +941,18 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+class _FilterEmptyState {
+  const _FilterEmptyState({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
 }
 
 class _DarkkickPlaceholder extends StatelessWidget {
