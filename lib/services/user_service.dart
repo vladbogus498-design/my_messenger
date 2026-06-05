@@ -11,6 +11,48 @@ class UserService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static Future<void> _presenceWriteQueue = Future.value();
   static int _presenceRequestId = 0;
+  static const Set<String> _localRulesUserFields = {
+    'uid',
+    'email',
+    'emailLower',
+    'phone',
+    'name',
+    'nameLower',
+    'username',
+    'usernameLower',
+    'tag',
+    'tagLower',
+    'searchKeywords',
+    'bio',
+    'photoURL',
+    'avatarUpdatedAt',
+    'publicKey',
+    'publicKeyUpdatedAt',
+    'isOnline',
+    'lastSeen',
+    'createdAt',
+    'updatedAt',
+    'premiumStatus',
+  };
+  static const Set<String> _localRulesPublicProfileFields = {
+    'uid',
+    'name',
+    'nameLower',
+    'username',
+    'usernameLower',
+    'tag',
+    'tagLower',
+    'searchKeywords',
+    'bio',
+    'photoURL',
+    'avatarUpdatedAt',
+    'publicKey',
+    'publicKeyUpdatedAt',
+    'isOnline',
+    'lastSeen',
+    'createdAt',
+    'updatedAt',
+  };
 
   static Stream<UserModel?> watchUserData(String userId) {
     if (!InputValidator.isValidUserId(userId)) {
@@ -152,12 +194,34 @@ class UserService {
     if (userId == null) throw Exception('User not authenticated');
 
     try {
+      appLogger.d('Profile save started: userId=$userId');
       final updates = <String, dynamic>{};
       final userRef = _firestore.collection('users').doc(userId);
       final publicProfileRef = _firestore
           .collection('publicProfiles')
           .doc(userId);
-      final currentDoc = await userRef.get();
+      appLogger.d('Users document read started: users/$userId');
+      var currentDoc = await userRef.get();
+      appLogger.d(
+        'Users document read success: users/$userId exists=${currentDoc.exists}',
+      );
+      if (!currentDoc.exists) {
+        appLogger.w(
+          'Users document missing before profile save: users/$userId. '
+          'Creating automatically.',
+        );
+        final user = _auth.currentUser;
+        if (user == null) throw Exception('User not authenticated');
+        await ensureUserProfile(
+          user: user,
+          fallbackName: user.email?.split('@').first ?? user.phoneNumber,
+        );
+        currentDoc = await userRef.get();
+        appLogger.d(
+          'Users document reread after auto-create: users/$userId '
+          'exists=${currentDoc.exists}',
+        );
+      }
       final currentData = currentDoc.data() ?? const <String, dynamic>{};
       final authUser = _auth.currentUser;
       var nextName =
@@ -219,10 +283,47 @@ class UserService {
 
       final mergedData = <String, dynamic>{...currentData, ...updates};
       final publicData = _publicProfileData(userId, mergedData);
-      final batch = _firestore.batch()
-        ..set(userRef, updates, SetOptions(merge: true))
-        ..set(publicProfileRef, publicData);
-      await batch.commit();
+      _logUnexpectedProfileFields(
+        documentPath: 'users/$userId',
+        fields: updates.keys,
+        allowedFields: _localRulesUserFields,
+      );
+      _logUnexpectedProfileFields(
+        documentPath: 'publicProfiles/$userId',
+        fields: publicData.keys,
+        allowedFields: _localRulesPublicProfileFields,
+      );
+      appLogger.d(
+        'Users document update started: users/$userId set(merge) '
+        'fields=${updates.keys.toList()}',
+      );
+      try {
+        await userRef.set(updates, SetOptions(merge: true));
+        appLogger.d('Users document update success: users/$userId');
+      } on FirebaseException catch (e) {
+        appLogger.e(
+          'Users document update failed: users/$userId '
+          '${e.code} ${e.message ?? ''}',
+          error: e,
+        );
+        rethrow;
+      }
+
+      appLogger.d(
+        'PublicProfiles update started: publicProfiles/$userId set '
+        'fields=${publicData.keys.toList()}',
+      );
+      try {
+        await publicProfileRef.set(publicData);
+        appLogger.d('PublicProfiles update success: publicProfiles/$userId');
+      } on FirebaseException catch (e) {
+        appLogger.e(
+          'PublicProfiles update failed: publicProfiles/$userId '
+          '${e.code} ${e.message ?? ''}',
+          error: e,
+        );
+        rethrow;
+      }
 
       if (photoURL != null) {
         try {
@@ -450,11 +551,43 @@ class UserService {
     Map<String, dynamic> source,
   ) async {
     final publicData = _publicProfileData(uid, source);
+    _logUnexpectedProfileFields(
+      documentPath: 'publicProfiles/$uid',
+      fields: publicData.keys,
+      allowedFields: _localRulesPublicProfileFields,
+    );
 
+    appLogger.d(
+      'PublicProfiles update started: publicProfiles/$uid set '
+      'fields=${publicData.keys.toList()}',
+    );
     await _firestore
         .collection('publicProfiles')
         .doc(uid)
         .set(publicData);
+    appLogger.d('PublicProfiles update success: publicProfiles/$uid');
+  }
+
+  static void _logUnexpectedProfileFields({
+    required String documentPath,
+    required Iterable<String> fields,
+    required Set<String> allowedFields,
+  }) {
+    final unsupported = fields
+        .where((field) => !allowedFields.contains(field))
+        .toList();
+    if (unsupported.isEmpty) {
+      appLogger.d(
+        'Local firestore.rules field check passed: $documentPath '
+        'fields=${fields.toList()}',
+      );
+      return;
+    }
+
+    appLogger.e(
+      'Local firestore.rules field mismatch: $documentPath '
+      'unsupportedFields=$unsupported allowedFields=$allowedFields',
+    );
   }
 
   static Map<String, dynamic> _publicProfileData(

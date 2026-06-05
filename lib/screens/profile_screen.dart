@@ -52,14 +52,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() => _busy = true);
     try {
-      appLogger.d('Profile avatar upload started: path=${picked.path}');
+      appLogger.d('Avatar upload started: path=${picked.path}');
       final url = await StorageService.uploadUserAvatar(File(picked.path));
-      appLogger.d('Profile avatar upload finished: imageUrl=$url');
+      appLogger.d('Avatar upload success: imageUrl=$url');
       appLogger.d('Profile avatar Firestore update started');
       await UserService.updateUserData(photoURL: url);
       appLogger.d('Profile avatar Firestore update finished');
       _showMessage('Аватар обновлён');
     } on FirebaseException catch (error) {
+      appLogger.e(
+        'Avatar upload failed during Firestore save: '
+        '${error.code} ${error.message ?? ''}',
+        error: error,
+      );
       appLogger.e(
         'Profile avatar Firestore update failed: '
         '${error.code} ${error.message ?? ''}',
@@ -69,7 +74,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'Не удалось загрузить аватар: ${_firebaseErrorText(error)}',
       );
     } catch (error) {
-      appLogger.e('Profile avatar update failed', error: error);
+      appLogger.e('Avatar upload failed: $error', error: error);
       _showMessage(
         'Не удалось загрузить аватар: ${_friendlyUploadError(error)}',
       );
@@ -83,7 +88,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final nextTag = _tagController.text.trim();
     final nextBio = _bioController.text.trim();
     appLogger.d(
-      'Profile save requested: name="$nextName" tag="$nextTag" '
+      'Profile save started: name="$nextName" tag="$nextTag" '
       'bioLength=${nextBio.length}',
     );
 
