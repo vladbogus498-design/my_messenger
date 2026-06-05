@@ -84,11 +84,16 @@ class UserService {
         'isOnline': isOnline,
         'lastSeen': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final userData = userDoc.data() ?? const <String, dynamic>{};
+      final existingName = (userData['name'] ?? '').toString().trim();
       await _upsertPublicProfile(user.uid, {
+        ...userData,
         'uid': user.uid,
-        'name':
-            user.displayName ??
-            (user.email?.split('@').first ?? 'Пользователь'),
+        'name': existingName.isNotEmpty
+            ? existingName
+            : user.displayName ??
+                  (user.email?.split('@').first ?? 'Пользователь'),
         'isOnline': isOnline,
         'lastSeen': FieldValue.serverTimestamp(),
       });
@@ -101,6 +106,7 @@ class UserService {
     String? name,
     String? bio,
     String? photoURL,
+    String? tag,
   }) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
@@ -118,6 +124,13 @@ class UserService {
         final bioError = InputValidator.validateBio(bio);
         if (bioError != null) throw Exception(bioError);
         updates['bio'] = InputValidator.sanitizeBio(bio);
+      }
+      if (tag != null) {
+        final sanitizedTag = _sanitizeTag(tag);
+        updates['tag'] = sanitizedTag;
+        updates['tagLower'] = sanitizedTag.toLowerCase();
+        updates['username'] = sanitizedTag;
+        updates['usernameLower'] = sanitizedTag.toLowerCase();
       }
       if (photoURL != null) {
         final uri = Uri.tryParse(photoURL);
@@ -149,6 +162,22 @@ class UserService {
     }
   }
 
+  static Future<void> ensurePublicProfile() async {
+    final user = _auth.currentUser;
+    if (user == null || !InputValidator.isValidUserId(user.uid)) return;
+
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    if (userDoc.exists) {
+      await _upsertPublicProfile(user.uid, userDoc.data() ?? const {});
+      return;
+    }
+
+    await ensureUserProfile(
+      user: user,
+      fallbackName: user.email?.split('@').first ?? user.phoneNumber,
+    );
+  }
+
   static Future<List<UserModel>> searchUsersByTag(String tag) async {
     try {
       final userId = _auth.currentUser?.uid ?? 'anonymous';
@@ -162,14 +191,30 @@ class UserService {
       ).toLowerCase();
       if (sanitizedTag.isEmpty) return [];
 
-      final snapshot = await _firestore
+      final byName = await _firestore
           .collection('publicProfiles')
           .where('nameLower', isGreaterThanOrEqualTo: sanitizedTag)
           .where('nameLower', isLessThan: '$sanitizedTag\uf8ff')
           .limit(20)
           .get();
+      final byTag = await _firestore
+          .collection('publicProfiles')
+          .where('tagLower', isGreaterThanOrEqualTo: sanitizedTag)
+          .where('tagLower', isLessThan: '$sanitizedTag\uf8ff')
+          .limit(20)
+          .get();
+      final byKeyword = await _firestore
+          .collection('publicProfiles')
+          .where('searchKeywords', arrayContains: sanitizedTag)
+          .limit(20)
+          .get();
 
-      return snapshot.docs.map(UserModel.fromFirestore).toList();
+      final seen = <String>{};
+      return [
+        ...byName.docs,
+        ...byTag.docs,
+        ...byKeyword.docs,
+      ].where((doc) => seen.add(doc.id)).map(UserModel.fromFirestore).toList();
     } catch (e) {
       appLogger.e('Error searching users by tag: $tag', error: e);
       return [];
@@ -293,10 +338,15 @@ class UserService {
   ) async {
     final rawName = (source['name'] ?? 'Пользователь').toString().trim();
     final name = rawName.isEmpty ? 'Пользователь' : rawName;
+    final tag = (source['tag'] ?? source['username'] ?? '').toString().trim();
+    final username = (source['username'] ?? source['tag'] ?? '')
+        .toString()
+        .trim();
     final publicData = <String, dynamic>{
       'uid': uid,
       'name': name,
       'nameLower': name.toLowerCase(),
+      'searchKeywords': _buildSearchKeywords(name, tag, username),
       'updatedAt': FieldValue.serverTimestamp(),
       if (source['username'] != null) 'username': source['username'],
       if (source['username'] != null)
@@ -321,5 +371,43 @@ class UserService {
         .collection('publicProfiles')
         .doc(uid)
         .set(publicData, SetOptions(merge: true));
+  }
+
+  static String _sanitizeTag(String rawTag) {
+    final tag = rawTag.trim().replaceFirst(RegExp(r'^@+'), '');
+    final sanitized = tag
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_\-.]'), '')
+        .toLowerCase();
+    return sanitized.length > 32 ? sanitized.substring(0, 32) : sanitized;
+  }
+
+  static List<String> _buildSearchKeywords(
+    String name,
+    String tag,
+    String username,
+  ) {
+    final values = <String>{};
+
+    void addValue(String raw) {
+      final value = raw.trim().toLowerCase();
+      if (value.isEmpty) return;
+      values.add(value);
+      for (final part in value.split(RegExp(r'[\s@._-]+'))) {
+        if (part.isEmpty) continue;
+        values.add(part);
+        final maxLength = part.length > 24 ? 24 : part.length;
+        for (var i = 1; i <= maxLength; i++) {
+          values.add(part.substring(0, i));
+        }
+      }
+      final compact = value.replaceAll(RegExp(r'[\s@._-]+'), '');
+      if (compact.isNotEmpty) values.add(compact);
+    }
+
+    addValue(name);
+    addValue(tag);
+    addValue(username);
+
+    return values.take(80).toList();
   }
 }

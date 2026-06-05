@@ -46,6 +46,7 @@ service cloud.firestore {
         'usernameLower',
         'tag',
         'tagLower',
+        'searchKeywords',
         'bio',
         'photoURL',
         'avatarUpdatedAt',
@@ -75,6 +76,8 @@ service cloud.firestore {
           || stringMax(request.resource.data.tag, 100))
         && (!('tagLower' in request.resource.data)
           || stringMax(request.resource.data.tagLower, 100))
+        && (!('searchKeywords' in request.resource.data)
+          || request.resource.data.searchKeywords is list)
         && (!('bio' in request.resource.data)
           || stringMax(request.resource.data.bio, 500))
         && (!('photoURL' in request.resource.data)
@@ -261,7 +264,8 @@ service cloud.firestore {
         allow read: if isChatParticipant(chatId);
         allow create: if validMessageCreate(chatId);
         allow update: if validMessageUpdate(chatId);
-        allow delete: if false;
+        allow delete: if isChatParticipant(chatId)
+          && resource.data.senderId == request.auth.uid;
       }
     }
   }

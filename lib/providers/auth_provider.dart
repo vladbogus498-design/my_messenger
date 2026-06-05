@@ -173,10 +173,7 @@ class AuthController extends StateNotifier<AuthFlowState> {
         _service.instance.currentUser,
         fallbackName: _service.instance.currentUser?.phoneNumber,
       );
-      state = state.copyWith(
-        isLoading: false,
-        isPhoneVerified: true,
-      );
+      state = state.copyWith(isLoading: false, isPhoneVerified: true);
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -207,16 +204,10 @@ class AuthController extends StateNotifier<AuthFlowState> {
     }
   }
 
-
-  Future<void> _ensureUserProfile(
-    User? user, {
-    String? fallbackName,
-  }) async {
+  Future<void> _ensureUserProfile(User? user, {String? fallbackName}) async {
     if (user == null) return;
-    await UserService.ensureUserProfile(
-      user: user,
-      fallbackName: fallbackName,
-    );
+    await UserService.ensureUserProfile(user: user, fallbackName: fallbackName);
+    await UserService.ensurePublicProfile();
   }
 
   String _mapFirebaseAuthError(FirebaseAuthException exception) {
@@ -243,5 +234,5 @@ class AuthController extends StateNotifier<AuthFlowState> {
 
 final authControllerProvider =
     StateNotifierProvider<AuthController, AuthFlowState>(
-  (ref) => AuthController(ref),
-);
+      (ref) => AuthController(ref),
+    );

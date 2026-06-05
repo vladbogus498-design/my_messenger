@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../theme/darkkick_colors.dart';
@@ -79,9 +80,29 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
     setState(() => _showStickerPicker = false);
   }
 
+  KeyEventResult _handleTextFieldKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.enter) {
+      return KeyEventResult.ignored;
+    }
+
+    final pressed = HardwareKeyboard.instance.logicalKeysPressed;
+    final isShiftPressed =
+        pressed.contains(LogicalKeyboardKey.shiftLeft) ||
+        pressed.contains(LogicalKeyboardKey.shiftRight);
+    if (isShiftPressed) {
+      return KeyEventResult.ignored;
+    }
+
+    _sendTextMessage();
+    return KeyEventResult.handled;
+  }
+
   void _showSnackBar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -123,21 +144,27 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: DarkKickColors.divider),
                     ),
-                    child: TextField(
-                      controller: _controller,
-                      style: const TextStyle(color: DarkKickColors.textPrimary),
-                      cursorColor: DarkKickColors.neonPurple,
-                      minLines: 1,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        hintText: 'Сообщение...',
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 11,
+                    child: Focus(
+                      onKeyEvent: _handleTextFieldKey,
+                      child: TextField(
+                        controller: _controller,
+                        style: const TextStyle(
+                          color: DarkKickColors.textPrimary,
                         ),
+                        cursorColor: DarkKickColors.neonPurple,
+                        minLines: 1,
+                        maxLines: 4,
+                        textInputAction: TextInputAction.newline,
+                        decoration: const InputDecoration(
+                          hintText: 'Сообщение...',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 11,
+                          ),
+                        ),
+                        onSubmitted: (_) => _sendTextMessage(),
                       ),
-                      onSubmitted: (_) => _sendTextMessage(),
                     ),
                   ),
                 ),
@@ -152,13 +179,18 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
                       color: DarkKickColors.neonPurple,
                       boxShadow: [
                         BoxShadow(
-                          color:
-                              DarkKickColors.neonPurple.withValues(alpha: 0.35),
+                          color: DarkKickColors.neonPurple.withValues(
+                            alpha: 0.35,
+                          ),
                           blurRadius: 14,
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.send, color: Colors.white, size: 19),
+                    child: const Icon(
+                      Icons.send,
+                      color: Colors.white,
+                      size: 19,
+                    ),
                   ),
                 ),
               ],
@@ -187,9 +219,8 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
           _AttachmentButton(
             icon: Icons.emoji_emotions_outlined,
             label: 'Стикер',
-            onTap: () => setState(
-              () => _showStickerPicker = !_showStickerPicker,
-            ),
+            onTap: () =>
+                setState(() => _showStickerPicker = !_showStickerPicker),
           ),
           _AttachmentButton(
             icon: Icons.bolt_outlined,

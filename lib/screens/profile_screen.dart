@@ -24,6 +24,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _auth = FirebaseAuth.instance;
   final _nameController = TextEditingController();
+  final _tagController = TextEditingController();
   final _bioController = TextEditingController();
   bool _isEditing = false;
   bool _busy = false;
@@ -33,6 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _tagController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -63,6 +65,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       await UserService.updateUserData(
         name: _nameController.text.trim(),
+        tag: _tagController.text.trim(),
         bio: _bioController.text.trim(),
       );
       if (mounted) setState(() => _isEditing = false);
@@ -76,6 +79,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _startEditing(UserModel user) {
     _nameController.text = user.name;
+    _tagController.text = user.username ?? user.tag ?? '';
     _bioController.text = user.bio ?? '';
     setState(() => _isEditing = true);
   }
@@ -155,6 +159,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(height: 12),
                         _DarkInput(
+                          controller: _tagController,
+                          hint: 'Tag / username',
+                          maxLines: 1,
+                        ),
+                        const SizedBox(height: 12),
+                        _DarkInput(
                           controller: _bioController,
                           hint: 'О себе',
                           maxLines: 3,
@@ -189,7 +199,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 6),
                         Center(
                           child: Text(
-                            user.email.isEmpty ? '@darkkick' : user.email,
+                            '@${(user.username ?? user.tag ?? '').trim().isEmpty ? 'darkkick' : (user.username ?? user.tag)!.trim()}',
                             style: const TextStyle(
                               color: DarkKickColors.textTertiary,
                               fontSize: 13,

@@ -61,6 +61,12 @@ class _NewChatScreenState extends State<NewChatScreen> {
             .get();
         docs.addAll(snapshot.docs);
       }
+      final keywordSnapshot = await _firestore
+          .collection('publicProfiles')
+          .where('searchKeywords', arrayContains: query)
+          .limit(12)
+          .get();
+      docs.addAll(keywordSnapshot.docs);
 
       final seen = <String>{};
       final users = <_SearchUser>[];
@@ -144,7 +150,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                         style: const TextStyle(color: Colors.white),
                         cursorColor: DarkKickColors.neonPurple,
                         decoration: const InputDecoration(
-                          hintText: 'Имя, ник, tag или email',
+                          hintText: 'Имя, ник или tag',
                           border: InputBorder.none,
                           isCollapsed: true,
                         ),
@@ -214,8 +220,7 @@ class _SearchUser {
     final data = doc.data();
     final name = (data['name'] ?? data['username'] ?? 'Пользователь')
         .toString();
-    final tag = (data['tag'] ?? data['username'] ?? data['email'] ?? '')
-        .toString();
+    final tag = (data['tag'] ?? data['username'] ?? '').toString();
     final photoUrl = UserFormatters.readPhotoUrl(data);
     final avatarUpdatedAt = UserFormatters.readDate(data['avatarUpdatedAt']);
 

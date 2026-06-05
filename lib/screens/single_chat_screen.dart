@@ -477,6 +477,44 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     await ChatService.pinMessage(chatId, message);
   }
 
+  Future<void> _confirmDeleteMessage(Message message) async {
+    final chatId = _actualChatId ?? widget.chatId;
+    if (chatId.isEmpty || !_isMyMessage(message.senderId)) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: DarkKickColors.panel,
+        title: const Text(
+          'Удалить сообщение у всех?',
+          style: TextStyle(color: DarkKickColors.textPrimary),
+        ),
+        content: const Text(
+          'Сообщение исчезнет у всех участников чата.',
+          style: TextStyle(color: DarkKickColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await ChatService.deleteMessageForEveryone(chatId, message);
+    } catch (e) {
+      _showSnackBar('Не удалось удалить сообщение');
+    }
+  }
+
   GlobalKey _messageKey(String messageId) {
     return _messageKeys.putIfAbsent(messageId, GlobalKey.new);
   }
@@ -1322,6 +1360,21 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                 _pinMessage(message);
               },
             ),
+            if (_isMyMessage(message.senderId))
+              ListTile(
+                leading: const Icon(
+                  Icons.delete_outline,
+                  color: Color(0xFFFF4D5D),
+                ),
+                title: const Text(
+                  'Удалить',
+                  style: TextStyle(color: Color(0xFFFF4D5D)),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmDeleteMessage(message);
+                },
+              ),
             Divider(),
             Text(
               'Добавить реакцию:',
@@ -1390,6 +1443,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           userId: otherUserId!,
           isMyProfile: false,
           chatId: _actualChatId ?? widget.chatId,
+          openedFromChat: true,
+          sourceChatId: _actualChatId ?? widget.chatId,
         ),
       ),
     );

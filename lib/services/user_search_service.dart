@@ -31,6 +31,11 @@ class UserSearchService {
         .where('tagLower', isLessThan: '$normalizedQuery\uf8ff')
         .limit(20)
         .get();
+    final byKeyword = await _fs
+        .collection('publicProfiles')
+        .where('searchKeywords', arrayContains: normalizedQuery)
+        .limit(20)
+        .get();
 
     final all = <UserModel>[];
     for (final d in byName.docs) {
@@ -40,6 +45,9 @@ class UserSearchService {
       all.add(UserModel.fromMap({...d.data(), 'uid': d.id}));
     }
     for (final d in byTag.docs) {
+      all.add(UserModel.fromMap({...d.data(), 'uid': d.id}));
+    }
+    for (final d in byKeyword.docs) {
       all.add(UserModel.fromMap({...d.data(), 'uid': d.id}));
     }
     // de-dup by uid

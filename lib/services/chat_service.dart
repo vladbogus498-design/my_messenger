@@ -616,6 +616,104 @@ class ChatService {
     }
   }
 
+  static Future<void> deleteMessageForEveryone(
+    String chatId,
+    Message message,
+  ) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+    if (message.senderId != userId) {
+      throw Exception('Only sender can delete this message');
+    }
+
+    try {
+      final chatRef = _firestore.collection('chats').doc(chatId);
+      final messagesRef = chatRef.collection('messages');
+      final messageRef = messagesRef.doc(message.id);
+
+      final chatDoc = await chatRef.get();
+      final chatData = chatDoc.data() ?? const <String, dynamic>{};
+      final latest = await messagesRef
+          .orderBy('timestamp', descending: true)
+          .limit(2)
+          .get();
+      QueryDocumentSnapshot<Map<String, dynamic>>? previousMessage;
+      for (final doc in latest.docs) {
+        if (doc.id != message.id) {
+          previousMessage = doc;
+          break;
+        }
+      }
+
+      final latestMessageId = latest.docs.isEmpty ? null : latest.docs.first.id;
+      final deletedWasLast =
+          chatData['lastMessageId'] == message.id ||
+          latestMessageId == message.id;
+      final pinnedMessage = chatData['pinnedMessage'];
+      final deletedWasPinned =
+          pinnedMessage is Map && pinnedMessage['messageId'] == message.id;
+
+      final batch = _firestore.batch();
+      batch.delete(messageRef);
+
+      final chatUpdate = <String, dynamic>{};
+      if (deletedWasPinned) {
+        chatUpdate['pinnedMessage'] = null;
+      }
+
+      if (deletedWasLast) {
+        if (previousMessage == null) {
+          final now = FieldValue.serverTimestamp();
+          chatUpdate.addAll({
+            'lastMessage': '',
+            'lastMessageType': 'text',
+            'lastMessageAt': now,
+            'lastMessageTime': now,
+            'lastMessageId': null,
+            'lastMessageStatus': 'sent',
+            'lastMessageReadBy': <String>[],
+            'lastSenderId': null,
+            'updatedAt': now,
+          });
+        } else {
+          final data = previousMessage.data();
+          final type = (data['type'] ?? 'text').toString();
+          final text = (data['text'] ?? '').toString();
+          final timestamp =
+              data['timestamp'] ??
+              data['createdAt'] ??
+              FieldValue.serverTimestamp();
+          chatUpdate.addAll({
+            'lastMessage': _lastMessagePreview(type, text),
+            'lastMessageType': type,
+            'lastMessageAt': timestamp,
+            'lastMessageTime': timestamp,
+            'lastMessageId': previousMessage.id,
+            'lastMessageStatus': (data['status'] ?? 'sent').toString(),
+            'lastMessageReadBy': List<String>.from(data['readBy'] ?? const []),
+            'lastSenderId': data['senderId'],
+            'updatedAt': timestamp,
+          });
+        }
+      }
+
+      if (chatUpdate.isNotEmpty) {
+        batch.update(chatRef, chatUpdate);
+      }
+
+      // TODO: delete Cloudinary assets through a signed backend/Cloud Function.
+      await batch.commit();
+    } catch (e) {
+      appLogger.e(
+        'Error deleting message for everyone: ${message.id}',
+        error: e,
+      );
+      rethrow;
+    }
+  }
+
   static Future<void> markMessageAsDelivered(
     String chatId,
     String messageId,

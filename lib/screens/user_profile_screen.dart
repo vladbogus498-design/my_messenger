@@ -19,11 +19,15 @@ class UserProfileScreen extends StatelessWidget {
     this.userId,
     this.isMyProfile = false,
     this.chatId,
+    this.openedFromChat = false,
+    this.sourceChatId,
   });
 
   final String? userId;
   final bool isMyProfile;
   final String? chatId;
+  final bool openedFromChat;
+  final String? sourceChatId;
 
   String get _targetUserId =>
       userId ?? FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -86,6 +90,8 @@ class UserProfileScreen extends StatelessWidget {
                               _ProfileActions(
                                 user: user,
                                 chatId: chatId,
+                                openedFromChat: openedFromChat,
+                                sourceChatId: sourceChatId,
                                 isMyProfile:
                                     isMyProfile ||
                                     FirebaseAuth.instance.currentUser?.uid ==
@@ -255,11 +261,15 @@ class _ProfileActions extends StatelessWidget {
   const _ProfileActions({
     required this.user,
     required this.chatId,
+    required this.openedFromChat,
+    required this.sourceChatId,
     required this.isMyProfile,
   });
 
   final UserModel user;
   final String? chatId;
+  final bool openedFromChat;
+  final String? sourceChatId;
   final bool isMyProfile;
 
   @override
@@ -291,6 +301,11 @@ class _ProfileActions extends StatelessWidget {
 
   Future<void> _openChat(BuildContext context) async {
     final navigator = Navigator.of(context);
+    if (openedFromChat && (sourceChatId ?? chatId)?.isNotEmpty == true) {
+      navigator.pop();
+      return;
+    }
+
     final id =
         chatId ??
         await ChatService.createChat(
