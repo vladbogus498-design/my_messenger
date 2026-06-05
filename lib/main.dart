@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'config/app_config.dart';
 import 'auth/auth_screen.dart';
 import 'auth/auth_credentials_screen.dart';
 import 'screens/chats_screen.dart';
@@ -14,18 +14,10 @@ import 'services/user_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (kIsWeb) {
+  final firebaseOptions = AppConfig.firebaseOptions;
+  if (firebaseOptions != null) {
     // Подключаем твой Firebase конфиг для браузера на ПК
-    await Firebase.initializeApp(
-      options: const FirebaseOptions(
-        apiKey: "AIzaSyBoQAh2PbD8skQ7ZQOJca49KTXrVVLwxro",
-        authDomain: "darkkickchat-765e0.firebaseapp.com",
-        projectId: "darkkickchat-765e0",
-        storageBucket: "darkkickchat-765e0.firebasestorage.app",
-        messagingSenderId: "366138349689",
-        appId: "1:366138349689:web:8c0111db70ea9b56961ca8",
-      ),
-    );
+    await Firebase.initializeApp(options: firebaseOptions);
   } else {
     // Обычная инициализация для мобилок
     await Firebase.initializeApp();

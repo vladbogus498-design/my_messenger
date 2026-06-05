@@ -5,12 +5,16 @@ import 'package:pointycastle/export.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
+import 'biometric_service.dart';
 import '../utils/logger.dart';
 
 /// Сервис для генерации, хранения и обмена RSA ключами
 class RSAKeyService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
+  static const String _privateKeyPrefix = 'rsa_private_key_v2_';
+  static const String _legacyPrivateKeyPrefix = 'rsa_private_key_';
   static const _secureStorage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
     iOptions: IOSOptions(
@@ -59,7 +63,7 @@ class RSAKeyService {
       // Конвертируем приватный ключ в PEM формат
       final keyBytes = _encodeRSAPrivateKeyToPEM(privateKey);
       await _secureStorage.write(
-        key: 'rsa_private_key_$userId',
+        key: _privateKeyStorageKey(userId),
         value: keyBytes,
       );
       appLogger.i('Private key saved securely for user: $userId');
@@ -78,9 +82,8 @@ class RSAKeyService {
     }
 
     try {
-      final keyString = await _secureStorage.read(
-        key: 'rsa_private_key_$userId',
-      );
+      await _unlockPrivateKeyIfRequired();
+      final keyString = await _readPrivateKeyString(userId);
       if (keyString == null) {
         appLogger.d('No private key found for user: $userId');
         return null;
@@ -95,7 +98,41 @@ class RSAKeyService {
     }
   }
 
-  // Публикация публичного ключа в Firestore
+  // Local private key storage helpers.
+  static Future<String?> _readPrivateKeyString(String userId) async {
+    final storageKey = _privateKeyStorageKey(userId);
+    final keyString = await _secureStorage.read(key: storageKey);
+    if (keyString != null) return keyString;
+
+    final legacyStorageKey = '$_legacyPrivateKeyPrefix$userId';
+    final legacyKeyString = await _secureStorage.read(key: legacyStorageKey);
+    if (legacyKeyString == null) return null;
+
+    await _secureStorage.write(key: storageKey, value: legacyKeyString);
+    await _secureStorage.delete(key: legacyStorageKey);
+    appLogger.i('Migrated RSA private key to scoped storage key');
+    return legacyKeyString;
+  }
+
+  static String _privateKeyStorageKey(String userId) {
+    final digest = sha256.convert(
+      utf8.encode('darkkick:rsa_private_key:$userId'),
+    );
+    return '$_privateKeyPrefix$digest';
+  }
+
+  static Future<void> _unlockPrivateKeyIfRequired() async {
+    final useBiometrics = await BiometricService.getUseBiometrics();
+    if (!useBiometrics) return;
+
+    final unlocked = await BiometricService.authenticate(
+      reason: 'Unlock your Darkkick encryption key',
+    );
+    if (!unlocked) {
+      throw Exception('Private key unlock failed');
+    }
+  }
+
   static Future<void> publishPublicKey(RSAPublicKey publicKey) async {
     final user = _auth.currentUser;
     final userId = user?.uid;

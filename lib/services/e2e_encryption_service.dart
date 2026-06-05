@@ -9,10 +9,15 @@ import '../utils/logger.dart';
 /// Сервис для End-to-End шифрования с использованием RSA + AES
 class E2EEncryptionService {
   // Шифрование сообщения для конкретного получателя (RSA + AES)
-  static Future<String> encryptMessage(String plainText, String recipientUserId) async {
+  static Future<String> encryptMessage(
+    String plainText,
+    String recipientUserId,
+  ) async {
     try {
       // Получаем публичный ключ получателя
-      final recipientPublicKey = await RSAKeyService.getUserPublicKey(recipientUserId);
+      final recipientPublicKey = await RSAKeyService.getUserPublicKey(
+        recipientUserId,
+      );
       if (recipientPublicKey == null) {
         throw Exception('Public key not found for user: $recipientUserId');
       }
@@ -22,7 +27,9 @@ class E2EEncryptionService {
       final iv = encrypt.IV.fromSecureRandom(16);
 
       // Шифруем сообщение с помощью AES
-      final encrypter = encrypt.Encrypter(encrypt.AES(aesKey, mode: encrypt.AESMode.cbc));
+      final encrypter = encrypt.Encrypter(
+        encrypt.AES(aesKey, mode: encrypt.AESMode.cbc),
+      );
       final encrypted = encrypter.encrypt(plainText, iv: iv);
 
       // Шифруем AES ключ с помощью RSA публичного ключа получателя
@@ -31,9 +38,11 @@ class E2EEncryptionService {
       // Формат: RSA_encrypted_AES_key:IV:encrypted_message (все в base64)
       return '${base64Encode(encryptedAESKey)}:${iv.base64}:${encrypted.base64}';
     } catch (e) {
-      appLogger.e('E2E Encryption error for recipient: $recipientUserId', error: e);
-      // В случае ошибки возвращаем оригинальный текст (для обратной совместимости)
-      return plainText;
+      appLogger.e(
+        'E2E Encryption error for recipient: $recipientUserId',
+        error: e,
+      );
+      throw Exception('E2E encryption failed for recipient: $recipientUserId');
     }
   }
 
@@ -62,7 +71,9 @@ class E2EEncryptionService {
       final aesKey = encrypt.Key(aesKeyBytes);
 
       // Дешифруем сообщение с помощью AES
-      final encrypter = encrypt.Encrypter(encrypt.AES(aesKey, mode: encrypt.AESMode.cbc));
+      final encrypter = encrypt.Encrypter(
+        encrypt.AES(aesKey, mode: encrypt.AESMode.cbc),
+      );
       final decrypted = encrypter.decrypt(encrypted, iv: iv);
 
       return decrypted;
@@ -78,7 +89,7 @@ class E2EEncryptionService {
     // Проверяем формат: base64:base64:base64
     final parts = message.split(':');
     if (parts.length != 3) return false;
-    
+
     try {
       // Проверяем, что все части валидный base64
       base64Decode(parts[0]);
@@ -114,7 +125,10 @@ class E2EEncryptionService {
   }
 
   // Дешифрование данных с помощью RSA (приватный ключ)
-  static Uint8List _decryptWithRSA(Uint8List encryptedData, RSAPrivateKey privateKey) {
+  static Uint8List _decryptWithRSA(
+    Uint8List encryptedData,
+    RSAPrivateKey privateKey,
+  ) {
     final decrypter = OAEPEncoding(RSAEngine())
       ..init(false, PrivateKeyParameter<RSAPrivateKey>(privateKey));
 
@@ -125,7 +139,9 @@ class E2EEncryptionService {
     for (var i = 0; i < encryptedData.length; i += chunkSize) {
       final chunk = encryptedData.sublist(
         i,
-        i + chunkSize > encryptedData.length ? encryptedData.length : i + chunkSize,
+        i + chunkSize > encryptedData.length
+            ? encryptedData.length
+            : i + chunkSize,
       );
       final decrypted = decrypter.process(chunk);
       output.addAll(decrypted);
@@ -147,10 +163,10 @@ class E2EEncryptionService {
         encryptedMessages[recipientId] = encrypted;
       } catch (e) {
         appLogger.e('Error encrypting for recipient: $recipientId', error: e);
+        throw Exception('E2E encryption failed for recipient: $recipientId');
       }
     }
 
     return encryptedMessages;
   }
 }
-

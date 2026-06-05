@@ -29,6 +29,15 @@ service cloud.firestore {
         && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
     }
 
+    function rateLimitMessageCreate(chatId) {
+      let chat = get(/databases/$(database)/documents/chats/$(chatId)).data;
+      return !(('lastSenderId' in chat)
+        && chat.lastSenderId == request.auth.uid
+        && ('lastMessageAt' in chat)
+        && chat.lastMessageAt is timestamp
+        && request.time < chat.lastMessageAt + duration.value(1, 's'));
+    }
+
     function requestHasCurrentUserParticipant() {
       return signedIn()
         && request.resource.data.participants is list
@@ -57,6 +66,106 @@ service cloud.firestore {
         'createdAt',
         'updatedAt'
       ]);
+    }
+
+    function userFieldsOnly(keys) {
+      return keys.hasOnly([
+        'uid',
+        'email',
+        'emailLower',
+        'phone',
+        'name',
+        'nameLower',
+        'username',
+        'usernameLower',
+        'tag',
+        'tagLower',
+        'bio',
+        'photoURL',
+        'avatarUpdatedAt',
+        'publicKey',
+        'publicKeyUpdatedAt',
+        'isOnline',
+        'lastSeen',
+        'createdAt',
+        'updatedAt',
+        'premiumStatus'
+      ]);
+    }
+
+    function validUserFields(userId) {
+      return (!('uid' in request.resource.data)
+          || request.resource.data.uid == userId)
+        && (!('email' in request.resource.data)
+          || stringMax(request.resource.data.email, 254))
+        && (!('emailLower' in request.resource.data)
+          || stringMax(request.resource.data.emailLower, 254))
+        && (!('phone' in request.resource.data)
+          || stringMax(request.resource.data.phone, 32))
+        && (!('name' in request.resource.data)
+          || nonEmptyStringMax(request.resource.data.name, 100))
+        && (!('nameLower' in request.resource.data)
+          || stringMax(request.resource.data.nameLower, 100))
+        && (!('username' in request.resource.data)
+          || stringMax(request.resource.data.username, 100))
+        && (!('usernameLower' in request.resource.data)
+          || stringMax(request.resource.data.usernameLower, 100))
+        && (!('tag' in request.resource.data)
+          || stringMax(request.resource.data.tag, 100))
+        && (!('tagLower' in request.resource.data)
+          || stringMax(request.resource.data.tagLower, 100))
+        && (!('bio' in request.resource.data)
+          || stringMax(request.resource.data.bio, 500))
+        && (!('photoURL' in request.resource.data)
+          || request.resource.data.photoURL == null
+          || stringMax(request.resource.data.photoURL, 2048))
+        && (!('publicKey' in request.resource.data)
+          || request.resource.data.publicKey == null
+          || stringMax(request.resource.data.publicKey, 8000));
+    }
+
+    function validChangedUserFields(userId, changed) {
+      return (!changed.hasAny(['uid'])
+          || request.resource.data.uid == userId)
+        && (!changed.hasAny(['email'])
+          || stringMax(request.resource.data.email, 254))
+        && (!changed.hasAny(['emailLower'])
+          || stringMax(request.resource.data.emailLower, 254))
+        && (!changed.hasAny(['phone'])
+          || stringMax(request.resource.data.phone, 32))
+        && (!changed.hasAny(['name'])
+          || nonEmptyStringMax(request.resource.data.name, 100))
+        && (!changed.hasAny(['nameLower'])
+          || stringMax(request.resource.data.nameLower, 100))
+        && (!changed.hasAny(['username'])
+          || stringMax(request.resource.data.username, 100))
+        && (!changed.hasAny(['usernameLower'])
+          || stringMax(request.resource.data.usernameLower, 100))
+        && (!changed.hasAny(['tag'])
+          || stringMax(request.resource.data.tag, 100))
+        && (!changed.hasAny(['tagLower'])
+          || stringMax(request.resource.data.tagLower, 100))
+        && (!changed.hasAny(['bio'])
+          || stringMax(request.resource.data.bio, 500))
+        && (!changed.hasAny(['photoURL'])
+          || request.resource.data.photoURL == null
+          || stringMax(request.resource.data.photoURL, 2048))
+        && (!changed.hasAny(['publicKey'])
+          || request.resource.data.publicKey == null
+          || stringMax(request.resource.data.publicKey, 8000));
+    }
+
+    function validUserCreate(userId) {
+      return isSelf(userId)
+        && userFieldsOnly(request.resource.data.keys())
+        && validUserFields(userId);
+    }
+
+    function validUserUpdate(userId) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return isSelf(userId)
+        && userFieldsOnly(changed)
+        && validChangedUserFields(userId, changed);
     }
 
     function validPublicProfileWrite(userId) {
@@ -171,6 +280,7 @@ service cloud.firestore {
 
     function validMessageCreate(chatId) {
       return isChatParticipant(chatId)
+        && rateLimitMessageCreate(chatId)
         && messageFieldsOnly()
         && request.resource.data.senderId == request.auth.uid
         && (!('chatId' in request.resource.data)
@@ -227,7 +337,8 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isSelf(userId);
-      allow create, update: if isSelf(userId);
+      allow create: if validUserCreate(userId);
+      allow update: if validUserUpdate(userId);
       allow delete: if false;
 
       match /chats/{chatId} {

@@ -337,41 +337,11 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     String base64Audio,
     int durationSeconds,
   ) async {
+    if (!mounted) return;
     if (_voiceMessagesTemporarilyDisabled) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Голосовые сообщения временно отключены'),
-          ),
-        );
-      }
-      return;
-    }
-
-    try {
-      final chatId = await _ensureChatExists();
-      await ChatService.sendMessage(
-        chatId: chatId,
-        text: '🎤 Голосовое сообщение',
-        type: 'voice',
-        voiceAudioBase64: base64Audio,
-        voiceDuration: durationSeconds,
-        replyToId: _replyingTo?.id,
-        replyToText: _replyingTo?.text,
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Голосовые сообщения временно отключены')),
       );
-
-      _cancelAction(); // Clear preview immediately
-      _scrollToBottom();
-    } catch (e) {
-      appLogger.e(
-        'Error sending voice message in chat: ${widget.chatId}',
-        error: e,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка отправки голосового: $e')),
-        );
-      }
     }
   }
 

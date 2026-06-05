@@ -24,8 +24,9 @@ class EncryptionService {
     try {
       final key = generateKey(password);
       final iv = generateIV();
-      final encrypter =
-          encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
+      final encrypter = encrypt.Encrypter(
+        encrypt.AES(key, mode: encrypt.AESMode.cbc),
+      );
 
       final encrypted = encrypter.encrypt(plainText, iv: iv);
 
@@ -33,7 +34,7 @@ class EncryptionService {
       return '${iv.base64}:${encrypted.base64}';
     } catch (e) {
       appLogger.e('Encryption error', error: e);
-      return plainText; // В случае ошибки возвращаем оригинальный текст
+      throw Exception('Encryption failed');
     }
   }
 
@@ -49,8 +50,9 @@ class EncryptionService {
       final encrypted = encrypt.Encrypted.fromBase64(parts[1]);
 
       final key = generateKey(password);
-      final encrypter =
-          encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
+      final encrypter = encrypt.Encrypter(
+        encrypt.AES(key, mode: encrypt.AESMode.cbc),
+      );
 
       final decrypted = encrypter.decrypt(encrypted, iv: iv);
       return decrypted;
@@ -78,7 +80,11 @@ class EncryptionService {
     const chars =
         'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#\$%^&*()_+-=[]{}|;:,.<>?';
     final random = Random.secure();
-    return String.fromCharCodes(List.generate(
-        length, (index) => chars.codeUnitAt(random.nextInt(chars.length))));
+    return String.fromCharCodes(
+      List.generate(
+        length,
+        (index) => chars.codeUnitAt(random.nextInt(chars.length)),
+      ),
+    );
   }
 }

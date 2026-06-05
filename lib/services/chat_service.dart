@@ -164,9 +164,9 @@ class ChatService {
         recipientIds = recipientIds
             .where(InputValidator.isValidUserId)
             .toList();
-        if (recipientIds.isEmpty && encrypt) {
-          encrypt = false;
-        }
+      }
+      if (encrypt && (recipientIds == null || recipientIds.isEmpty)) {
+        throw Exception('E2E encryption requires a valid recipient');
       }
 
       final originalText = text.trim();
@@ -188,6 +188,7 @@ class ChatService {
           isEncrypted = true;
         } catch (e) {
           appLogger.e('Error encrypting message for chat: $chatId', error: e);
+          throw Exception('Message encryption failed');
         }
       }
 

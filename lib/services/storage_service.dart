@@ -4,17 +4,13 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/app_config.dart';
 import '../utils/input_validator.dart';
 import '../utils/logger.dart';
 import '../utils/rate_limiter.dart';
 
 class StorageService {
-  static const String _cloudName = 'do4bvuj43';
-  static const String _uploadPreset = 'darkkick_uploads';
   static final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  static Uri get _uploadUri =>
-      Uri.https('api.cloudinary.com', '/v1_1/$_cloudName/image/upload');
 
   static Future<String> uploadChatImage(
     File imageFile,
@@ -87,7 +83,6 @@ class StorageService {
 
   static Future<void> deleteUserAvatar() async {
     // Unsigned Cloudinary uploads cannot delete assets safely from the client.
-    // Deleting requires a signed backend/API secret, which must not be in APK.
     appLogger.w(
       'Cloudinary unsigned upload does not support client-side delete',
     );
@@ -98,8 +93,17 @@ class StorageService {
     required String folder,
     required String publicId,
   }) async {
-    final request = http.MultipartRequest('POST', _uploadUri)
-      ..fields['upload_preset'] = _uploadPreset
+    if (!AppConfig.hasCloudinaryUnsignedUploadConfig) {
+      throw Exception('Cloudinary unsigned upload is not configured');
+    }
+
+    final uploadUri = Uri.https(
+      'api.cloudinary.com',
+      '/v1_1/${AppConfig.cloudinaryCloudName}/image/upload',
+    );
+
+    final request = http.MultipartRequest('POST', uploadUri)
+      ..fields['upload_preset'] = AppConfig.cloudinaryUploadPreset
       ..fields['folder'] = folder
       ..fields['public_id'] = publicId
       ..files.add(await http.MultipartFile.fromPath('file', imageFile.path));
