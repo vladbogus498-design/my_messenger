@@ -11,7 +11,7 @@ import '../utils/navigation_animations.dart';
 import '../utils/time_formatter.dart';
 import '../utils/user_formatters.dart';
 import 'new_chat_screen.dart';
-import 'settings_screen.dart';
+import 'profile_screen.dart';
 import 'single_chat_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -63,7 +63,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             title: 'Люди',
             subtitle: 'Поиск людей и контакты будут в этом разделе.',
           ),
-          const SettingsScreen(showBackButton: false),
+          const ProfileScreen(showBackButton: false),
         ],
       ),
       bottomNavigationBar: _buildBottomNavBar(),
@@ -399,9 +399,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             label: 'Люди',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            activeIcon: Icon(Icons.settings),
-            label: 'Настройки',
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Профиль',
           ),
         ],
       ),

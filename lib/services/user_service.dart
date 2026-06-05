@@ -124,12 +124,28 @@ class UserService {
 
     try {
       final updates = <String, dynamic>{};
+      final userRef = _firestore.collection('users').doc(userId);
+      final currentDoc = await userRef.get();
+      final currentData = currentDoc.data() ?? const <String, dynamic>{};
+      final authUser = _auth.currentUser;
+      var nextName =
+          (currentData['name'] ??
+                  authUser?.displayName ??
+                  authUser?.email?.split('@').first ??
+                  '')
+              .toString();
+      var nextTag = (currentData['tag'] ?? currentData['username'] ?? '')
+          .toString();
+      var nextUsername = (currentData['username'] ?? currentData['tag'] ?? '')
+          .toString();
+
       if (name != null) {
-        final nameError = InputValidator.validateName(name);
+        final nameError = _validateProfileName(name);
         if (nameError != null) throw Exception(nameError);
-        final sanitizedName = InputValidator.sanitizeName(name);
+        final sanitizedName = _sanitizeProfileName(name);
         updates['name'] = sanitizedName;
         updates['nameLower'] = sanitizedName.toLowerCase();
+        nextName = sanitizedName;
       }
       if (bio != null) {
         final bioError = InputValidator.validateBio(bio);
@@ -142,6 +158,8 @@ class UserService {
         updates['tagLower'] = sanitizedTag.toLowerCase();
         updates['username'] = sanitizedTag;
         updates['usernameLower'] = sanitizedTag.toLowerCase();
+        nextTag = sanitizedTag;
+        nextUsername = sanitizedTag;
       }
       if (photoURL != null) {
         final uri = Uri.tryParse(photoURL);
@@ -153,11 +171,15 @@ class UserService {
       }
 
       if (updates.isEmpty) return;
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .set(updates, SetOptions(merge: true));
-      final freshDoc = await _firestore.collection('users').doc(userId).get();
+      updates['searchKeywords'] = _buildSearchKeywords(
+        nextName,
+        nextTag,
+        nextUsername,
+      );
+      updates['updatedAt'] = FieldValue.serverTimestamp();
+
+      await userRef.set(updates, SetOptions(merge: true));
+      final freshDoc = await userRef.get();
       await _upsertPublicProfile(userId, freshDoc.data() ?? updates);
       if (photoURL != null) {
         try {
@@ -247,10 +269,10 @@ class UserService {
       final emailError = InputValidator.validateEmail(email);
       if (emailError != null) throw Exception(emailError);
 
-      final nameError = InputValidator.validateName(name);
+      final nameError = _validateProfileName(name);
       if (nameError != null) throw Exception(nameError);
 
-      final sanitizedName = InputValidator.sanitizeName(name);
+      final sanitizedName = _sanitizeProfileName(name);
 
       await _firestore.collection('users').doc(uid).set({
         'uid': uid,
@@ -316,7 +338,7 @@ class UserService {
               : phone.isNotEmpty
               ? phone
               : 'Пользователь');
-      final sanitizedName = InputValidator.sanitizeName(generatedName);
+      final sanitizedName = _sanitizeProfileName(generatedName);
 
       await docRef.set({
         'uid': user.uid,
@@ -394,6 +416,38 @@ class UserService {
         .replaceAll(RegExp(r'[^a-zA-Z0-9_\-.]'), '')
         .toLowerCase();
     return sanitized.length > 32 ? sanitized.substring(0, 32) : sanitized;
+  }
+
+  static String? _validateProfileName(String? name) {
+    if (name == null || name.trim().isEmpty) {
+      return 'Имя не может быть пустым';
+    }
+
+    final trimmed = name.trim();
+    if (trimmed.length > InputValidator.maxNameLength) {
+      return 'Имя слишком длинное';
+    }
+
+    if (!RegExp(
+      r'^[a-zA-Zа-яА-ЯёЁ0-9\s\-_\.]+$',
+      unicode: true,
+    ).hasMatch(trimmed)) {
+      return 'Имя содержит недопустимые символы';
+    }
+
+    return null;
+  }
+
+  static String _sanitizeProfileName(String name) {
+    var sanitized = name.replaceAll(
+      RegExp(r'[^a-zA-Zа-яА-ЯёЁ0-9\s\-_\.]', unicode: true),
+      '',
+    );
+    sanitized = sanitized.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (sanitized.length > InputValidator.maxNameLength) {
+      sanitized = sanitized.substring(0, InputValidator.maxNameLength).trim();
+    }
+    return sanitized;
   }
 
   static List<String> _buildSearchKeywords(

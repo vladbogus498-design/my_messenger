@@ -10,6 +10,7 @@ import '../services/storage_service.dart';
 import '../services/user_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/user_formatters.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, this.showBackButton = true, this.chatId});
@@ -54,13 +55,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await UserService.updateUserData(photoURL: url);
       _showMessage('Аватар обновлён');
     } catch (error) {
-      _showMessage('Не удалось загрузить аватар: $error');
+      _showMessage(
+        'Не удалось загрузить аватар: ${_friendlyUploadError(error)}',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _saveProfile() async {
+  Future<bool> _saveProfile() async {
     setState(() => _busy = true);
     try {
       await UserService.updateUserData(
@@ -70,8 +73,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       if (mounted) setState(() => _isEditing = false);
       _showMessage('Профиль сохранён');
+      return true;
     } catch (error) {
       _showMessage('Не удалось сохранить профиль: $error');
+      return false;
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -81,7 +86,99 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _nameController.text = user.name;
     _tagController.text = user.username ?? user.tag ?? '';
     _bioController.text = user.bio ?? '';
-    setState(() => _isEditing = true);
+    _showEditProfileDialog();
+  }
+
+  Future<void> _showEditProfileDialog() async {
+    var saving = false;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: DarkKickColors.panel,
+              title: const Text(
+                'Изменить профиль',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _DarkInput(
+                      controller: _nameController,
+                      hint: 'Имя',
+                      maxLines: 1,
+                    ),
+                    const SizedBox(height: 12),
+                    _DarkInput(
+                      controller: _tagController,
+                      hint: 'Tag / username',
+                      maxLines: 1,
+                    ),
+                    const SizedBox(height: 12),
+                    _DarkInput(
+                      controller: _bioController,
+                      hint: 'О себе',
+                      maxLines: 3,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: saving ? null : () => Navigator.pop(context),
+                  child: const Text('Отмена'),
+                ),
+                FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          setDialogState(() => saving = true);
+                          final saved = await _saveProfile();
+                          if (saved && context.mounted) {
+                            Navigator.pop(context);
+                          } else {
+                            setDialogState(() => saving = false);
+                          }
+                        },
+                  child: saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Сохранить'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _friendlyUploadError(Object error) {
+    final text = error.toString();
+    if (text.contains('Cloudinary') &&
+        (text.contains('not configured') ||
+            text.contains('signature endpoint'))) {
+      return 'Cloudinary не настроен для загрузки. Проверь CLOUDINARY_CLOUD_NAME и CLOUDINARY_UPLOAD_PRESET.';
+    }
+    return text;
+  }
+
+  void _openSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SettingsScreen(showBackButton: true),
+      ),
+    );
   }
 
   void _showMessage(String text) {
@@ -118,6 +215,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: _busy ? null : _saveProfile,
               child: const Text('Готово'),
             ),
+          IconButton(
+            tooltip: 'Настройки',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: _openSettings,
+          ),
         ],
       ),
       body: uid == null
@@ -148,6 +250,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           user: user,
                           busy: _busy,
                           onTap: _busy ? null : _uploadAvatar,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: _busy ? null : _uploadAvatar,
+                          icon: const Icon(Icons.photo_camera_outlined),
+                          label: const Text('Изменить аватарку'),
                         ),
                       ),
                       const SizedBox(height: 18),
