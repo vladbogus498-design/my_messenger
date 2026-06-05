@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/chat.dart';
@@ -47,51 +48,69 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: DarkKickColors.darkBackground,
-      body: IndexedStack(
-        index: _selectedNavIndex,
-        children: [
-          _buildChatsHome(),
-          const _DarkkickPlaceholder(
-            icon: Icons.phone_outlined,
-            title: 'Звонки',
-            subtitle: 'Голосовые и приватные звонки появятся здесь.',
-          ),
-          const _DarkkickPlaceholder(
-            icon: Icons.people_outline,
-            title: 'Люди',
-            subtitle: 'Поиск людей и контакты будут в этом разделе.',
-          ),
-          const ProfileScreen(showBackButton: false),
-        ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: DarkKickColors.darkBackground,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: DarkKickColors.darkBackground,
+        systemNavigationBarDividerColor: DarkKickColors.darkBackground,
+        systemNavigationBarIconBrightness: Brightness.light,
       ),
-      bottomNavigationBar: _buildBottomNavBar(),
+      child: Scaffold(
+        backgroundColor: DarkKickColors.darkBackground,
+        body: ColoredBox(
+          color: DarkKickColors.darkBackground,
+          child: IndexedStack(
+            index: _selectedNavIndex,
+            children: [
+              _buildChatsHome(),
+              const _DarkkickPlaceholder(
+                icon: Icons.phone_outlined,
+                title: 'Звонки',
+                subtitle: 'Голосовые и приватные звонки появятся здесь.',
+              ),
+              const _DarkkickPlaceholder(
+                icon: Icons.people_outline,
+                title: 'Люди',
+                subtitle: 'Поиск людей и контакты будут в этом разделе.',
+              ),
+              const ProfileScreen(showBackButton: false),
+            ],
+          ),
+        ),
+        bottomNavigationBar: _buildBottomNavBar(),
+      ),
     );
   }
 
   Widget _buildChatsHome() {
     final chatsState = ref.watch(chatsProvider);
 
-    return SafeArea(
-      child: Column(
-        children: [
-          _buildHeader(),
-          _buildSearchBar(),
-          chatsState.when(
-            data: (chats) => _buildStoriesList(chats),
-            loading: () => _buildStoriesSkeleton(),
-            error: (_, __) => const SizedBox(height: 14),
-          ),
-          _buildFilterTabs(),
-          Expanded(
-            child: chatsState.when(
-              data: _buildChatsList,
-              loading: _buildLoadingState,
-              error: (error, _) => _buildErrorState(error),
+    return ColoredBox(
+      color: DarkKickColors.darkBackground,
+      child: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            _buildSearchBar(),
+            chatsState.when(
+              data: (chats) => _buildStoriesList(chats),
+              loading: () => _buildStoriesSkeleton(),
+              error: (_, __) => const SizedBox(height: 14),
             ),
-          ),
-        ],
+            _buildFilterTabs(),
+            Expanded(
+              child: ColoredBox(
+                color: DarkKickColors.darkBackground,
+                child: chatsState.when(
+                  data: _buildChatsList,
+                  loading: _buildLoadingState,
+                  error: (error, _) => _buildErrorState(error),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -380,6 +399,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         border: Border(top: BorderSide(color: DarkKickColors.divider)),
       ),
       child: BottomNavigationBar(
+        elevation: 0,
+        backgroundColor: DarkKickColors.darkBackground,
         currentIndex: _selectedNavIndex,
         onTap: (index) => setState(() => _selectedNavIndex = index),
         items: const [
@@ -918,48 +939,51 @@ class _DarkkickPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: GoogleFonts.spaceGrotesk(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const Spacer(),
-            Center(
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: DarkKickColors.panel,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: DarkKickColors.divider),
+    return ColoredBox(
+      color: DarkKickColors.darkBackground,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.spaceGrotesk(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(icon, color: DarkKickColors.neonPurple, size: 42),
-                    const SizedBox(height: 14),
-                    Text(
-                      subtitle,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: DarkKickColors.textSecondary,
-                        height: 1.35,
+              ),
+              const Spacer(),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: DarkKickColors.panel,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: DarkKickColors.divider),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, color: DarkKickColors.neonPurple, size: 42),
+                      const SizedBox(height: 14),
+                      Text(
+                        subtitle,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: DarkKickColors.textSecondary,
+                          height: 1.35,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const Spacer(),
-          ],
+              const Spacer(),
+            ],
+          ),
         ),
       ),
     );
