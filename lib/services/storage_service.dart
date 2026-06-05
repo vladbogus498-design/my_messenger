@@ -94,8 +94,17 @@ class StorageService {
     required String publicId,
   }) async {
     if (!AppConfig.hasCloudinaryUnsignedUploadConfig) {
-      throw Exception('Cloudinary unsigned upload is not configured');
+      throw Exception(
+        'Cloudinary не настроен для загрузки. '
+        'В Codemagic открой App settings > Environment variables и добавь '
+        'CLOUDINARY_CLOUD_NAME и CLOUDINARY_UPLOAD_PRESET. '
+        'Build script уже передаёт их в APK через --dart-define.',
+      );
     }
+
+    appLogger.d(
+      'Uploading image to Cloudinary folder=$folder publicId=$publicId',
+    );
 
     final uploadUri = Uri.https(
       'api.cloudinary.com',
@@ -122,6 +131,8 @@ class StorageService {
     if (secureUrl == null || secureUrl.isEmpty) {
       throw Exception('Cloudinary response does not contain secure_url');
     }
+
+    appLogger.d('Cloudinary upload success: $secureUrl');
 
     return secureUrl;
   }

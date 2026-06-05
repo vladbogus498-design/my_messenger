@@ -19,8 +19,21 @@ workflows:
           rm -f pubspec.lock
           flutter pub get
           test -f .dart_tool/package_config.json || (echo "Missing .dart_tool/package_config.json after pub get" && exit 1)
+          if [ -z "${CLOUDINARY_CLOUD_NAME:-}" ] || [ -z "${CLOUDINARY_UPLOAD_PRESET:-}" ]; then
+            echo "WARNING: Cloudinary env vars are missing."
+            echo "Set CLOUDINARY_CLOUD_NAME and CLOUDINARY_UPLOAD_PRESET in Codemagic > App settings > Environment variables."
+          fi
           echo "=== Building Android release APK ==="
-          flutter build apk --release --no-shrink
+          flutter build apk --release --no-shrink \
+            --dart-define=FIREBASE_API_KEY="${FIREBASE_API_KEY:-}" \
+            --dart-define=FIREBASE_AUTH_DOMAIN="${FIREBASE_AUTH_DOMAIN:-}" \
+            --dart-define=FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID:-}" \
+            --dart-define=FIREBASE_STORAGE_BUCKET="${FIREBASE_STORAGE_BUCKET:-}" \
+            --dart-define=FIREBASE_MESSAGING_SENDER_ID="${FIREBASE_MESSAGING_SENDER_ID:-}" \
+            --dart-define=FIREBASE_APP_ID="${FIREBASE_APP_ID:-}" \
+            --dart-define=FIREBASE_MEASUREMENT_ID="${FIREBASE_MEASUREMENT_ID:-}" \
+            --dart-define=CLOUDINARY_CLOUD_NAME="${CLOUDINARY_CLOUD_NAME:-}" \
+            --dart-define=CLOUDINARY_UPLOAD_PRESET="${CLOUDINARY_UPLOAD_PRESET:-}"
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
     publishing:

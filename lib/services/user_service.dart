@@ -149,11 +149,14 @@ class UserService {
     String? tag,
   }) async {
     final userId = _auth.currentUser?.uid;
-    if (userId == null) return;
+    if (userId == null) throw Exception('User not authenticated');
 
     try {
       final updates = <String, dynamic>{};
       final userRef = _firestore.collection('users').doc(userId);
+      final publicProfileRef = _firestore
+          .collection('publicProfiles')
+          .doc(userId);
       final currentDoc = await userRef.get();
       final currentData = currentDoc.data() ?? const <String, dynamic>{};
       final authUser = _auth.currentUser;
@@ -207,9 +210,20 @@ class UserService {
       );
       updates['updatedAt'] = FieldValue.serverTimestamp();
 
-      await userRef.set(updates, SetOptions(merge: true));
-      final freshDoc = await userRef.get();
-      await _upsertPublicProfile(userId, freshDoc.data() ?? updates);
+      appLogger.d(
+        'UserService.updateUserData before save: userId=$userId '
+        'fields=${updates.keys.toList()} name="$nextName" tag="$nextTag" '
+        'username="$nextUsername" bioChanged=${bio != null} '
+        'photoChanged=${photoURL != null}',
+      );
+
+      final mergedData = <String, dynamic>{...currentData, ...updates};
+      final publicData = _publicProfileData(userId, mergedData);
+      final batch = _firestore.batch()
+        ..set(userRef, updates, SetOptions(merge: true))
+        ..set(publicProfileRef, publicData);
+      await batch.commit();
+
       if (photoURL != null) {
         try {
           await _auth.currentUser?.updatePhotoURL(photoURL);
@@ -217,7 +231,17 @@ class UserService {
           appLogger.e('Error updating FirebaseAuth photoURL', error: e);
         }
       }
-      appLogger.d('User data updated for userId: $userId');
+      appLogger.d(
+        'UserService.updateUserData success: userId=$userId '
+        'publicFields=${publicData.keys.toList()}',
+      );
+    } on FirebaseException catch (e) {
+      appLogger.e(
+        'UserService.updateUserData FirebaseException: '
+        '${e.code} ${e.message ?? ''}',
+        error: e,
+      );
+      rethrow;
     } catch (e) {
       appLogger.e('Error updating user data for userId: $userId', error: e);
       rethrow;
@@ -425,6 +449,18 @@ class UserService {
     String uid,
     Map<String, dynamic> source,
   ) async {
+    final publicData = _publicProfileData(uid, source);
+
+    await _firestore
+        .collection('publicProfiles')
+        .doc(uid)
+        .set(publicData);
+  }
+
+  static Map<String, dynamic> _publicProfileData(
+    String uid,
+    Map<String, dynamic> source,
+  ) {
     final rawName = (source['name'] ?? 'Пользователь').toString().trim();
     final name = rawName.isEmpty ? 'Пользователь' : rawName;
     final tag = (source['tag'] ?? source['username'] ?? '').toString().trim();
@@ -455,11 +491,7 @@ class UserService {
       if (source.containsKey('lastSeen')) 'lastSeen': source['lastSeen'],
       if (source.containsKey('createdAt')) 'createdAt': source['createdAt'],
     };
-
-    await _firestore
-        .collection('publicProfiles')
-        .doc(uid)
-        .set(publicData, SetOptions(merge: true));
+    return publicData;
   }
 
   static String _sanitizeTag(String rawTag) {

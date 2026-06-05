@@ -67,14 +67,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<bool> _saveProfile() async {
+    final nextName = _nameController.text.trim();
+    final nextTag = _tagController.text.trim();
+    final nextBio = _bioController.text.trim();
+    appLogger.d(
+      'Profile save requested: name="$nextName" tag="$nextTag" '
+      'bioLength=${nextBio.length}',
+    );
+
     setState(() => _busy = true);
     try {
       await UserService.updateUserData(
-        name: _nameController.text.trim(),
-        tag: _tagController.text.trim(),
-        bio: _bioController.text.trim(),
+        name: nextName,
+        tag: nextTag,
+        bio: nextBio,
       );
       if (mounted) setState(() => _isEditing = false);
+      appLogger.d('Profile save completed successfully');
       _showMessage('Профиль сохранён');
       return true;
     } on FirebaseException catch (error) {
@@ -99,6 +108,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _nameController.text = user.name;
     _tagController.text = user.username ?? user.tag ?? '';
     _bioController.text = user.bio ?? '';
+    appLogger.d(
+      'Opening profile edit dialog: name="${_nameController.text}" '
+      'tag="${_tagController.text}" bioLength=${_bioController.text.length}',
+    );
     _showEditProfileDialog();
   }
 
@@ -179,8 +192,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final text = error.toString();
     if (text.contains('Cloudinary') &&
         (text.contains('not configured') ||
+            text.contains('не настроен') ||
             text.contains('signature endpoint'))) {
-      return 'Cloudinary не настроен для загрузки. Проверь CLOUDINARY_CLOUD_NAME и CLOUDINARY_UPLOAD_PRESET.';
+      return 'Cloudinary не настроен. В Codemagic добавь Environment variables: '
+          'CLOUDINARY_CLOUD_NAME и CLOUDINARY_UPLOAD_PRESET, build script '
+          'передаст их через --dart-define.';
     }
     return text;
   }
