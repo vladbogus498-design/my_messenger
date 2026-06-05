@@ -4,6 +4,8 @@ workflows:
     environment:
       flutter: 3.44.1
       java: 17
+      groups:
+        - production
     scripts:
       - name: Force Build with Fix
         script: |
