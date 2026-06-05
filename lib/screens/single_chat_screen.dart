@@ -205,6 +205,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           .doc(chatId)
           .collection('messages')
           .orderBy('timestamp', descending: true)
+          .limit(50)
           .snapshots();
     }
     return _messagesStream!;

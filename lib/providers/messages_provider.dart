@@ -30,6 +30,7 @@ final messagesProvider = StreamProvider.autoDispose
             .doc(chatId)
             .collection('messages')
             .orderBy('timestamp', descending: true)
+            .limit(50)
             .snapshots()
             .asyncMap((snapshot) async {
               final messages = <Message>[];

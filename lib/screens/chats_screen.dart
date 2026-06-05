@@ -317,19 +317,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
-      itemCount: chats.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final chat = chats[index];
-        return _ChatTile(
-          chat: chat,
-          currentUserId: currentUserId,
-          fallbackTitle: _fallbackTitle(chat),
-          onTap: () => _openChat(chat),
-        );
-      },
+    return CustomScrollView(
+      primary: false,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              if (index.isOdd) return const SizedBox(height: 10);
+              final chat = chats[index ~/ 2];
+              return _ChatTile(
+                chat: chat,
+                currentUserId: currentUserId,
+                fallbackTitle: _fallbackTitle(chat),
+                onTap: () => _openChat(chat),
+              );
+            }, childCount: chats.length * 2 - 1),
+          ),
+        ),
+        const SliverFillRemaining(
+          hasScrollBody: false,
+          child: ColoredBox(color: DarkKickColors.darkBackground),
+        ),
+      ],
     );
   }
 

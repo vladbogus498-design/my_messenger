@@ -11,12 +11,14 @@ class PremiumSubscriptionScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Преимущества премиума',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(
+              'Преимущества премиума',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
             SizedBox(height: 12),
             _benefit('Голосовые сообщения'),
             _benefit('Все стикеры'),
-            _benefit('E2E шифрование'),
+            _benefit('Приватные чаты'),
             _benefit('Премиум темы'),
             Spacer(),
             SizedBox(

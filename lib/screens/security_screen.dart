@@ -31,8 +31,9 @@ class SecurityScreen extends StatelessWidget {
               const SizedBox(height: 24),
               _FeatureCard(
                 icon: Icons.lock,
-                title: 'Шифрование E2EE',
-                description: 'Только ты и собеседник. Никто не прочитает твои сообщения.',
+                title: 'Защита сообщений',
+                description:
+                    'Приватные чаты и защита доступа развиваются в рамках MVP.',
                 trailingIcon: Icons.lock,
               ),
               const SizedBox(height: 12),
@@ -79,7 +80,9 @@ class SecurityScreen extends StatelessWidget {
                     color: DarkKickColors.electricPurple,
                     shadows: [
                       Shadow(
-                        color: DarkKickColors.neonPurple.withValues(alpha: 0.75),
+                        color: DarkKickColors.neonPurple.withValues(
+                          alpha: 0.75,
+                        ),
                         blurRadius: 16,
                       ),
                     ],
@@ -133,7 +136,11 @@ class SecurityScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          const Icon(Icons.arrow_upward, color: DarkKickColors.textSecondary, size: 26),
+          const Icon(
+            Icons.arrow_upward,
+            color: DarkKickColors.textSecondary,
+            size: 26,
+          ),
           const Spacer(),
           Icon(
             Icons.workspace_premium_outlined,
@@ -177,7 +184,11 @@ class SecurityScreen extends StatelessWidget {
                 ),
               ),
               SizedBox(width: 10),
-              Icon(Icons.arrow_forward, color: DarkKickColors.neonPurple, size: 20),
+              Icon(
+                Icons.arrow_forward,
+                color: DarkKickColors.neonPurple,
+                size: 20,
+              ),
             ],
           ),
         ),

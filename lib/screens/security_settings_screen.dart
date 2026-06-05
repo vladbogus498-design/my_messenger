@@ -24,7 +24,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
     '5 minutes',
     '10 minutes',
     '30 minutes',
-    'Never'
+    'Never',
   ];
 
   @override
@@ -69,8 +69,9 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
       final canAuth = await BiometricService.canAuthenticate();
       if (!canAuth) {
         _showMessage(
-            'Biometric authentication not available on this device',
-            isError: true);
+          'Biometric authentication not available on this device',
+          isError: true,
+        );
         return;
       }
 
@@ -93,9 +94,9 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
     setState(() => _encryptionEnabled = value);
     await _saveSetting('encryptionEnabled', value);
     if (value) {
-      _showMessage('End-to-end encryption enabled! 🔒');
+      _showMessage('Message protection setting enabled');
     } else {
-      _showMessage('Encryption disabled');
+      _showMessage('Message protection setting disabled');
     }
   }
 
@@ -105,11 +106,15 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
 
     // Шифрование
     final encrypted = EncryptionService.encryptText(testMessage, password);
-    appLogger.d('Encryption test - Encrypted: ${encrypted.substring(0, encrypted.length > 50 ? 50 : encrypted.length)}...');
+    appLogger.d(
+      'Encryption test - Encrypted: ${encrypted.substring(0, encrypted.length > 50 ? 50 : encrypted.length)}...',
+    );
 
     // Дешифрование
     final decrypted = EncryptionService.decryptText(encrypted, password);
-    appLogger.d('Encryption test - Decrypted successfully: ${decrypted == testMessage}');
+    appLogger.d(
+      'Encryption test - Decrypted successfully: ${decrypted == testMessage}',
+    );
 
     if (decrypted == testMessage) {
       _showMessage('✅ Encryption test successful!\nOriginal: $testMessage');
@@ -169,12 +174,12 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
 
             SizedBox(height: 20),
 
-            _buildSectionHeader('🔒 ENCRYPTION', Icons.lock),
+            _buildSectionHeader('MESSAGE PROTECTION', Icons.lock),
             _buildSecurityCard(
               children: [
                 _buildSwitchTile(
-                  title: 'End-to-End Encryption',
-                  subtitle: 'Encrypt all messages automatically',
+                  title: 'Message protection',
+                  subtitle: 'Advanced encryption controls are in development',
                   value: _encryptionEnabled,
                   onChanged: _toggleEncryption,
                   icon: Icons.lock_outline,
@@ -182,12 +187,19 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                 Divider(color: Colors.grey[700]),
                 ListTile(
                   leading: Icon(Icons.science, color: Colors.deepPurple),
-                  title: Text('Test Encryption',
-                      style: TextStyle(color: Colors.white)),
-                  subtitle: Text('Test message encryption/decryption',
-                      style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  trailing: Icon(Icons.arrow_forward_ios,
-                      color: Colors.grey, size: 16),
+                  title: Text(
+                    'Test Encryption',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  subtitle: Text(
+                    'Test message encryption/decryption',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  trailing: Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.grey,
+                    size: 16,
+                  ),
                   onTap: _testEncryption,
                 ),
               ],
@@ -206,7 +218,8 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                     setState(() => _screenshotBlocking = value);
                     _saveSetting('screenshotBlocking', value);
                     _showMessage(
-                        'Screenshot blocking ${value ? "enabled" : "disabled"}');
+                      'Screenshot blocking ${value ? "enabled" : "disabled"}',
+                    );
                   },
                   icon: Icons.screenshot_monitor,
                 ),
@@ -230,25 +243,42 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
             _buildSecurityCard(
               children: [
                 ListTile(
-                  leading:
-                      Icon(Icons.delete_forever, color: Colors.red, size: 28),
-                  title: Text('Delete All Messages',
-                      style: TextStyle(color: Colors.red)),
-                  subtitle: Text('Permanently delete all chat data',
-                      style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  trailing: Icon(Icons.arrow_forward_ios,
-                      color: Colors.red, size: 16),
+                  leading: Icon(
+                    Icons.delete_forever,
+                    color: Colors.red,
+                    size: 28,
+                  ),
+                  title: Text(
+                    'Delete All Messages',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  subtitle: Text(
+                    'Permanently delete all chat data',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  trailing: Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.red,
+                    size: 16,
+                  ),
                   onTap: () => _showDeleteConfirmation(context),
                 ),
                 Divider(color: Colors.grey[700]),
                 ListTile(
                   leading: Icon(Icons.logout, color: Colors.orange, size: 28),
-                  title: Text('Clear All Sessions',
-                      style: TextStyle(color: Colors.orange)),
-                  subtitle: Text('Log out from all devices',
-                      style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  trailing: Icon(Icons.arrow_forward_ios,
-                      color: Colors.orange, size: 16),
+                  title: Text(
+                    'Clear All Sessions',
+                    style: TextStyle(color: Colors.orange),
+                  ),
+                  subtitle: Text(
+                    'Log out from all devices',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  trailing: Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.orange,
+                    size: 16,
+                  ),
                   onTap: () => _showMessage('Session clearing coming soon!'),
                 ),
               ],
@@ -307,7 +337,10 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
     return ListTile(
       leading: Icon(icon, color: Colors.deepPurple),
       title: Text(title, style: TextStyle(color: Colors.white)),
-      subtitle: Text(subtitle, style: TextStyle(color: Colors.grey, fontSize: 12)),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(color: Colors.grey, fontSize: 12),
+      ),
       trailing: Switch(
         value: value,
         onChanged: onChanged,
@@ -327,17 +360,17 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
     return ListTile(
       leading: Icon(icon, color: Colors.deepPurple),
       title: Text(title, style: TextStyle(color: Colors.white)),
-      subtitle: Text(subtitle, style: TextStyle(color: Colors.grey, fontSize: 12)),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(color: Colors.grey, fontSize: 12),
+      ),
       trailing: DropdownButton<String>(
         value: value,
         dropdownColor: Colors.grey[800],
         style: TextStyle(color: Colors.white, fontSize: 12),
         underline: Container(),
         items: items.map((item) {
-          return DropdownMenuItem(
-            value: item,
-            child: Text(item),
-          );
+          return DropdownMenuItem(value: item, child: Text(item));
         }).toList(),
         onChanged: onChanged,
       ),
@@ -359,8 +392,8 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
     Color scoreColor = percentage >= 80
         ? Colors.green
         : percentage >= 50
-            ? Colors.orange
-            : Colors.red;
+        ? Colors.orange
+        : Colors.red;
 
     return Card(
       color: Colors.grey[850],
@@ -417,8 +450,10 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[850],
-        title: Text('⚠️ Delete All Messages?',
-            style: TextStyle(color: Colors.red)),
+        title: Text(
+          '⚠️ Delete All Messages?',
+          style: TextStyle(color: Colors.red),
+        ),
         content: Text(
           'This will permanently delete all your messages and chat history. This action cannot be undone!',
           style: TextStyle(color: Colors.white),

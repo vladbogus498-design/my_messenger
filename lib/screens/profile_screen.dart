@@ -96,7 +96,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           _SettingsItemData(
                             icon: Icons.lock_outline,
                             title: 'Безопасность',
-                            subtitle: 'Пароль, E2EE, устройства',
+                            subtitle: 'Пароль и устройства',
                             onTap: () => _openPlaceholder('Безопасность'),
                           ),
                           _SettingsItemData(
@@ -127,9 +127,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             icon: Icons.devices_outlined,
                             title: 'Активные устройства',
                             subtitle: 'Управление входами',
-                            onTap: () => _openPlaceholder(
-                              'Активные устройства',
-                            ),
+                            onTap: () =>
+                                _openPlaceholder('Активные устройства'),
                           ),
                           _SettingsItemData(
                             icon: Icons.info_outline,
@@ -216,9 +215,7 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
         '${error.code} ${error.message ?? ''}',
         error: error,
       );
-      _showMessage(
-        'Не удалось загрузить аватар: ${_firebaseErrorText(error)}',
-      );
+      _showMessage('Не удалось загрузить аватар: ${_firebaseErrorText(error)}');
     } catch (error) {
       appLogger.e('Avatar upload failed: $error', error: error);
       _showMessage(
@@ -347,10 +344,7 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
 }
 
 class _SettingsHeader extends StatelessWidget {
-  const _SettingsHeader({
-    required this.showBackButton,
-    required this.onBack,
-  });
+  const _SettingsHeader({required this.showBackButton, required this.onBack});
 
   final bool showBackButton;
   final VoidCallback onBack;
