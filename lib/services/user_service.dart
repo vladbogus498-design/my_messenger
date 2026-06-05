@@ -9,6 +9,7 @@ import '../utils/rate_limiter.dart';
 class UserService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
+  static Future<void> _presenceWriteQueue = Future.value();
 
   static Stream<UserModel?> watchUserData(String userId) {
     if (!InputValidator.isValidUserId(userId)) {
@@ -72,7 +73,17 @@ class UserService {
     }
   }
 
-  static Future<void> setPresence({required bool isOnline}) async {
+  static Future<void> setPresence({required bool isOnline}) {
+    _presenceWriteQueue = _presenceWriteQueue
+        .catchError((Object e, StackTrace s) {
+          appLogger.e('Previous presence update failed', error: e);
+        })
+        .then((_) => _setPresenceNow(isOnline: isOnline));
+
+    return _presenceWriteQueue;
+  }
+
+  static Future<void> _setPresenceNow({required bool isOnline}) async {
     final user = _auth.currentUser;
     if (user == null || !InputValidator.isValidUserId(user.uid)) return;
 

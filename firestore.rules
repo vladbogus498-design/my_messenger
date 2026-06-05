@@ -219,6 +219,7 @@ service cloud.firestore {
         'voiceUrl',
         'voiceDuration',
         'isEncrypted',
+        'encryptedFor',
         'replyTo',
         'replyToId',
         'replyToText',
@@ -289,6 +290,8 @@ service cloud.firestore {
           || request.resource.data.readBy is list)
         && (!('status' in request.resource.data)
           || request.resource.data.status in ['sending', 'sent', 'delivered', 'read'])
+        && (!('encryptedFor' in request.resource.data)
+          || request.resource.data.encryptedFor is map)
         && validMessagePayload();
     }
 

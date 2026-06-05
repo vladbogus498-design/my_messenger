@@ -59,6 +59,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   bool _peerIsOnline = false;
   DateTime? _peerLastSeen;
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _messageDocs = [];
+  List<Message> _messages = [];
   Stream<QuerySnapshot<Map<String, dynamic>>>? _messagesStream;
   String? _messagesStreamChatId;
   String? _highlightedMessageId;
@@ -207,6 +208,21 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           .snapshots();
     }
     return _messagesStream!;
+  }
+
+  Future<List<Message>> _messagesFromDocs(
+    String chatId,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    return Future.wait(
+      docs.map(
+        (doc) => ChatService.messageFromFirestoreData(
+          chatId: chatId,
+          messageId: doc.id,
+          data: doc.data(),
+        ),
+      ),
+    );
   }
 
   void _startReply(Message message) {
@@ -877,17 +893,14 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     );
   }
 
-  Widget _buildMessagesList(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-  ) {
+  Widget _buildMessagesList(List<Message> messages) {
     return ListView.builder(
       controller: _scrollController,
       reverse: true,
-      itemCount: docs.length,
+      itemCount: messages.length,
       key: ValueKey('messages_list_${_actualChatId ?? widget.chatId}'),
       itemBuilder: (_, i) {
-        final doc = docs[i];
-        final message = Message.fromMap(doc.data(), doc.id);
+        final message = messages[i];
         return RepaintBoundary(
           key: _messageKey(message.id),
           child: _buildMessageBubble(message),
@@ -1551,8 +1564,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                     stream: _messageStreamFor(chatId),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        if (_messageDocs.isNotEmpty) {
-                          return _buildMessagesList(_messageDocs);
+                        if (_messages.isNotEmpty) {
+                          return _buildMessagesList(_messages);
                         }
                         return const Center(
                           child: CircularProgressIndicator(
@@ -1594,7 +1607,24 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                           ),
                         );
                       }
-                      return _buildMessagesList(docs);
+                      return FutureBuilder<List<Message>>(
+                        future: _messagesFromDocs(chatId, docs),
+                        builder: (context, messagesSnapshot) {
+                          if (!messagesSnapshot.hasData) {
+                            if (_messages.isNotEmpty) {
+                              return _buildMessagesList(_messages);
+                            }
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                color: DarkKickColors.neonPurple,
+                              ),
+                            );
+                          }
+
+                          _messages = messagesSnapshot.data ?? const [];
+                          return _buildMessagesList(_messages);
+                        },
+                      );
                     },
                   )
                 : Center(

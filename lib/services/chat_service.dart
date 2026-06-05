@@ -46,35 +46,46 @@ class ChatService {
           .get();
 
       return Future.wait(
-        snapshot.docs.map((doc) async {
-          final data = doc.data();
-          var messageText = data['text'] ?? '';
-          final isEncrypted = data['isEncrypted'] ?? false;
-
-          if (isEncrypted && messageText.isNotEmpty) {
-            try {
-              messageText = await E2EEncryptionService.decryptMessage(
-                messageText,
-              );
-            } catch (e) {
-              appLogger.e(
-                'Error decrypting message in chat: $chatId',
-                error: e,
-              );
-            }
-          }
-
-          return Message.fromMap({
-            ...data,
-            'chatId': chatId,
-            'text': messageText,
-          }, doc.id);
-        }),
+        snapshot.docs.map(
+          (doc) => messageFromFirestoreData(
+            chatId: chatId,
+            messageId: doc.id,
+            data: doc.data(),
+          ),
+        ),
       );
     } catch (e) {
       appLogger.e('Error loading messages for chat: $chatId', error: e);
       return [];
     }
+  }
+
+  static Future<Message> messageFromFirestoreData({
+    required String chatId,
+    required String messageId,
+    required Map<String, dynamic> data,
+  }) async {
+    var messageText = (data['text'] ?? '').toString();
+    final isEncrypted = data['isEncrypted'] == true;
+
+    if (isEncrypted) {
+      final encryptedText = _encryptedTextForCurrentUser(data) ?? messageText;
+      if (encryptedText.isNotEmpty) {
+        try {
+          messageText = await E2EEncryptionService.decryptMessage(
+            encryptedText,
+          );
+        } catch (e) {
+          appLogger.e('Error decrypting message in chat: $chatId', error: e);
+        }
+      }
+    }
+
+    return Message.fromMap({
+      ...data,
+      'chatId': chatId,
+      'text': messageText,
+    }, messageId);
   }
 
   static String createMessageId(String chatId) {
@@ -175,16 +186,25 @@ class ChatService {
           : InputValidator.sanitizeMessage(text);
       final previewText = _lastMessagePreview(type, messageText);
       var isEncrypted = false;
+      Map<String, String>? encryptedFor;
 
       if (encrypt &&
           messageText.isNotEmpty &&
           recipientIds != null &&
           recipientIds.isNotEmpty) {
         try {
-          messageText = await E2EEncryptionService.encryptMessage(
-            messageText,
-            recipientIds[0],
-          );
+          final encryptionRecipients = <String>{userId, ...recipientIds};
+          encryptedFor =
+              await E2EEncryptionService.encryptForMultipleRecipients(
+                messageText,
+                encryptionRecipients.toList(),
+              );
+          messageText =
+              encryptedFor[recipientIds.first] ??
+              await E2EEncryptionService.encryptMessage(
+                messageText,
+                recipientIds.first,
+              );
           isEncrypted = true;
         } catch (e) {
           appLogger.e('Error encrypting message for chat: $chatId', error: e);
@@ -234,6 +254,7 @@ class ChatService {
           if (voiceDuration != null) 'voiceDuration': voiceDuration,
           if (stickerId != null) 'stickerId': stickerId,
           'isEncrypted': isEncrypted,
+          if (encryptedFor != null) 'encryptedFor': encryptedFor,
           if (replyPayload != null) 'replyTo': replyPayload,
           if (replyToId != null) 'replyToId': replyToId,
           if (replyToText != null) 'replyToText': replyToText,
@@ -746,6 +767,15 @@ class ChatService {
       final count = value is num ? value.toInt() : int.tryParse('$value') ?? 0;
       return MapEntry(key, count);
     });
+  }
+
+  static String? _encryptedTextForCurrentUser(Map<String, dynamic> data) {
+    final userId = _auth.currentUser?.uid;
+    final encryptedFor = data['encryptedFor'];
+    if (userId == null || encryptedFor is! Map) return null;
+
+    final text = encryptedFor[userId]?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
   }
 
   static String _lastMessagePreview(String type, String text) {

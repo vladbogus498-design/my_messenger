@@ -2,8 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/message.dart';
-import '../services/e2e_encryption_service.dart';
-import '../utils/logger.dart';
+import '../services/chat_service.dart';
 import 'auth_provider.dart';
 
 final messagesProvider = StreamProvider.autoDispose
@@ -35,29 +34,12 @@ final messagesProvider = StreamProvider.autoDispose
             .asyncMap((snapshot) async {
               final messages = <Message>[];
               for (final doc in snapshot.docs) {
-                final data = doc.data();
-                var messageText = data['text'] ?? '';
-                final isEncrypted = data['isEncrypted'] ?? false;
-
-                if (isEncrypted && messageText.isNotEmpty) {
-                  try {
-                    messageText = await E2EEncryptionService.decryptMessage(
-                      messageText,
-                    );
-                  } catch (e) {
-                    appLogger.e(
-                      'Error decrypting message in chat: $chatId',
-                      error: e,
-                    );
-                  }
-                }
-
                 messages.add(
-                  Message.fromMap({
-                    ...data,
-                    'chatId': chatId,
-                    'text': messageText,
-                  }, doc.id),
+                  await ChatService.messageFromFirestoreData(
+                    chatId: chatId,
+                    messageId: doc.id,
+                    data: doc.data(),
+                  ),
                 );
               }
               return messages;

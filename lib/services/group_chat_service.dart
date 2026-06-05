@@ -47,15 +47,8 @@ class GroupChatService {
     });
 
     // Создаем записи в подколлекциях пользователей для сохранения группы
-    try {
-      final batch = _fs.batch();
-
-      // Добавляем группу в список чатов каждого участника
-      await batch.commit();
-    } catch (e) {
-      // Не критично, если не удалось создать ссылки
-      appLogger.w('Failed to create user chat references for group', error: e);
-    }
+    // Добавляем группу в список чатов каждого участника
+    // Не критично, если не удалось создать ссылки
 
     // Fetch the created document to return as Chat object
     final doc = await docRef.get();
