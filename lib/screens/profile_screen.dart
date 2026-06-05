@@ -29,7 +29,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _nameController = TextEditingController();
   final _tagController = TextEditingController();
   final _bioController = TextEditingController();
-  bool _isEditing = false;
   bool _busy = false;
 
   String? get _uid => _auth.currentUser?.uid;
@@ -53,9 +52,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() => _busy = true);
     try {
+      appLogger.d('Profile avatar upload started: path=${picked.path}');
       final url = await StorageService.uploadUserAvatar(File(picked.path));
+      appLogger.d('Profile avatar upload finished: imageUrl=$url');
+      appLogger.d('Profile avatar Firestore update started');
       await UserService.updateUserData(photoURL: url);
+      appLogger.d('Profile avatar Firestore update finished');
       _showMessage('Аватар обновлён');
+    } on FirebaseException catch (error) {
+      appLogger.e(
+        'Profile avatar Firestore update failed: '
+        '${error.code} ${error.message ?? ''}',
+        error: error,
+      );
+      _showMessage(
+        'Не удалось загрузить аватар: ${_firebaseErrorText(error)}',
+      );
     } catch (error) {
       appLogger.e('Profile avatar update failed', error: error);
       _showMessage(
@@ -82,7 +94,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         tag: nextTag,
         bio: nextBio,
       );
-      if (mounted) setState(() => _isEditing = false);
       appLogger.d('Profile save completed successfully');
       _showMessage('Профиль сохранён');
       return true;
@@ -124,9 +135,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: DarkKickColors.panel,
-              title: const Text(
+              surfaceTintColor: DarkKickColors.neonPurple,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: const BorderSide(color: DarkKickColors.stroke),
+              ),
+              title: Text(
                 'Изменить профиль',
-                style: TextStyle(color: Colors.white),
+                style: GoogleFonts.spaceGrotesk(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               content: SingleChildScrollView(
                 child: Column(
@@ -152,6 +171,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
+              actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
               actions: [
                 TextButton(
                   onPressed: saving ? null : () => Navigator.pop(context),
@@ -216,6 +236,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _showFutureMessage(String title) {
+    _showMessage('$title появится в будущих настройках');
+  }
+
   void _showMessage(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
@@ -227,36 +251,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: DarkKickColors.darkBackground,
-      appBar: AppBar(
-        backgroundColor: DarkKickColors.darkBackground,
-        elevation: 0,
-        centerTitle: true,
-        leading: widget.showBackButton
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-                onPressed: () => Navigator.pop(context),
-              )
-            : null,
-        title: Text(
-          'Профиль',
-          style: GoogleFonts.spaceGrotesk(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        actions: [
-          if (_isEditing)
-            TextButton(
-              onPressed: _busy ? null : _saveProfile,
-              child: const Text('Готово'),
-            ),
-          IconButton(
-            tooltip: 'Настройки',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: _openSettings,
-          ),
-        ],
-      ),
       body: uid == null
           ? const _ProfileEmptyState()
           : StreamBuilder<UserModel?>(
@@ -276,104 +270,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     );
 
                 return SafeArea(
-                  top: false,
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(22, 14, 22, 28),
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
                     children: [
-                      Center(
-                        child: _ProfileAvatar(
-                          user: user,
-                          busy: _busy,
-                          onTap: _busy ? null : _uploadAvatar,
-                        ),
+                      _ProfileTopBar(
+                        showBackButton: widget.showBackButton,
+                        onBack: () => Navigator.pop(context),
+                        onSettings: _openSettings,
                       ),
-                      const SizedBox(height: 18),
-                      if (_isEditing) ...[
-                        _DarkInput(
-                          controller: _nameController,
-                          hint: 'Имя',
-                          maxLines: 1,
-                        ),
-                        const SizedBox(height: 12),
-                        _DarkInput(
-                          controller: _tagController,
-                          hint: 'Tag / username',
-                          maxLines: 1,
-                        ),
-                        const SizedBox(height: 12),
-                        _DarkInput(
-                          controller: _bioController,
-                          hint: 'О себе',
-                          maxLines: 3,
-                        ),
-                      ] else ...[
-                        Center(
-                          child: Text(
-                            user.name,
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.spaceGrotesk(
-                              color: Colors.white,
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
-                            ),
+                      const SizedBox(height: 16),
+                      _ProfileHeroCard(
+                        user: user,
+                        busy: _busy,
+                        onAvatarTap: _busy ? null : _uploadAvatar,
+                        onEditTap: _busy ? null : () => _startEditing(user),
+                      ),
+                      const SizedBox(height: 16),
+                      _ProfileInfoPanel(user: user),
+                      const SizedBox(height: 16),
+                      _SectionTitle(
+                        title: 'Настройки',
+                        subtitle: 'Разделы уже готовы под развитие профиля',
+                      ),
+                      const SizedBox(height: 12),
+                      _SettingsGrid(
+                        items: [
+                          _SettingsTileData(
+                            icon: Icons.security_outlined,
+                            title: 'Безопасность',
+                            subtitle: 'Пароль, E2EE, устройства',
+                            onTap: _openSettings,
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Center(
-                          child: Text(
-                            UserFormatters.chatPresence(
-                              isOnline: user.isOnline,
-                              lastSeen: user.lastSeen,
-                            ),
-                            style: TextStyle(
-                              color: user.isOnline
-                                  ? DarkKickColors.online
-                                  : DarkKickColors.textTertiary,
-                              fontSize: 13,
-                            ),
+                          _SettingsTileData(
+                            icon: Icons.shield_outlined,
+                            title: 'Приватность',
+                            subtitle: 'Кто может писать',
+                            onTap: () => _showFutureMessage('Приватность'),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Center(
-                          child: Text(
-                            '@${(user.username ?? user.tag ?? '').trim().isEmpty ? 'darkkick' : (user.username ?? user.tag)!.trim()}',
-                            style: const TextStyle(
-                              color: DarkKickColors.textTertiary,
-                              fontSize: 13,
-                            ),
+                          _SettingsTileData(
+                            icon: Icons.palette_outlined,
+                            title: 'Внешний вид',
+                            subtitle: 'Тема, цвета, иконки',
+                            onTap: () => _showFutureMessage('Внешний вид'),
                           ),
-                        ),
-                        const SizedBox(height: 18),
-                        Center(
-                          child: Text(
-                            (user.bio ?? '').trim().isEmpty
-                                ? 'О себе не указано'
-                                : user.bio!.trim(),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: DarkKickColors.textSecondary,
-                              height: 1.4,
-                            ),
+                          _SettingsTileData(
+                            icon: Icons.devices_outlined,
+                            title: 'Устройства',
+                            subtitle: 'Активные входы',
+                            onTap: () => _showFutureMessage('Устройства'),
                           ),
-                        ),
-                        const SizedBox(height: 22),
-                        Center(
-                          child: Text(
-                            'Дата регистрации\n${UserFormatters.registrationDate(user.createdAt)}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: DarkKickColors.textSecondary,
-                              height: 1.35,
-                            ),
+                          _SettingsTileData(
+                            icon: Icons.notifications_none_outlined,
+                            title: 'Уведомления',
+                            subtitle: 'Звуки и баннеры',
+                            onTap: () => _showFutureMessage('Уведомления'),
                           ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      _ActionCard(
-                        icon: Icons.edit_outlined,
-                        title: 'Изменить профиль',
-                        onTap: () =>
-                            _isEditing ? _saveProfile() : _startEditing(user),
+                          _SettingsTileData(
+                            icon: Icons.info_outline,
+                            title: 'О приложении',
+                            subtitle: 'Darkkick MVP',
+                            onTap: _openSettings,
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -384,16 +342,173 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+class _ProfileTopBar extends StatelessWidget {
+  const _ProfileTopBar({
+    required this.showBackButton,
+    required this.onBack,
+    required this.onSettings,
+  });
+
+  final bool showBackButton;
+  final VoidCallback onBack;
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        if (showBackButton)
+          _IconCircleButton(icon: Icons.arrow_back_ios_new, onTap: onBack)
+        else
+          const SizedBox(width: 42),
+        Expanded(
+          child: Text(
+            'Профиль',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.spaceGrotesk(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        _IconCircleButton(icon: Icons.settings_outlined, onTap: onSettings),
+      ],
+    );
+  }
+}
+
+class _ProfileHeroCard extends StatelessWidget {
+  const _ProfileHeroCard({
+    required this.user,
+    required this.busy,
+    required this.onAvatarTap,
+    required this.onEditTap,
+  });
+
+  final UserModel user;
+  final bool busy;
+  final VoidCallback? onAvatarTap;
+  final VoidCallback? onEditTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tag = (user.username ?? user.tag ?? '').trim();
+    final bio = (user.bio ?? '').trim();
+
+    return Container(
+      height: 316,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: DarkKickColors.stroke),
+        boxShadow: [
+          BoxShadow(
+            color: DarkKickColors.neonPurple.withValues(alpha: 0.18),
+            blurRadius: 34,
+            offset: const Offset(0, 18),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              'assets/images/auth_angel.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.12),
+                    Colors.black.withValues(alpha: 0.54),
+                    DarkKickColors.deepBackground.withValues(alpha: 0.98),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              left: 18,
+              right: 18,
+              bottom: 18,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _ProfileAvatar(
+                    user: user,
+                    busy: busy,
+                    onTap: onAvatarTap,
+                    size: 88,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'DARKKICK ID',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.spaceGrotesk(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          tag.isEmpty ? 'tag не указан' : '@$tag',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: DarkKickColors.electricPurple,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          bio.isEmpty ? 'О себе не указано' : bio,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: DarkKickColors.textSecondary,
+                            fontSize: 13,
+                            height: 1.25,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _EditProfileButton(onTap: onEditTap),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ProfileAvatar extends StatelessWidget {
   const _ProfileAvatar({
     required this.user,
     required this.busy,
     required this.onTap,
+    required this.size,
   });
 
   final UserModel user;
   final bool busy;
   final VoidCallback? onTap;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -411,15 +526,15 @@ class _ProfileAvatar extends StatelessWidget {
         alignment: Alignment.bottomRight,
         children: [
           Container(
-            width: 118,
-            height: 118,
+            width: size,
+            height: size,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: DarkKickColors.stroke, width: 2),
+              border: Border.all(color: DarkKickColors.neonPurple, width: 1.2),
               boxShadow: [
                 BoxShadow(
-                  color: DarkKickColors.neonPurple.withValues(alpha: 0.34),
-                  blurRadius: 28,
+                  color: DarkKickColors.neonPurple.withValues(alpha: 0.38),
+                  blurRadius: 24,
                 ),
               ],
             ),
@@ -436,19 +551,19 @@ class _ProfileAvatar extends StatelessWidget {
             ),
           ),
           Container(
-            width: 34,
-            height: 34,
+            width: 30,
+            height: 30,
             decoration: BoxDecoration(
               color: DarkKickColors.neonPurple,
               shape: BoxShape.circle,
               border: Border.all(
-                color: DarkKickColors.darkBackground,
+                color: DarkKickColors.deepBackground,
                 width: 3,
               ),
             ),
             child: busy
                 ? const Padding(
-                    padding: EdgeInsets.all(8),
+                    padding: EdgeInsets.all(7),
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: Colors.white,
@@ -457,11 +572,425 @@ class _ProfileAvatar extends StatelessWidget {
                 : const Icon(
                     Icons.camera_alt_outlined,
                     color: Colors.white,
-                    size: 17,
+                    size: 15,
                   ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EditProfileButton extends StatelessWidget {
+  const _EditProfileButton({required this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: DarkKickColors.neonPurple.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: DarkKickColors.neonPurple.withValues(alpha: 0.45),
+            ),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.edit_outlined, color: Colors.white, size: 16),
+              SizedBox(width: 8),
+              Text(
+                'Изменить профиль',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileInfoPanel extends StatelessWidget {
+  const _ProfileInfoPanel({required this.user});
+
+  final UserModel user;
+
+  @override
+  Widget build(BuildContext context) {
+    final presence = UserFormatters.chatPresence(
+      isOnline: user.isOnline,
+      lastSeen: user.lastSeen,
+    );
+    final registration = UserFormatters.registrationDate(user.createdAt);
+
+    return _GlassPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.spaceGrotesk(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      presence,
+                      style: TextStyle(
+                        color: user.isOnline
+                            ? DarkKickColors.online
+                            : DarkKickColors.textTertiary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: DarkKickColors.neonPurple.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: DarkKickColors.neonPurple.withValues(alpha: 0.28),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.person_outline,
+                  color: DarkKickColors.electricPurple,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _MiniInfo(
+                  label: 'Tag',
+                  value: (user.username ?? user.tag ?? '').trim().isEmpty
+                      ? 'не указан'
+                      : '@${(user.username ?? user.tag)!.trim()}',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MiniInfo(label: 'Регистрация', value: registration),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _MiniInfo(
+            label: 'О себе',
+            value: (user.bio ?? '').trim().isEmpty
+                ? 'О себе не указано'
+                : user.bio!.trim(),
+            expanded: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniInfo extends StatelessWidget {
+  const _MiniInfo({
+    required this.label,
+    required this.value,
+    this.expanded = false,
+  });
+
+  final String label;
+  final String value;
+  final bool expanded;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.035),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: DarkKickColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: DarkKickColors.textTertiary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: expanded ? 4 : 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              height: 1.25,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.spaceGrotesk(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: DarkKickColors.textTertiary,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsGrid extends StatelessWidget {
+  const _SettingsGrid({required this.items});
+
+  final List<_SettingsTileData> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 1.3,
+      ),
+      itemBuilder: (context, index) => _SettingsTile(data: items[index]),
+    );
+  }
+}
+
+class _SettingsTileData {
+  const _SettingsTileData({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+}
+
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({required this.data});
+
+  final _SettingsTileData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: data.onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: DarkKickColors.panel.withValues(alpha: 0.82),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: DarkKickColors.divider),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _IconGlow(icon: data.icon),
+                    const Spacer(),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: DarkKickColors.textTertiary,
+                      size: 20,
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                Text(
+                  data.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  data.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: DarkKickColors.textSecondary,
+                    fontSize: 12,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassPanel extends StatelessWidget {
+  const _GlassPanel({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: DarkKickColors.panel.withValues(alpha: 0.86),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: DarkKickColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.28),
+            blurRadius: 22,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _IconCircleButton extends StatelessWidget {
+  const _IconCircleButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Ink(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: DarkKickColors.panel,
+            border: Border.all(color: DarkKickColors.stroke),
+            boxShadow: [
+              BoxShadow(
+                color: DarkKickColors.neonPurple.withValues(alpha: 0.18),
+                blurRadius: 18,
+              ),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 19),
+        ),
+      ),
+    );
+  }
+}
+
+class _IconGlow extends StatelessWidget {
+  const _IconGlow({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: DarkKickColors.neonPurple.withValues(alpha: 0.14),
+        border: Border.all(
+          color: DarkKickColors.neonPurple.withValues(alpha: 0.28),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: DarkKickColors.neonPurple.withValues(alpha: 0.18),
+            blurRadius: 18,
+          ),
+        ],
+      ),
+      child: Icon(icon, color: DarkKickColors.electricPurple, size: 24),
     );
   }
 }
@@ -480,7 +1009,7 @@ class _AvatarFallback extends StatelessWidget {
           initial,
           style: GoogleFonts.spaceGrotesk(
             color: Colors.white,
-            fontSize: 42,
+            fontSize: 34,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -510,7 +1039,7 @@ class _DarkInput extends StatelessWidget {
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: DarkKickColors.panel,
+        fillColor: DarkKickColors.deepBackground,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: DarkKickColors.divider),
@@ -522,56 +1051,6 @@ class _DarkInput extends StatelessWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: DarkKickColors.neonPurple),
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionCard extends StatelessWidget {
-  const _ActionCard({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(17),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            color: DarkKickColors.panel,
-            borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: DarkKickColors.divider),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: DarkKickColors.neonPurple, size: 22),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const Icon(
-                Icons.chevron_right,
-                color: DarkKickColors.textTertiary,
-              ),
-            ],
-          ),
         ),
       ),
     );
