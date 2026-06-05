@@ -336,10 +336,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             }, childCount: chats.length * 2 - 1),
           ),
         ),
-        const SliverFillRemaining(
-          hasScrollBody: false,
-          child: ColoredBox(color: DarkKickColors.darkBackground),
-        ),
       ],
     );
   }
