@@ -163,19 +163,23 @@ class UserService {
   }
 
   static Future<void> ensurePublicProfile() async {
-    final user = _auth.currentUser;
-    if (user == null || !InputValidator.isValidUserId(user.uid)) return;
+    try {
+      final user = _auth.currentUser;
+      if (user == null || !InputValidator.isValidUserId(user.uid)) return;
 
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    if (userDoc.exists) {
-      await _upsertPublicProfile(user.uid, userDoc.data() ?? const {});
-      return;
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        await _upsertPublicProfile(user.uid, userDoc.data() ?? const {});
+        return;
+      }
+
+      await ensureUserProfile(
+        user: user,
+        fallbackName: user.email?.split('@').first ?? user.phoneNumber,
+      );
+    } catch (e) {
+      appLogger.e('Error ensuring public profile', error: e);
     }
-
-    await ensureUserProfile(
-      user: user,
-      fallbackName: user.email?.split('@').first ?? user.phoneNumber,
-    );
   }
 
   static Future<List<UserModel>> searchUsersByTag(String tag) async {

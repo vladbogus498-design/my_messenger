@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
+import '../utils/logger.dart';
 
 final appAuthServiceProvider = Provider<AppAuthService>((ref) {
   return AppAuthService(FirebaseAuth.instance);
@@ -207,7 +208,11 @@ class AuthController extends StateNotifier<AuthFlowState> {
   Future<void> _ensureUserProfile(User? user, {String? fallbackName}) async {
     if (user == null) return;
     await UserService.ensureUserProfile(user: user, fallbackName: fallbackName);
-    await UserService.ensurePublicProfile();
+    try {
+      await UserService.ensurePublicProfile();
+    } catch (e) {
+      appLogger.e('Post-login public profile sync failed', error: e);
+    }
   }
 
   String _mapFirebaseAuthError(FirebaseAuthException exception) {
