@@ -10,6 +10,7 @@ class UserService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static Future<void> _presenceWriteQueue = Future.value();
+  static int _presenceRequestId = 0;
 
   static Stream<UserModel?> watchUserData(String userId) {
     if (!InputValidator.isValidUserId(userId)) {
@@ -73,40 +74,68 @@ class UserService {
     }
   }
 
-  static Future<void> setPresence({required bool isOnline}) {
+  static Future<void> setPresence({
+    required bool isOnline,
+    bool force = false,
+  }) {
+    final user = _auth.currentUser;
+    if (user == null || !InputValidator.isValidUserId(user.uid)) {
+      return Future.value();
+    }
+
+    final requestId = ++_presenceRequestId;
+    final userId = user.uid;
+    final email = user.email;
+    final displayName = user.displayName;
+
     _presenceWriteQueue = _presenceWriteQueue
         .catchError((Object e, StackTrace s) {
           appLogger.e('Previous presence update failed', error: e);
         })
-        .then((_) => _setPresenceNow(isOnline: isOnline));
+        .then((_) {
+          if (!force && requestId != _presenceRequestId) {
+            return Future<void>.value();
+          }
+          return _setPresenceNow(
+            userId: userId,
+            email: email,
+            displayName: displayName,
+            isOnline: isOnline,
+          );
+        });
 
     return _presenceWriteQueue;
   }
 
-  static Future<void> _setPresenceNow({required bool isOnline}) async {
-    final user = _auth.currentUser;
-    if (user == null || !InputValidator.isValidUserId(user.uid)) return;
-
+  static Future<void> _setPresenceNow({
+    required String userId,
+    required String? email,
+    required String? displayName,
+    required bool isOnline,
+  }) async {
     try {
-      await _firestore.collection('users').doc(user.uid).set({
-        'uid': user.uid,
-        'email': (user.email ?? '').toLowerCase().trim(),
-        'emailLower': (user.email ?? '').toLowerCase().trim(),
+      final userUpdates = <String, dynamic>{
+        'uid': userId,
+        'email': (email ?? '').toLowerCase().trim(),
+        'emailLower': (email ?? '').toLowerCase().trim(),
         'isOnline': isOnline,
-        'lastSeen': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+        if (!isOnline) 'lastSeen': FieldValue.serverTimestamp(),
+      };
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .set(userUpdates, SetOptions(merge: true));
+      final userDoc = await _firestore.collection('users').doc(userId).get();
       final userData = userDoc.data() ?? const <String, dynamic>{};
       final existingName = (userData['name'] ?? '').toString().trim();
-      await _upsertPublicProfile(user.uid, {
+      await _upsertPublicProfile(userId, {
         ...userData,
-        'uid': user.uid,
+        'uid': userId,
         'name': existingName.isNotEmpty
             ? existingName
-            : user.displayName ??
-                  (user.email?.split('@').first ?? 'Пользователь'),
+            : displayName ?? (email?.split('@').first ?? 'Пользователь'),
         'isOnline': isOnline,
-        'lastSeen': FieldValue.serverTimestamp(),
+        if (!isOnline) 'lastSeen': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       appLogger.e('Error updating user presence', error: e);
@@ -273,12 +302,14 @@ class UserService {
       if (nameError != null) throw Exception(nameError);
 
       final sanitizedName = _sanitizeProfileName(name);
+      final searchKeywords = _buildSearchKeywords(sanitizedName, '', '');
 
       await _firestore.collection('users').doc(uid).set({
         'uid': uid,
         'email': email.toLowerCase().trim(),
         'name': sanitizedName,
         'nameLower': sanitizedName.toLowerCase(),
+        'searchKeywords': searchKeywords,
         'emailLower': email.toLowerCase().trim(),
         'bio': '',
         'photoURL': null,
@@ -316,15 +347,34 @@ class UserService {
       final docRef = _firestore.collection('users').doc(user.uid);
       final doc = await docRef.get();
       if (doc.exists) {
+        final data = doc.data() ?? const <String, dynamic>{};
+        final existingName = (data['name'] ?? user.displayName ?? fallbackName)
+            ?.toString()
+            .trim();
+        final nameForSearch = (existingName == null || existingName.isEmpty)
+            ? (user.email?.split('@').first ?? user.phoneNumber ?? 'Пользователь')
+            : existingName;
+        final tagForSearch = (data['tag'] ?? data['username'] ?? '')
+            .toString()
+            .trim();
+        final usernameForSearch = (data['username'] ?? data['tag'] ?? '')
+            .toString()
+            .trim();
         final updates = {
           'uid': user.uid,
           if (user.email != null) 'email': user.email!.toLowerCase().trim(),
           if (user.email != null)
             'emailLower': user.email!.toLowerCase().trim(),
           if (user.photoURL != null) 'photoURL': user.photoURL,
+          'nameLower': nameForSearch.toLowerCase(),
+          'searchKeywords': _buildSearchKeywords(
+            nameForSearch,
+            tagForSearch,
+            usernameForSearch,
+          ),
         };
         await docRef.set({...updates}, SetOptions(merge: true));
-        await _upsertPublicProfile(user.uid, {...?doc.data(), ...updates});
+        await _upsertPublicProfile(user.uid, {...data, ...updates});
         return;
       }
 
@@ -339,6 +389,7 @@ class UserService {
               ? phone
               : 'Пользователь');
       final sanitizedName = _sanitizeProfileName(generatedName);
+      final searchKeywords = _buildSearchKeywords(sanitizedName, '', '');
 
       await docRef.set({
         'uid': user.uid,
@@ -347,6 +398,7 @@ class UserService {
         'phone': phone.trim(),
         'name': sanitizedName,
         'nameLower': sanitizedName.toLowerCase(),
+        'searchKeywords': searchKeywords,
         'bio': '',
         'photoURL': user.photoURL,
         'isOnline': true,

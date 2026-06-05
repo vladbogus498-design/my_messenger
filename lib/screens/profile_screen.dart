@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,6 +10,7 @@ import '../models/user_model.dart';
 import '../services/storage_service.dart';
 import '../services/user_service.dart';
 import '../theme/darkkick_colors.dart';
+import '../utils/logger.dart';
 import '../utils/user_formatters.dart';
 import 'settings_screen.dart';
 
@@ -55,6 +57,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await UserService.updateUserData(photoURL: url);
       _showMessage('Аватар обновлён');
     } catch (error) {
+      appLogger.e('Profile avatar update failed', error: error);
       _showMessage(
         'Не удалось загрузить аватар: ${_friendlyUploadError(error)}',
       );
@@ -74,7 +77,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) setState(() => _isEditing = false);
       _showMessage('Профиль сохранён');
       return true;
+    } on FirebaseException catch (error) {
+      appLogger.e(
+        'Profile save failed: ${error.code} ${error.message ?? ''}',
+        error: error,
+      );
+      _showMessage(
+        'Не удалось сохранить профиль: ${_firebaseErrorText(error)}',
+      );
+      return false;
     } catch (error) {
+      appLogger.e('Profile save failed', error: error);
       _showMessage('Не удалось сохранить профиль: $error');
       return false;
     } finally {
@@ -172,6 +185,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return text;
   }
 
+  String _firebaseErrorText(FirebaseException error) {
+    final message = error.message?.trim();
+    if (message == null || message.isEmpty) return error.code;
+    return '${error.code}: $message';
+  }
+
   void _openSettings() {
     Navigator.push(
       context,
@@ -250,14 +269,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           user: user,
                           busy: _busy,
                           onTap: _busy ? null : _uploadAvatar,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Center(
-                        child: TextButton.icon(
-                          onPressed: _busy ? null : _uploadAvatar,
-                          icon: const Icon(Icons.photo_camera_outlined),
-                          label: const Text('Изменить аватарку'),
                         ),
                       ),
                       const SizedBox(height: 18),
@@ -347,12 +358,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: 'Изменить профиль',
                         onTap: () =>
                             _isEditing ? _saveProfile() : _startEditing(user),
-                      ),
-                      const SizedBox(height: 12),
-                      _ActionCard(
-                        icon: Icons.photo_camera_outlined,
-                        title: 'Изменить аватарку',
-                        onTap: _busy ? () {} : _uploadAvatar,
                       ),
                     ],
                   ),

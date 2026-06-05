@@ -111,8 +111,7 @@ class _PresenceAwareHomeState extends State<PresenceAwareHome>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       UserService.setPresence(isOnline: true);
-    } else if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused ||
+    } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
       UserService.setPresence(isOnline: false);
@@ -122,7 +121,6 @@ class _PresenceAwareHomeState extends State<PresenceAwareHome>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    UserService.setPresence(isOnline: false);
     super.dispose();
   }
 

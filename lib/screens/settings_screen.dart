@@ -40,7 +40,7 @@ class SettingsScreen extends ConsumerWidget {
     } catch (_) {
       // Local cache may be unavailable on some builds; provider reset still protects UI state.
     }
-    await UserService.setPresence(isOnline: false);
+    await UserService.setPresence(isOnline: false, force: true);
     await FirebaseAuth.instance.signOut();
     ref.invalidate(chatsProvider);
     ref.invalidate(chatsNotifierProvider);
