@@ -202,6 +202,43 @@ service cloud.firestore {
           || stringMax(request.resource.data.publicKey, 8000));
     }
 
+    function systemBotPublicProfileFieldsOnly() {
+      return request.resource.data.keys().hasOnly([
+        'uid',
+        'name',
+        'nameLower',
+        'tag',
+        'tagLower',
+        'searchKeywords',
+        'bio',
+        'photoURL',
+        'isBot',
+        'isOfficial',
+        'createdAt',
+        'updatedAt'
+      ]);
+    }
+
+    function validSystemBotPublicProfileCreate(userId) {
+      return signedIn()
+        && userId == 'darkkick_bot'
+        && systemBotPublicProfileFieldsOnly()
+        && request.resource.data.uid == 'darkkick_bot'
+        && request.resource.data.name == 'DARKKICK'
+        && request.resource.data.nameLower == 'darkkick'
+        && request.resource.data.tag == 'darkkick'
+        && request.resource.data.tagLower == 'darkkick'
+        && request.resource.data.bio == 'Официальный бот DARKKICK'
+        && request.resource.data.isBot == true
+        && request.resource.data.isOfficial == true
+        && request.resource.data.searchKeywords is list
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && (!('photoURL' in request.resource.data)
+          || request.resource.data.photoURL == null
+          || stringMax(request.resource.data.photoURL, 2048));
+    }
+
     function safeChatUpdate() {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       return signedIn()
@@ -370,7 +407,9 @@ service cloud.firestore {
 
     match /publicProfiles/{userId} {
       allow read: if signedIn();
-      allow create, update: if validPublicProfileWrite(userId);
+      allow create: if validPublicProfileWrite(userId)
+        || validSystemBotPublicProfileCreate(userId);
+      allow update: if validPublicProfileWrite(userId);
       allow delete: if false;
     }
 

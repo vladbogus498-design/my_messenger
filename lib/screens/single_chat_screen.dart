@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../constants/system_bot.dart';
 import '../services/chat_service.dart';
 import '../services/media_availability_service.dart';
 import '../services/storage_service.dart';
@@ -110,6 +111,18 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     }
 
     if (otherUserId == null || otherUserId.isEmpty) return;
+
+    if (otherUserId == SystemBot.uid) {
+      if (!mounted) return;
+      setState(() {
+        _otherUserId = SystemBot.uid;
+        _peerName = SystemBot.name;
+        _peerPhotoUrl = null;
+        _peerIsOnline = false;
+        _peerLastSeen = null;
+      });
+      return;
+    }
 
     try {
       final userDoc = await FirebaseFirestore.instance
@@ -1406,6 +1419,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   void _showUserProfile() async {
     // Используем otherUserId если он передан, иначе получаем из участников чата напрямую
     String? otherUserId = widget.otherUserId ?? _otherUserId;
+    if (otherUserId == SystemBot.uid) return;
 
     if (otherUserId == null) {
       // Получаем ID другого пользователя из участников чата напрямую через Firestore
@@ -1463,8 +1477,11 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       required String? photoUrl,
       required bool isOnline,
       required DateTime? lastSeen,
+      bool isOfficial = false,
     }) {
-      final status = _typingStatus.recordingVoiceUsers.isNotEmpty
+      final status = isOfficial
+          ? SystemBot.bio
+          : _typingStatus.recordingVoiceUsers.isNotEmpty
           ? 'Записывает голосовое...'
           : _typingStatus.sendingPhotoUsers.isNotEmpty
           ? 'Отправляет фото...'
@@ -1473,13 +1490,15 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           : UserFormatters.chatPresence(isOnline: isOnline, lastSeen: lastSeen);
 
       return GestureDetector(
-        onTap: _showUserProfile,
+        onTap: isOfficial ? null : _showUserProfile,
         child: Row(
           children: [
             _ChatAppBarAvatar(
               name: name,
               photoUrl: photoUrl,
               isOnline: isOnline,
+              assetPath: isOfficial ? SystemBot.avatarAsset : null,
+              isOfficial: isOfficial,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -1505,6 +1524,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                     style: TextStyle(
                       color: isOnline
                           ? DarkKickColors.online
+                          : isOfficial
+                          ? DarkKickColors.electricPurple
                           : DarkKickColors.textTertiary,
                       fontSize: 12,
                     ),
@@ -1523,6 +1544,16 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         photoUrl: _peerPhotoUrl,
         isOnline: _peerIsOnline,
         lastSeen: _peerLastSeen,
+      );
+    }
+
+    if (otherUserId == SystemBot.uid) {
+      return titleContent(
+        name: SystemBot.name,
+        photoUrl: null,
+        isOnline: false,
+        lastSeen: null,
+        isOfficial: true,
       );
     }
 
@@ -1610,10 +1641,20 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                       }
                       final docs = snapshot.data?.docs ?? [];
                       _messageDocs = docs;
+                      final isSystemBotChat =
+                          (widget.otherUserId ?? _otherUserId) ==
+                          SystemBot.uid;
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         _markMessagesAsRead();
                       });
                       if (docs.isEmpty) {
+                        if (isSystemBotChat) {
+                          return const _ChatEmptyState(
+                            icon: Icons.verified_rounded,
+                            title: SystemBot.name,
+                            subtitle: SystemBot.welcomeMessage,
+                          );
+                        }
                         return const _ChatEmptyState(
                           icon: Icons.chat_bubble_outline,
                           title: 'Диалог пуст',
@@ -1696,11 +1737,15 @@ class _ChatAppBarAvatar extends StatelessWidget {
     required this.name,
     required this.photoUrl,
     required this.isOnline,
+    this.assetPath,
+    this.isOfficial = false,
   });
 
   final String name;
   final String? photoUrl;
   final bool isOnline;
+  final String? assetPath;
+  final bool isOfficial;
 
   @override
   Widget build(BuildContext context) {
@@ -1714,10 +1759,22 @@ class _ChatAppBarAvatar extends StatelessWidget {
           height: 38,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: DarkKickColors.stroke),
+            border: Border.all(
+              color: isOfficial
+                  ? DarkKickColors.electricPurple
+                  : DarkKickColors.stroke,
+              width: 0.8,
+            ),
           ),
           child: ClipOval(
-            child: photoUrl != null && photoUrl!.isNotEmpty
+            child: assetPath != null
+                ? Image.asset(
+                    assetPath!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        _ChatAppBarAvatarFallback(initial: initial),
+                  )
+                : photoUrl != null && photoUrl!.isNotEmpty
                 ? Image.network(
                     photoUrl!,
                     fit: BoxFit.cover,
@@ -1734,7 +1791,11 @@ class _ChatAppBarAvatar extends StatelessWidget {
             width: 11,
             height: 11,
             decoration: BoxDecoration(
-              color: isOnline ? DarkKickColors.online : DarkKickColors.offline,
+              color: isOfficial
+                  ? DarkKickColors.electricPurple
+                  : isOnline
+                  ? DarkKickColors.online
+                  : DarkKickColors.offline,
               shape: BoxShape.circle,
               border: Border.all(
                 color: DarkKickColors.darkBackground,

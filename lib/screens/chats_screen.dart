@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../constants/system_bot.dart';
 import '../models/chat.dart';
 import '../providers/chats_provider.dart';
 import '../theme/darkkick_colors.dart';
@@ -339,9 +340,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             delegate: SliverChildBuilderDelegate((context, index) {
               if (index.isOdd) return const SizedBox(height: 10);
               final chat = chats[index ~/ 2];
+              final isSystemBotChat = SystemBot.isSystemChat(chat);
               return _ChatTile(
                 chat: chat,
-                isDirectChat: _isDirectLikeChat(chat),
+                isDirectChat: !isSystemBotChat && _isDirectLikeChat(chat),
+                isSystemBotChat: isSystemBotChat,
                 currentUserId: currentUserId,
                 fallbackTitle: _fallbackTitle(chat),
                 onTap: () => _openChat(chat),
@@ -395,6 +398,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         !chat.participants.contains(currentUserId)) {
       _logSkippedLegacyChat(chat, currentUserId, 'invalid id/participants');
       return false;
+    }
+    if (SystemBot.isSystemChat(chat)) {
+      return true;
     }
     if (_isDirectLikeChat(chat)) {
       final hasPeer = chat.otherParticipantId(currentUserId) != null;
@@ -515,6 +521,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   String _fallbackTitle(Chat chat) {
+    if (SystemBot.isSystemChat(chat)) return SystemBot.name;
     final raw = (chat.groupName ?? chat.name).trim();
     if (raw.isNotEmpty) return raw;
     if (_isGroupChat(chat)) return 'Группа';
@@ -529,7 +536,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         SingleChatScreen(
           chatId: chat.id,
           chatName: _fallbackTitle(chat),
-          otherUserId: chat.otherParticipantId(_currentUserId),
+          otherUserId: SystemBot.isSystemChat(chat)
+              ? SystemBot.uid
+              : chat.otherParticipantId(_currentUserId),
         ),
       ),
     );
@@ -540,6 +549,7 @@ class _ChatTile extends StatelessWidget {
   const _ChatTile({
     required this.chat,
     required this.isDirectChat,
+    required this.isSystemBotChat,
     required this.currentUserId,
     required this.fallbackTitle,
     required this.onTap,
@@ -547,6 +557,7 @@ class _ChatTile extends StatelessWidget {
 
   final Chat chat;
   final bool isDirectChat;
+  final bool isSystemBotChat;
   final String? currentUserId;
   final String fallbackTitle;
   final VoidCallback onTap;
@@ -561,7 +572,9 @@ class _ChatTile extends StatelessWidget {
       stream: _peerMetaStream(otherUserId),
       builder: (context, snapshot) {
         final meta = snapshot.data;
-        final title = isDirectChat
+        final title = isSystemBotChat
+            ? SystemBot.name
+            : isDirectChat
             ? meta?.name ?? fallbackTitle
             : fallbackTitle;
         final photoUrl = isDirectChat ? meta?.photoUrl : null;
@@ -597,12 +610,14 @@ class _ChatTile extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  _ChatAvatar(
-                    title: title,
-                    photoUrl: photoUrl,
-                    isGroup: chat.isGroup,
-                    size: 52,
-                  ),
+                  isSystemBotChat
+                      ? const _SystemBotAvatar(size: 52)
+                      : _ChatAvatar(
+                          title: title,
+                          photoUrl: photoUrl,
+                          isGroup: chat.isGroup,
+                          size: 52,
+                        ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -629,6 +644,15 @@ class _ChatTile extends StatelessWidget {
                                   Icons.group,
                                   color: DarkKickColors.neonPurple,
                                   size: 14,
+                                ),
+                              ),
+                            if (isSystemBotChat)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 4),
+                                child: Icon(
+                                  Icons.verified_rounded,
+                                  color: DarkKickColors.electricPurple,
+                                  size: 15,
                                 ),
                               ),
                           ],
@@ -759,6 +783,45 @@ class _UnreadBadge extends StatelessWidget {
           color: Colors.white,
           fontSize: 11,
           fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _SystemBotAvatar extends StatelessWidget {
+  const _SystemBotAvatar({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: DarkKickColors.electricPurple, width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: DarkKickColors.neonPurple.withValues(alpha: 0.2),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: Image.asset(
+          SystemBot.avatarAsset,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const ColoredBox(
+            color: DarkKickColors.cardSoft,
+            child: Center(
+              child: Icon(
+                Icons.verified_rounded,
+                color: DarkKickColors.electricPurple,
+              ),
+            ),
+          ),
         ),
       ),
     );

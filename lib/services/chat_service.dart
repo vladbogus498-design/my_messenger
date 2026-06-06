@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../constants/system_bot.dart';
 import '../models/chat.dart';
 import '../models/message.dart';
 import '../models/message_type.dart';
@@ -100,6 +101,79 @@ class ChatService {
   static String _directChatId(String userId, String otherUserId) {
     final participants = [userId, otherUserId]..sort();
     return participants.join('_');
+  }
+
+  static Future<void> ensureSystemBotPublicProfile() async {
+    final botRef = _firestore.collection('publicProfiles').doc(SystemBot.uid);
+
+    try {
+      final snapshot = await botRef.get();
+      if (snapshot.exists) return;
+
+      final now = FieldValue.serverTimestamp();
+      await botRef.set({
+        'uid': SystemBot.uid,
+        'name': SystemBot.name,
+        'nameLower': SystemBot.name.toLowerCase(),
+        'tag': SystemBot.tag,
+        'tagLower': SystemBot.tag,
+        'bio': SystemBot.bio,
+        'photoURL': null,
+        'isBot': true,
+        'isOfficial': true,
+        'searchKeywords': SystemBot.searchKeywords,
+        'createdAt': now,
+        'updatedAt': now,
+      });
+      appLogger.d('System bot public profile ensured');
+    } on FirebaseException catch (e) {
+      appLogger.w(
+        'System bot public profile sync skipped: ${e.code} ${e.message ?? ''}',
+      );
+    } catch (e) {
+      appLogger.w('System bot public profile sync skipped: $e');
+    }
+  }
+
+  static Future<String> ensureSystemBotChat(String currentUid) async {
+    if (!InputValidator.isValidUserId(currentUid)) {
+      throw Exception('Invalid currentUid');
+    }
+
+    await ensureSystemBotPublicProfile();
+
+    final chatId = SystemBot.chatIdFor(currentUid);
+    final chatRef = _firestore.collection('chats').doc(chatId);
+
+    return _firestore.runTransaction<String>((transaction) async {
+      final snapshot = await transaction.get(chatRef);
+      if (snapshot.exists) return chatId;
+
+      final now = FieldValue.serverTimestamp();
+      transaction.set(chatRef, {
+        'type': SystemBot.type,
+        'name': SystemBot.name,
+        'isGroup': false,
+        'isSystem': true,
+        'participants': [currentUid, SystemBot.uid],
+        'admins': [],
+        'createdBy': currentUid,
+        'lastMessage': SystemBot.welcomeMessage,
+        'lastMessageType': SystemBot.type,
+        'lastMessageAt': now,
+        'lastMessageTime': now,
+        'lastMessageStatus': 'sent',
+        'lastMessageReadBy': [SystemBot.uid],
+        'lastSenderId': SystemBot.uid,
+        'unreadCount': {currentUid: 1, SystemBot.uid: 0},
+        'typing': <String, dynamic>{},
+        'pinnedMessage': null,
+        'createdAt': now,
+        'updatedAt': now,
+      });
+
+      return chatId;
+    });
   }
 
   static Future<void> sendMessage({
@@ -497,6 +571,10 @@ class ChatService {
 
     if (userId == otherUserId) {
       throw Exception('Cannot create chat with yourself');
+    }
+
+    if (otherUserId == SystemBot.uid) {
+      return ensureSystemBotChat(userId);
     }
 
     final directChatId = _directChatId(userId, otherUserId);

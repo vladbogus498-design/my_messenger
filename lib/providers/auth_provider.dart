@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/auth_service.dart';
+import '../services/chat_service.dart';
 import '../services/user_service.dart';
 import '../utils/logger.dart';
 
@@ -212,6 +213,11 @@ class AuthController extends StateNotifier<AuthFlowState> {
       await UserService.ensurePublicProfile();
     } catch (e) {
       appLogger.e('Post-login public profile sync failed', error: e);
+    }
+    try {
+      await ChatService.ensureSystemBotChat(user.uid);
+    } catch (e) {
+      appLogger.e('Post-login system bot chat ensure failed', error: e);
     }
   }
 
