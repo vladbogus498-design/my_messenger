@@ -144,6 +144,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 22),
+                      _LogoutGlassButton(
+                        onTap: () async {
+                          await UserService.setPresence(
+                            isOnline: false,
+                            force: true,
+                          );
+                          await _auth.signOut();
+                        },
+                      ),
                     ],
                   ),
                 );
@@ -585,6 +595,51 @@ class _SettingsIcon extends StatelessWidget {
           ),
           Icon(icon, color: DarkKickColors.neonPurple, size: 30),
         ],
+      ),
+    );
+  }
+}
+
+class _LogoutGlassButton extends StatelessWidget {
+  const _LogoutGlassButton({required this.onTap});
+
+  final Future<void> Function() onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => onTap(),
+        borderRadius: BorderRadius.circular(22),
+        child: Ink(
+          height: 58,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2A080D).withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: const Color(0xFFFF405A).withValues(alpha: 0.34),
+            ),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.logout, color: Color(0xFFFF4D5D), size: 22),
+              SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Выйти из аккаунта',
+                  style: TextStyle(
+                    color: Color(0xFFFF5B6C),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Color(0xFFFF7A88), size: 24),
+            ],
+          ),
+        ),
       ),
     );
   }

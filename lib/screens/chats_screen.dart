@@ -147,23 +147,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
       child: Container(
-        height: 46,
+        height: 48,
         decoration: BoxDecoration(
-          color: DarkKickColors.panel,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: DarkKickColors.divider),
+          color: DarkKickColors.panel.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: DarkKickColors.stroke),
         ),
         child: Row(
           children: [
-            const SizedBox(width: 14),
-            const Icon(
-              Icons.search,
-              color: DarkKickColors.textTertiary,
-              size: 20,
+            const SizedBox(width: 12),
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: DarkKickColors.neonPurple.withValues(alpha: 0.08),
+              ),
+              child: const Icon(
+                Icons.search,
+                color: DarkKickColors.electricPurple,
+                size: 18,
+              ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Expanded(
               child: TextField(
                 controller: _searchController,
@@ -185,14 +193,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 onPressed: _searchController.clear,
               )
             else
-              const Padding(
-                padding: EdgeInsets.only(right: 14),
-                child: Icon(
-                  Icons.tune,
-                  color: DarkKickColors.neonPurple,
-                  size: 20,
-                ),
-              ),
+              const SizedBox(width: 14),
           ],
         ),
       ),
@@ -259,7 +260,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     const filters = ['Все', 'Личные', 'Группы', 'Каналы'];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
       child: Row(
         children: List.generate(filters.length, (index) {
           final isSelected = _selectedFilterIndex == index;
@@ -272,18 +273,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 onTap: () => setState(() => _selectedFilterIndex = index),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  height: 34,
+                  height: 38,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? DarkKickColors.cardSoft
+                        ? DarkKickColors.neonPurple.withValues(alpha: 0.16)
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(17),
+                    borderRadius: BorderRadius.circular(19),
                     border: Border.all(
                       color: isSelected
-                          ? DarkKickColors.stroke
+                          ? DarkKickColors.neonPurple
                           : DarkKickColors.divider,
                     ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: DarkKickColors.neonPurple.withValues(
+                                alpha: 0.18,
+                              ),
+                              blurRadius: 14,
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Text(
                     filters[index],
@@ -346,9 +357,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ? const <Chat>[]
         : chats
               .where((chat) => chat.participants.contains(currentUserId))
+              .where((chat) => _isDisplayableChat(chat, currentUserId))
               .toList();
     if (_selectedFilterIndex == 1) {
-      filtered = filtered.where(_isDirectChat).toList();
+      filtered = filtered.where(_isDirectLikeChat).toList();
     } else if (_selectedFilterIndex == 2) {
       filtered = filtered.where(_isGroupChat).toList();
     } else if (_selectedFilterIndex == 3) {
@@ -366,6 +378,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _isDirectChat(Chat chat) {
     final type = chat.type.toLowerCase().trim();
     return type == 'direct' || type == 'private';
+  }
+
+  bool _isDirectLikeChat(Chat chat) {
+    final type = chat.type.toLowerCase().trim();
+    return type == 'direct' ||
+        type == 'private' ||
+        (!chat.isGroup && type != 'group' && type != 'channel');
+  }
+
+  bool _isDisplayableChat(Chat chat, String currentUserId) {
+    if (chat.id.trim().isEmpty || chat.participants.isEmpty) return false;
+    if (_isDirectLikeChat(chat)) {
+      return chat.otherParticipantId(currentUserId) != null;
+    }
+    return _fallbackTitle(chat).trim().isNotEmpty;
   }
 
   bool _isGroupChat(Chat chat) {
@@ -423,8 +450,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         border: Border(top: BorderSide(color: DarkKickColors.divider)),
       ),
       child: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         elevation: 0,
         backgroundColor: DarkKickColors.darkBackground,
+        selectedItemColor: DarkKickColors.neonPurple,
+        unselectedItemColor: DarkKickColors.textTertiary,
+        selectedFontSize: 11,
+        unselectedFontSize: 11,
+        iconSize: 24,
+        showSelectedLabels: true,
+        showUnselectedLabels: true,
         currentIndex: _selectedNavIndex,
         onTap: (index) => setState(() => _selectedNavIndex = index),
         items: const [
@@ -453,7 +488,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  String _fallbackTitle(Chat chat) => chat.groupName ?? chat.name;
+  String _fallbackTitle(Chat chat) {
+    final raw = (chat.groupName ?? chat.name).trim();
+    if (raw.isNotEmpty) return raw;
+    if (_isGroupChat(chat)) return 'Группа';
+    if (_isChannelChat(chat)) return 'Канал';
+    return 'Чат';
+  }
 
   void _openChat(Chat chat) {
     Navigator.push(
@@ -496,6 +537,9 @@ class _ChatTile extends StatelessWidget {
             ? meta?.name ?? fallbackTitle
             : fallbackTitle;
         final photoUrl = chat.isDirect ? meta?.photoUrl : null;
+        final preview = chat.lastMessage.trim().isEmpty
+            ? 'Сообщений пока нет'
+            : chat.lastMessage;
         final presence = meta == null || !chat.isDirect
             ? null
             : UserFormatters.compactPresence(
@@ -578,7 +622,7 @@ class _ChatTile extends StatelessWidget {
                           const SizedBox(height: 2),
                         ],
                         Text(
-                          chat.lastMessage,
+                          preview,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -819,7 +863,8 @@ Stream<_PeerMeta>? _peerMetaStream(String? uid) {
         final fallback = email.contains('@')
             ? email.split('@').first
             : 'Пользователь';
-        final name = (data['name'] ?? fallback).toString();
+        final loadedName = (data['name'] ?? fallback).toString().trim();
+        final name = loadedName.isEmpty ? fallback : loadedName;
         final photoUrl = UserFormatters.readPhotoUrl(data);
         final avatarUpdatedAt = UserFormatters.readDate(
           data['avatarUpdatedAt'],

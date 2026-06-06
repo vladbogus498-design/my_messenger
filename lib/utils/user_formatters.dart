@@ -26,35 +26,14 @@ class UserFormatters {
     required bool isOnline,
     required DateTime? lastSeen,
   }) {
-    if (isOnline) return 'В сети';
-    if (lastSeen == null) return 'Был(а) недавно';
-
-    final local = lastSeen.toLocal();
-    final now = DateTime.now();
-    final isToday =
-        local.year == now.year &&
-        local.month == now.month &&
-        local.day == now.day;
-    final time =
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-
-    if (isToday) return 'Был(а) сегодня в $time';
-
-    final yesterday = now.subtract(const Duration(days: 1));
-    final isYesterday =
-        local.year == yesterday.year &&
-        local.month == yesterday.month &&
-        local.day == yesterday.day;
-    if (isYesterday) return 'Был(а) вчера в $time';
-
-    return 'Был(а) ${registrationDate(local)}';
+    return compactPresence(isOnline: isOnline, lastSeen: lastSeen);
   }
 
   static String compactPresence({
     required bool isOnline,
     required DateTime? lastSeen,
   }) {
-    if (isOnline) return '● В сети';
+    if (isOnline) return 'В сети';
     if (lastSeen == null) return 'Был(а) недавно';
 
     final diff = DateTime.now().difference(lastSeen.toLocal());
