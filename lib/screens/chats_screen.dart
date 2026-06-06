@@ -147,7 +147,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
       child: Container(
-        height: 48,
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: DarkKickColors.panel.withValues(alpha: 0.92),
           borderRadius: BorderRadius.circular(18),
@@ -155,29 +156,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         child: Row(
           children: [
-            const SizedBox(width: 12),
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: DarkKickColors.neonPurple.withValues(alpha: 0.08),
-              ),
-              child: const Icon(
-                Icons.search,
-                color: DarkKickColors.electricPurple,
-                size: 18,
-              ),
+            const Icon(
+              Icons.search,
+              color: DarkKickColors.electricPurple,
+              size: 20,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: TextField(
                 controller: _searchController,
-                style: const TextStyle(color: DarkKickColors.textPrimary),
+                style: const TextStyle(
+                  color: DarkKickColors.textPrimary,
+                  fontSize: 15,
+                ),
                 decoration: const InputDecoration(
                   hintText: 'Поиск',
+                  hintStyle: TextStyle(
+                    color: DarkKickColors.textTertiary,
+                    fontSize: 15,
+                  ),
                   border: InputBorder.none,
-                  isCollapsed: true,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                  isDense: true,
                 ),
               ),
             ),

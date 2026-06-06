@@ -160,17 +160,47 @@ service cloud.firestore {
           || stringMax(request.resource.data.publicKey, 8000));
     }
 
+    function hasNonEmptyUsernameLower() {
+      return ('usernameLower' in request.resource.data)
+        && request.resource.data.usernameLower is string
+        && request.resource.data.usernameLower.size() > 0;
+    }
+
+    function usernameValuesConsistent() {
+      return (!('username' in request.resource.data)
+          || !('usernameLower' in request.resource.data)
+          || request.resource.data.username == request.resource.data.usernameLower)
+        && (!('tag' in request.resource.data)
+          || !('tagLower' in request.resource.data)
+          || request.resource.data.tag == request.resource.data.tagLower)
+        && (!('username' in request.resource.data)
+          || !('tag' in request.resource.data)
+          || request.resource.data.username == request.resource.data.tag);
+    }
+
+    function ownsUsernameLowerAfterWrite() {
+      return !hasNonEmptyUsernameLower()
+        || (
+          getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.usernameLower)).data.uid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.usernameLower)).data.usernameLower == request.resource.data.usernameLower
+        );
+    }
+
     function validUserCreate(userId) {
       return isSelf(userId)
         && userFieldsOnly(request.resource.data.keys())
-        && validUserFields(userId);
+        && validUserFields(userId)
+        && usernameValuesConsistent()
+        && ownsUsernameLowerAfterWrite();
     }
 
     function validUserUpdate(userId) {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       return isSelf(userId)
         && userFieldsOnly(changed)
-        && validChangedUserFields(userId, changed);
+        && validChangedUserFields(userId, changed)
+        && usernameValuesConsistent()
+        && ownsUsernameLowerAfterWrite();
     }
 
     function validPublicProfileWrite(userId) {
@@ -199,7 +229,9 @@ service cloud.firestore {
           || stringMax(request.resource.data.photoURL, 2048))
         && (!('publicKey' in request.resource.data)
           || request.resource.data.publicKey == null
-          || stringMax(request.resource.data.publicKey, 8000));
+          || stringMax(request.resource.data.publicKey, 8000))
+        && usernameValuesConsistent()
+        && ownsUsernameLowerAfterWrite();
     }
 
     function usernameFieldsOnly() {
@@ -220,7 +252,22 @@ service cloud.firestore {
         && request.resource.data.username == usernameLower
         && nonEmptyStringMax(request.resource.data.username, 32)
         && request.resource.data.createdAt is timestamp
-        && request.resource.data.updatedAt is timestamp;
+        && request.resource.data.updatedAt is timestamp
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.usernameLower == usernameLower
+        && getAfter(/databases/$(database)/documents/publicProfiles/$(request.auth.uid)).data.usernameLower == usernameLower;
+    }
+
+    function validUsernameDelete(usernameLower) {
+      return signedIn()
+        && resource.data.uid == request.auth.uid
+        && (
+          !('usernameLower' in getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+          || getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.usernameLower != usernameLower
+        )
+        && (
+          !('usernameLower' in getAfter(/databases/$(database)/documents/publicProfiles/$(request.auth.uid)).data)
+          || getAfter(/databases/$(database)/documents/publicProfiles/$(request.auth.uid)).data.usernameLower != usernameLower
+        );
     }
 
     function systemBotPublicProfileFieldsOnly() {
@@ -440,8 +487,7 @@ service cloud.firestore {
       allow update: if validUsernameWrite(usernameLower)
         && resource.data.uid == request.auth.uid
         && request.resource.data.uid == resource.data.uid;
-      allow delete: if signedIn()
-        && resource.data.uid == request.auth.uid;
+      allow delete: if validUsernameDelete(usernameLower);
     }
 
     match /typingStatus/{chatId} {

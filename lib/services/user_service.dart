@@ -278,6 +278,15 @@ class UserService {
         updates['avatarUpdatedAt'] = FieldValue.serverTimestamp();
       }
 
+      if (tag == null && updates.isNotEmpty && currentUsernameLower.isNotEmpty) {
+        updates['tag'] = currentUsernameLower;
+        updates['tagLower'] = currentUsernameLower;
+        updates['username'] = currentUsernameLower;
+        updates['usernameLower'] = currentUsernameLower;
+        nextTag = currentUsernameLower;
+        nextUsername = currentUsernameLower;
+      }
+
       if (updates.isEmpty) return;
       updates['searchKeywords'] = _buildSearchKeywords(
         nextName,
@@ -305,16 +314,23 @@ class UserService {
         fields: publicData.keys,
         allowedFields: _localRulesPublicProfileFields,
       );
-      if (tag != null) {
+      final effectiveNextUsernameLower = tag != null
+          ? updates['usernameLower']?.toString() ?? ''
+          : currentUsernameLower;
+      final effectiveNextUsername = tag != null
+          ? updates['username']?.toString() ?? ''
+          : nextUsername.trim().toLowerCase();
+      final shouldUseUsernameTransaction =
+          tag != null || currentUsernameLower.isNotEmpty;
+      if (shouldUseUsernameTransaction) {
         await _saveProfileWithUsernameTransaction(
           userId: userId,
           updates: updates,
           publicData: publicData,
           userRef: userRef,
           publicProfileRef: publicProfileRef,
-          currentUsernameLower: currentUsernameLower,
-          nextUsernameLower: updates['usernameLower']?.toString() ?? '',
-          nextUsername: updates['username']?.toString() ?? '',
+          nextUsernameLower: effectiveNextUsernameLower,
+          nextUsername: effectiveNextUsername,
         );
       } else {
         appLogger.d(
@@ -380,7 +396,6 @@ class UserService {
     required Map<String, dynamic> publicData,
     required DocumentReference<Map<String, dynamic>> userRef,
     required DocumentReference<Map<String, dynamic>> publicProfileRef,
-    required String currentUsernameLower,
     required String nextUsernameLower,
     required String nextUsername,
   }) async {
@@ -388,22 +403,38 @@ class UserService {
     final nextUsernameRef = nextUsernameLower.isEmpty
         ? null
         : usernames.doc(nextUsernameLower);
-    final oldUsernameRef =
-        currentUsernameLower.isEmpty ||
-            currentUsernameLower == nextUsernameLower
-        ? null
-        : usernames.doc(currentUsernameLower);
 
     appLogger.d(
       'Profile username transaction started: userId=$userId '
-      'oldUsernameLower="$currentUsernameLower" '
       'nextUsernameLower="$nextUsernameLower"',
     );
 
     try {
       await _firestore.runTransaction((transaction) async {
+        final transactionUserDoc = await transaction.get(userRef);
+        final transactionPublicProfileDoc = await transaction.get(
+          publicProfileRef,
+        );
         DocumentSnapshot<Map<String, dynamic>>? nextUsernameDoc;
         DocumentSnapshot<Map<String, dynamic>>? oldUsernameDoc;
+
+        final transactionUserData =
+            transactionUserDoc.data() ?? const <String, dynamic>{};
+        final transactionPublicProfileData =
+            transactionPublicProfileDoc.data() ?? const <String, dynamic>{};
+        final oldUsernameLower =
+            (transactionUserData['usernameLower'] ??
+                    transactionUserData['tagLower'] ??
+                    transactionPublicProfileData['usernameLower'] ??
+                    transactionPublicProfileData['tagLower'] ??
+                    '')
+                .toString()
+                .trim()
+                .toLowerCase();
+        final oldUsernameRef =
+            oldUsernameLower.isEmpty || oldUsernameLower == nextUsernameLower
+            ? null
+            : usernames.doc(oldUsernameLower);
 
         if (nextUsernameRef != null) {
           nextUsernameDoc = await transaction.get(nextUsernameRef);

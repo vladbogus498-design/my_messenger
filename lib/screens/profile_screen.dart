@@ -112,13 +112,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             onTap: () => _openEditProfile(user),
                           ),
                           _SettingsItemData(
-                            icon: Icons.shield_rounded,
+                            icon: Icons.privacy_tip_outlined,
                             title: 'Приватность',
                             subtitle: 'Кто может писать, онлайн',
                             onTap: () => _openPlaceholder('Приватность'),
                           ),
                           _SettingsItemData(
-                            icon: Icons.lock_rounded,
+                            icon: Icons.lock_outline_rounded,
                             title: 'Безопасность',
                             subtitle: 'Пароль, устройства',
                             onTap: () => _openPlaceholder('Безопасность'),
@@ -130,13 +130,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: 'ОБЩЕНИЕ',
                         items: [
                           _SettingsItemData(
-                            icon: Icons.chat_bubble_rounded,
+                            icon: Icons.chat_bubble_outline_rounded,
                             title: 'Чаты',
                             subtitle: 'Темы, размер текста',
                             onTap: () => _openPlaceholder('Чаты'),
                           ),
                           _SettingsItemData(
-                            icon: Icons.notifications_rounded,
+                            icon: Icons.notifications_none_rounded,
                             title: 'Уведомления',
                             subtitle: 'Звуки, вибрация, баннеры',
                             onTap: () => _openPlaceholder('Уведомления'),
@@ -155,13 +155,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: 'ПРИЛОЖЕНИЕ',
                         items: [
                           _SettingsItemData(
-                            icon: Icons.palette_rounded,
+                            icon: Icons.palette_outlined,
                             title: 'Внешний вид',
                             subtitle: 'Тема, цвета, иконки',
                             onTap: () => _openPlaceholder('Внешний вид'),
                           ),
                           _SettingsItemData(
-                            icon: Icons.info_rounded,
+                            icon: Icons.info_outline_rounded,
                             title: 'О приложении',
                             subtitle: 'Версия, поддержка',
                             onTap: () => _openPlaceholder('О приложении'),
@@ -380,7 +380,7 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
                 _ProfileFieldCard(
                   label: 'О себе',
                   controller: _bioController,
-                  height: 108,
+                  height: 96,
                   minLines: 2,
                   maxLines: 3,
                   textInputAction: TextInputAction.newline,
@@ -698,7 +698,7 @@ class _SettingsIcon extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(12),
               color: DarkKickColors.neonPurple.withValues(alpha: 0.18),
               border: Border.all(
                 color: DarkKickColors.neonPurple.withValues(alpha: 0.2),
@@ -713,7 +713,7 @@ class _SettingsIcon extends StatelessWidget {
               ],
             ),
           ),
-          Icon(icon, color: DarkKickColors.electricPurple, size: 22),
+          Icon(icon, color: DarkKickColors.electricPurple, size: 20),
         ],
       ),
     );
@@ -775,7 +775,7 @@ class _LogoutIcon extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(12),
         color: const Color(0xFFFF3B5F).withValues(alpha: 0.13),
         border: Border.all(
           color: const Color(0xFFFF3B5F).withValues(alpha: 0.22),
@@ -792,7 +792,7 @@ class _LogoutIcon extends StatelessWidget {
       child: const Icon(
         Icons.logout_rounded,
         color: Color(0xFFFF4D5D),
-        size: 22,
+        size: 20,
       ),
     );
   }
