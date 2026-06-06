@@ -90,18 +90,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 return SafeArea(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(22, 26, 22, 28),
+                    padding: const EdgeInsets.fromLTRB(20, 26, 20, 30),
                     children: [
                       _SettingsHeader(
                         showBackButton: widget.showBackButton,
                         onBack: () => Navigator.pop(context),
                       ),
-                      const SizedBox(height: 22),
+                      const SizedBox(height: 20),
                       _DarkkickIdCard(
                         user: user,
                         onTap: () => _openEditProfile(user),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
                       _SettingsSection(
                         title: 'АККАУНТ',
                         items: [
@@ -125,7 +125,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 20),
                       _SettingsSection(
                         title: 'ОБЩЕНИЕ',
                         items: [
@@ -150,7 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 20),
                       _SettingsSection(
                         title: 'ПРИЛОЖЕНИЕ',
                         items: [
@@ -174,7 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 22),
+                      const SizedBox(height: 18),
                       _LogoutGlassButton(onTap: _confirmLogout),
                     ],
                   ),
@@ -330,14 +330,14 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
 
           return SafeArea(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(24, 22, 24, 32),
+              padding: const EdgeInsets.fromLTRB(22, 22, 22, 34),
               children: [
                 _EditHeader(
                   busy: _busy,
                   onBack: () => Navigator.pop(context),
                   onSave: _busy ? null : _saveProfile,
                 ),
-                const SizedBox(height: 34),
+                const SizedBox(height: 36),
                 Center(
                   child: _EditableAvatar(
                     user: user,
@@ -345,7 +345,7 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
                     onTap: _busy ? null : _uploadAvatar,
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 38),
                 _ProfileFieldCard(
                   label: 'Имя',
                   controller: _nameController,
@@ -419,38 +419,39 @@ class _DarkkickIdCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(30),
         child: Ink(
-          height: 128,
-          padding: const EdgeInsets.all(16),
+          height: 124,
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
           decoration: BoxDecoration(
-            color: DarkKickColors.panel.withValues(alpha: 0.76),
-            borderRadius: BorderRadius.circular(24),
+            color: const Color(0xFF0B0814).withValues(alpha: 0.86),
+            borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.07),
-              width: 0.8,
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 1,
             ),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                DarkKickColors.cardSoft.withValues(alpha: 0.82),
-                DarkKickColors.panel.withValues(alpha: 0.54),
-                DarkKickColors.neonPurple.withValues(alpha: 0.05),
+                const Color(0xFF0B0814).withValues(alpha: 0.96),
+                const Color(0xFF10091D).withValues(alpha: 0.92),
+                const Color(0xFF140B25).withValues(alpha: 0.9),
               ],
             ),
             boxShadow: [
               BoxShadow(
-                color: DarkKickColors.neonPurple.withValues(alpha: 0.12),
-                blurRadius: 24,
-                offset: const Offset(0, 14),
+                color: DarkKickColors.neonPurple.withValues(alpha: 0.08),
+                blurRadius: 28,
+                spreadRadius: -8,
+                offset: const Offset(0, 16),
               ),
             ],
           ),
           child: Row(
             children: [
-              _ProfileAvatar(user: user, size: 78),
-              const SizedBox(width: 16),
+              _ProfileAvatar(user: user, size: 80),
+              const SizedBox(width: 18),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -462,11 +463,11 @@ class _DarkkickIdCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.spaceGrotesk(
                         color: Colors.white,
-                        fontSize: 20,
+                        fontSize: 19,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 4),
                     Text(
                       tag.isEmpty ? '@darkkick' : '@$tag',
                       maxLines: 1,
@@ -475,11 +476,11 @@ class _DarkkickIdCard extends StatelessWidget {
                         color: DarkKickColors.electricPurple.withValues(
                           alpha: 0.95,
                         ),
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 6),
                     Text(
                       bio,
                       maxLines: 2,
@@ -487,7 +488,7 @@ class _DarkkickIdCard extends StatelessWidget {
                       style: const TextStyle(
                         color: DarkKickColors.textSecondary,
                         fontSize: 13,
-                        height: 1.25,
+                        height: 1.22,
                       ),
                     ),
                   ],
@@ -518,13 +519,13 @@ class _SettingsSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 10, bottom: 9),
+          padding: const EdgeInsets.only(left: 12, bottom: 10),
           child: Text(
             title,
-            style: const TextStyle(
-              color: DarkKickColors.textTertiary,
+            style: TextStyle(
+              color: DarkKickColors.textTertiary.withValues(alpha: 0.7),
               fontSize: 12,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               letterSpacing: 0,
             ),
           ),
@@ -544,17 +545,26 @@ class _SettingsList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: DarkKickColors.panel.withValues(alpha: 0.66),
-        borderRadius: BorderRadius.circular(22),
+        color: const Color(0xFF0F0B18).withValues(alpha: 0.66),
+        borderRadius: BorderRadius.circular(26),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.055),
-          width: 0.8,
+          color: Colors.white.withValues(alpha: 0.07),
+          width: 1,
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF151020).withValues(alpha: 0.72),
+            const Color(0xFF0A0711).withValues(alpha: 0.62),
+          ],
         ),
         boxShadow: [
           BoxShadow(
-            color: DarkKickColors.neonPurple.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+            color: DarkKickColors.neonPurple.withValues(alpha: 0.055),
+            blurRadius: 24,
+            spreadRadius: -8,
+            offset: const Offset(0, 14),
           ),
         ],
       ),
@@ -567,7 +577,7 @@ class _SettingsList extends StatelessWidget {
                 padding: const EdgeInsets.only(left: 86),
                 child: Divider(
                   height: 1,
-                  color: Colors.white.withValues(alpha: 0.052),
+                  color: Colors.white.withValues(alpha: 0.06),
                 ),
               ),
           ],
@@ -602,14 +612,14 @@ class _SettingsRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: data.onTap,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(26),
         child: SizedBox(
-          height: 72,
+          height: 70,
           child: Row(
             children: [
-              const SizedBox(width: 18),
+              const SizedBox(width: 20),
               _SettingsIcon(icon: data.icon),
-              const SizedBox(width: 16),
+              const SizedBox(width: 18),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -643,7 +653,7 @@ class _SettingsRow extends StatelessWidget {
                 color: DarkKickColors.textSecondary,
                 size: 24,
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 16),
             ],
           ),
         ),
@@ -660,30 +670,31 @@ class _SettingsIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 38,
-      height: 38,
+      width: 40,
+      height: 40,
       child: Stack(
         alignment: Alignment.center,
         children: [
           Container(
-            width: 34,
-            height: 34,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(11),
-              color: DarkKickColors.neonPurple.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(15),
+              color: DarkKickColors.neonPurple.withValues(alpha: 0.18),
               border: Border.all(
-                color: DarkKickColors.neonPurple.withValues(alpha: 0.24),
-                width: 0.8,
+                color: DarkKickColors.neonPurple.withValues(alpha: 0.2),
+                width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: DarkKickColors.neonPurple.withValues(alpha: 0.14),
-                  blurRadius: 10,
+                  color: DarkKickColors.neonPurple.withValues(alpha: 0.1),
+                  blurRadius: 14,
+                  spreadRadius: -4,
                 ),
               ],
             ),
           ),
-          Icon(icon, color: DarkKickColors.electricPurple, size: 21),
+          Icon(icon, color: DarkKickColors.electricPurple, size: 22),
         ],
       ),
     );
@@ -900,6 +911,14 @@ class _EditHeader extends StatelessWidget {
         ),
         TextButton(
           onPressed: onSave,
+          style: TextButton.styleFrom(
+            foregroundColor: DarkKickColors.electricPurple,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           child: busy
               ? const SizedBox(
                   width: 18,
@@ -911,11 +930,6 @@ class _EditHeader extends StatelessWidget {
                 )
               : const Text(
                   'Сохранить',
-                  style: TextStyle(
-                    color: DarkKickColors.electricPurple,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
                 ),
         ),
       ],
@@ -941,21 +955,28 @@ class _EditableAvatar extends StatelessWidget {
       child: Stack(
         alignment: Alignment.bottomRight,
         children: [
-          _ProfileAvatar(user: user, size: 176),
+          _ProfileAvatar(user: user, size: 136),
           Container(
-            width: 52,
-            height: 52,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
               color: DarkKickColors.brightPurple,
               shape: BoxShape.circle,
               border: Border.all(
                 color: DarkKickColors.deepBackground,
-                width: 4,
+                width: 3,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: DarkKickColors.electricPurple.withValues(alpha: 0.24),
+                  blurRadius: 18,
+                  spreadRadius: -4,
+                ),
+              ],
             ),
             child: busy
                 ? const Padding(
-                    padding: EdgeInsets.all(14),
+                    padding: EdgeInsets.all(12),
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: Colors.white,
@@ -964,7 +985,7 @@ class _EditableAvatar extends StatelessWidget {
                 : const Icon(
                     Icons.camera_alt_outlined,
                     color: Colors.white,
-                    size: 24,
+                    size: 22,
                   ),
           ),
         ],
@@ -989,13 +1010,21 @@ class _ProfileFieldCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(22, 16, 22, 14),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
       decoration: BoxDecoration(
-        color: DarkKickColors.panel.withValues(alpha: 0.82),
+        color: const Color(0xFF0F0B18).withValues(alpha: 0.78),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
-          width: 0.8,
+          color: Colors.white.withValues(alpha: 0.075),
+          width: 1,
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF151020).withValues(alpha: 0.82),
+            const Color(0xFF09070F).withValues(alpha: 0.68),
+          ],
         ),
       ),
       child: Column(

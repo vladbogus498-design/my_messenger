@@ -498,46 +498,72 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildBottomNavBar() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: DarkKickColors.darkBackground,
-        border: Border(top: BorderSide(color: DarkKickColors.divider)),
+    const items = [
+      _DarkkickNavDestination(
+        icon: Icons.chat_bubble_outline,
+        activeIcon: Icons.chat_bubble,
+        label: 'Чаты',
       ),
-      child: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
-        backgroundColor: DarkKickColors.darkBackground,
-        selectedItemColor: DarkKickColors.neonPurple,
-        unselectedItemColor: DarkKickColors.textTertiary,
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        iconSize: 24,
-        showSelectedLabels: true,
-        showUnselectedLabels: true,
-        currentIndex: _selectedNavIndex,
-        onTap: (index) => setState(() => _selectedNavIndex = index),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            activeIcon: Icon(Icons.chat_bubble),
-            label: 'Чаты',
+      _DarkkickNavDestination(
+        icon: Icons.phone_outlined,
+        activeIcon: Icons.phone,
+        label: 'Звонки',
+      ),
+      _DarkkickNavDestination(
+        icon: Icons.people_outline,
+        activeIcon: Icons.people,
+        label: 'Люди',
+      ),
+      _DarkkickNavDestination(
+        icon: Icons.person_outline,
+        activeIcon: Icons.person,
+        label: 'Профиль',
+      ),
+    ];
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: Container(
+          height: 78,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0B0814).withValues(alpha: 0.88),
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.075),
+              width: 1,
+            ),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF12101D).withValues(alpha: 0.9),
+                const Color(0xFF07050C).withValues(alpha: 0.92),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: DarkKickColors.neonPurple.withValues(alpha: 0.08),
+                blurRadius: 28,
+                spreadRadius: -8,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.phone_outlined),
-            activeIcon: Icon(Icons.phone),
-            label: 'Звонки',
+          child: Row(
+            children: List.generate(items.length, (index) {
+              final selected = index == _selectedNavIndex;
+              return Expanded(
+                child: _DarkkickBottomNavItem(
+                  item: items[index],
+                  selected: selected,
+                  onTap: () => setState(() => _selectedNavIndex = index),
+                ),
+              );
+            }),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people_outline),
-            activeIcon: Icon(Icons.people),
-            label: 'Люди',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Профиль',
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -570,6 +596,103 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     Navigator.push(
       context,
       NavigationAnimations.slideFadeRoute(const NewChatScreen()),
+    );
+  }
+}
+
+class _DarkkickNavDestination {
+  const _DarkkickNavDestination({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+}
+
+class _DarkkickBottomNavItem extends StatelessWidget {
+  const _DarkkickBottomNavItem({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _DarkkickNavDestination item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected
+        ? DarkKickColors.electricPurple
+        : DarkKickColors.textTertiary;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: item.label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(28),
+          child: Stack(
+            alignment: Alignment.topCenter,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: selected ? 32 : 0,
+                height: 3,
+                margin: const EdgeInsets.only(top: 7),
+                decoration: BoxDecoration(
+                  color: DarkKickColors.electricPurple,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: DarkKickColors.neonPurple.withValues(
+                              alpha: 0.32,
+                            ),
+                            blurRadius: 12,
+                          ),
+                        ]
+                      : null,
+                ),
+              ),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        selected ? item.activeIcon : item.icon,
+                        color: color,
+                        size: selected ? 25 : 24,
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 11,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
