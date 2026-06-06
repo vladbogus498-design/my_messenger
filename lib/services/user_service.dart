@@ -6,6 +6,13 @@ import '../utils/input_validator.dart';
 import '../utils/logger.dart';
 import '../utils/rate_limiter.dart';
 
+class UsernameTakenException implements Exception {
+  const UsernameTakenException();
+
+  @override
+  String toString() => 'Username уже занят';
+}
+
 class UserService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -223,6 +230,11 @@ class UserService {
         );
       }
       final currentData = currentDoc.data() ?? const <String, dynamic>{};
+      final currentUsernameLower =
+          (currentData['usernameLower'] ?? currentData['tagLower'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
       final authUser = _auth.currentUser;
       var nextName =
           (currentData['name'] ??
@@ -293,36 +305,49 @@ class UserService {
         fields: publicData.keys,
         allowedFields: _localRulesPublicProfileFields,
       );
-      appLogger.d(
-        'Users document update started: users/$userId set(merge) '
-        'fields=${updates.keys.toList()}',
-      );
-      try {
-        await userRef.set(updates, SetOptions(merge: true));
-        appLogger.d('Users document update success: users/$userId');
-      } on FirebaseException catch (e) {
-        appLogger.e(
-          'Users document update failed: users/$userId '
-          '${e.code} ${e.message ?? ''}',
-          error: e,
+      if (tag != null) {
+        await _saveProfileWithUsernameTransaction(
+          userId: userId,
+          updates: updates,
+          publicData: publicData,
+          userRef: userRef,
+          publicProfileRef: publicProfileRef,
+          currentUsernameLower: currentUsernameLower,
+          nextUsernameLower: updates['usernameLower']?.toString() ?? '',
+          nextUsername: updates['username']?.toString() ?? '',
         );
-        rethrow;
-      }
+      } else {
+        appLogger.d(
+          'Users document update started: users/$userId set(merge) '
+          'fields=${updates.keys.toList()}',
+        );
+        try {
+          await userRef.set(updates, SetOptions(merge: true));
+          appLogger.d('Users document update success: users/$userId');
+        } on FirebaseException catch (e) {
+          appLogger.e(
+            'Users document update failed: users/$userId '
+            '${e.code} ${e.message ?? ''}',
+            error: e,
+          );
+          rethrow;
+        }
 
-      appLogger.d(
-        'PublicProfiles update started: publicProfiles/$userId set '
-        'fields=${publicData.keys.toList()}',
-      );
-      try {
-        await publicProfileRef.set(publicData);
-        appLogger.d('PublicProfiles update success: publicProfiles/$userId');
-      } on FirebaseException catch (e) {
-        appLogger.e(
-          'PublicProfiles update failed: publicProfiles/$userId '
-          '${e.code} ${e.message ?? ''}',
-          error: e,
+        appLogger.d(
+          'PublicProfiles update started: publicProfiles/$userId set '
+          'fields=${publicData.keys.toList()}',
         );
-        rethrow;
+        try {
+          await publicProfileRef.set(publicData);
+          appLogger.d('PublicProfiles update success: publicProfiles/$userId');
+        } on FirebaseException catch (e) {
+          appLogger.e(
+            'PublicProfiles update failed: publicProfiles/$userId '
+            '${e.code} ${e.message ?? ''}',
+            error: e,
+          );
+          rethrow;
+        }
       }
 
       if (photoURL != null) {
@@ -345,6 +370,98 @@ class UserService {
       rethrow;
     } catch (e) {
       appLogger.e('Error updating user data for userId: $userId', error: e);
+      rethrow;
+    }
+  }
+
+  static Future<void> _saveProfileWithUsernameTransaction({
+    required String userId,
+    required Map<String, dynamic> updates,
+    required Map<String, dynamic> publicData,
+    required DocumentReference<Map<String, dynamic>> userRef,
+    required DocumentReference<Map<String, dynamic>> publicProfileRef,
+    required String currentUsernameLower,
+    required String nextUsernameLower,
+    required String nextUsername,
+  }) async {
+    final usernames = _firestore.collection('usernames');
+    final nextUsernameRef = nextUsernameLower.isEmpty
+        ? null
+        : usernames.doc(nextUsernameLower);
+    final oldUsernameRef =
+        currentUsernameLower.isEmpty ||
+            currentUsernameLower == nextUsernameLower
+        ? null
+        : usernames.doc(currentUsernameLower);
+
+    appLogger.d(
+      'Profile username transaction started: userId=$userId '
+      'oldUsernameLower="$currentUsernameLower" '
+      'nextUsernameLower="$nextUsernameLower"',
+    );
+
+    try {
+      await _firestore.runTransaction((transaction) async {
+        DocumentSnapshot<Map<String, dynamic>>? nextUsernameDoc;
+        DocumentSnapshot<Map<String, dynamic>>? oldUsernameDoc;
+
+        if (nextUsernameRef != null) {
+          nextUsernameDoc = await transaction.get(nextUsernameRef);
+          final ownerUid = nextUsernameDoc.data()?['uid']?.toString();
+          if (nextUsernameDoc.exists && ownerUid != userId) {
+            appLogger.w(
+              'Username is already taken: usernameLower=$nextUsernameLower '
+              'ownerUid=$ownerUid currentUid=$userId',
+            );
+            throw const UsernameTakenException();
+          }
+        }
+
+        if (oldUsernameRef != null) {
+          oldUsernameDoc = await transaction.get(oldUsernameRef);
+        }
+
+        appLogger.d(
+          'Users document update started: users/$userId transaction set(merge) '
+          'fields=${updates.keys.toList()}',
+        );
+        transaction.set(userRef, updates, SetOptions(merge: true));
+
+        appLogger.d(
+          'PublicProfiles update started: publicProfiles/$userId '
+          'transaction set fields=${publicData.keys.toList()}',
+        );
+        transaction.set(publicProfileRef, publicData);
+
+        if (oldUsernameRef != null &&
+            oldUsernameDoc?.exists == true &&
+            oldUsernameDoc?.data()?['uid']?.toString() == userId) {
+          transaction.delete(oldUsernameRef);
+        }
+
+        if (nextUsernameRef != null) {
+          transaction.set(nextUsernameRef, {
+            'uid': userId,
+            'username': nextUsername,
+            'usernameLower': nextUsernameLower,
+            if (nextUsernameDoc?.exists != true)
+              'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+      });
+      appLogger.d(
+        'Profile username transaction success: userId=$userId '
+        'usernameLower="$nextUsernameLower"',
+      );
+    } on UsernameTakenException {
+      rethrow;
+    } on FirebaseException catch (e) {
+      appLogger.e(
+        'Profile username transaction failed: '
+        '${e.code} ${e.message ?? ''}',
+        error: e,
+      );
       rethrow;
     }
   }

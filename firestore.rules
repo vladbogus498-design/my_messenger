@@ -202,6 +202,27 @@ service cloud.firestore {
           || stringMax(request.resource.data.publicKey, 8000));
     }
 
+    function usernameFieldsOnly() {
+      return request.resource.data.keys().hasOnly([
+        'uid',
+        'username',
+        'usernameLower',
+        'createdAt',
+        'updatedAt'
+      ]);
+    }
+
+    function validUsernameWrite(usernameLower) {
+      return signedIn()
+        && usernameFieldsOnly()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.usernameLower == usernameLower
+        && request.resource.data.username == usernameLower
+        && nonEmptyStringMax(request.resource.data.username, 32)
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+    }
+
     function systemBotPublicProfileFieldsOnly() {
       return request.resource.data.keys().hasOnly([
         'uid',
@@ -411,6 +432,16 @@ service cloud.firestore {
         || validSystemBotPublicProfileCreate(userId);
       allow update: if validPublicProfileWrite(userId);
       allow delete: if false;
+    }
+
+    match /usernames/{usernameLower} {
+      allow read: if signedIn();
+      allow create: if validUsernameWrite(usernameLower);
+      allow update: if validUsernameWrite(usernameLower)
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == resource.data.uid;
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid;
     }
 
     match /typingStatus/{chatId} {

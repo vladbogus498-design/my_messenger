@@ -106,19 +106,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: 'АККАУНТ',
                         items: [
                           _SettingsItemData(
-                            icon: Icons.person_outline,
+                            icon: Icons.person_rounded,
                             title: 'Профиль',
                             subtitle: 'Имя, username, аватар',
                             onTap: () => _openEditProfile(user),
                           ),
                           _SettingsItemData(
-                            icon: Icons.privacy_tip_outlined,
+                            icon: Icons.shield_rounded,
                             title: 'Приватность',
                             subtitle: 'Кто может писать, онлайн',
                             onTap: () => _openPlaceholder('Приватность'),
                           ),
                           _SettingsItemData(
-                            icon: Icons.lock_outline,
+                            icon: Icons.lock_rounded,
                             title: 'Безопасность',
                             subtitle: 'Пароль, устройства',
                             onTap: () => _openPlaceholder('Безопасность'),
@@ -130,19 +130,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: 'ОБЩЕНИЕ',
                         items: [
                           _SettingsItemData(
-                            icon: Icons.chat_bubble_outline,
+                            icon: Icons.chat_bubble_rounded,
                             title: 'Чаты',
                             subtitle: 'Темы, размер текста',
                             onTap: () => _openPlaceholder('Чаты'),
                           ),
                           _SettingsItemData(
-                            icon: Icons.notifications_none_outlined,
+                            icon: Icons.notifications_rounded,
                             title: 'Уведомления',
                             subtitle: 'Звуки, вибрация, баннеры',
                             onTap: () => _openPlaceholder('Уведомления'),
                           ),
                           _SettingsItemData(
-                            icon: Icons.devices_outlined,
+                            icon: Icons.devices_rounded,
                             title: 'Активные устройства',
                             subtitle: 'Управление входами',
                             onTap: () =>
@@ -155,19 +155,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: 'ПРИЛОЖЕНИЕ',
                         items: [
                           _SettingsItemData(
-                            icon: Icons.palette_outlined,
+                            icon: Icons.palette_rounded,
                             title: 'Внешний вид',
                             subtitle: 'Тема, цвета, иконки',
                             onTap: () => _openPlaceholder('Внешний вид'),
                           ),
                           _SettingsItemData(
-                            icon: Icons.info_outline,
+                            icon: Icons.info_rounded,
                             title: 'О приложении',
                             subtitle: 'Версия, поддержка',
                             onTap: () => _openPlaceholder('О приложении'),
                           ),
                           _SettingsItemData(
-                            icon: Icons.more_horiz,
+                            icon: Icons.more_horiz_rounded,
                             title: 'Дополнительно',
                             subtitle: 'Язык, данные, экспериментальные',
                             onTap: () => _openPlaceholder('Дополнительно'),
@@ -200,6 +200,7 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
   final _tagController = TextEditingController();
   final _bioController = TextEditingController();
   bool _busy = false;
+  bool _usernameTaken = false;
 
   String? get _uid => _auth.currentUser?.uid;
 
@@ -207,6 +208,10 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
   void initState() {
     super.initState();
     _fillControllers(widget.initialUser);
+    _tagController.addListener(() {
+      if (!_usernameTaken || !mounted) return;
+      setState(() => _usernameTaken = false);
+    });
   }
 
   @override
@@ -267,7 +272,10 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
       'bioLength=${nextBio.length}',
     );
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _usernameTaken = false;
+    });
     try {
       await UserService.updateUserData(
         name: nextName,
@@ -277,6 +285,12 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
       appLogger.d('Profile save completed successfully');
       _showMessage('Профиль сохранён');
       if (mounted) Navigator.pop(context);
+    } on UsernameTakenException {
+      appLogger.w('Profile save blocked: username already taken');
+      if (mounted) {
+        setState(() => _usernameTaken = true);
+        _showMessage('Username уже занят');
+      }
     } on FirebaseException catch (error) {
       appLogger.e(
         'Profile save failed: ${error.code} ${error.message ?? ''}',
@@ -330,14 +344,14 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
 
           return SafeArea(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(22, 22, 22, 34),
+              padding: const EdgeInsets.fromLTRB(24, 22, 24, 34),
               children: [
                 _EditHeader(
                   busy: _busy,
                   onBack: () => Navigator.pop(context),
                   onSave: _busy ? null : _saveProfile,
                 ),
-                const SizedBox(height: 36),
+                const SizedBox(height: 34),
                 Center(
                   child: _EditableAvatar(
                     user: user,
@@ -345,10 +359,11 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
                     onTap: _busy ? null : _uploadAvatar,
                   ),
                 ),
-                const SizedBox(height: 38),
+                const SizedBox(height: 36),
                 _ProfileFieldCard(
                   label: 'Имя',
                   controller: _nameController,
+                  height: 76,
                   maxLines: 1,
                   textInputAction: TextInputAction.next,
                 ),
@@ -356,13 +371,17 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
                 _ProfileFieldCard(
                   label: 'Username',
                   controller: _tagController,
+                  height: 76,
                   maxLines: 1,
                   textInputAction: TextInputAction.next,
+                  hasError: _usernameTaken,
                 ),
                 const SizedBox(height: 14),
                 _ProfileFieldCard(
                   label: 'О себе',
                   controller: _bioController,
+                  height: 108,
+                  minLines: 2,
                   maxLines: 3,
                   textInputAction: TextInputAction.newline,
                 ),
@@ -726,7 +745,7 @@ class _LogoutGlassButton extends StatelessWidget {
           ),
           child: const Row(
             children: [
-              Icon(Icons.logout, color: Color(0xFFFF4D5D), size: 22),
+              _LogoutIcon(),
               SizedBox(width: 14),
               Expanded(
                 child: Text(
@@ -742,6 +761,38 @@ class _LogoutGlassButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _LogoutIcon extends StatelessWidget {
+  const _LogoutIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15),
+        color: const Color(0xFFFF3B5F).withValues(alpha: 0.13),
+        border: Border.all(
+          color: const Color(0xFFFF3B5F).withValues(alpha: 0.22),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF3B5F).withValues(alpha: 0.08),
+            blurRadius: 14,
+            spreadRadius: -4,
+          ),
+        ],
+      ),
+      child: const Icon(
+        Icons.logout_rounded,
+        color: Color(0xFFFF4D5D),
+        size: 22,
       ),
     );
   }
@@ -895,44 +946,45 @@ class _EditHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _SmallIconButton(icon: Icons.arrow_back_ios_new, onTap: onBack),
-        Expanded(
-          child: Text(
-            'Профиль',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.spaceGrotesk(
-              color: Colors.white,
-              fontSize: 23,
-              fontWeight: FontWeight.w700,
+    return SizedBox(
+      height: 64,
+      child: Row(
+        children: [
+          _SmallIconButton(icon: Icons.arrow_back_ios_new, onTap: onBack),
+          Expanded(
+            child: Text(
+              'Профиль',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.spaceGrotesk(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-        ),
-        TextButton(
-          onPressed: onSave,
-          style: TextButton.styleFrom(
-            foregroundColor: DarkKickColors.electricPurple,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            textStyle: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
+          TextButton(
+            onPressed: onSave,
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFC084FC),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
             ),
+            child: busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFFC084FC),
+                    ),
+                  )
+                : const Text('Сохранить'),
           ),
-          child: busy
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: DarkKickColors.neonPurple,
-                  ),
-                )
-              : const Text(
-                  'Сохранить',
-                ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -955,13 +1007,13 @@ class _EditableAvatar extends StatelessWidget {
       child: Stack(
         alignment: Alignment.bottomRight,
         children: [
-          _ProfileAvatar(user: user, size: 136),
+          _ProfileAvatar(user: user, size: 128),
           Container(
-            width: 46,
-            height: 46,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: DarkKickColors.brightPurple,
-              shape: BoxShape.circle,
+              color: const Color(0xFF8B5CF6),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: DarkKickColors.deepBackground,
                 width: 3,
@@ -985,7 +1037,7 @@ class _EditableAvatar extends StatelessWidget {
                 : const Icon(
                     Icons.camera_alt_outlined,
                     color: Colors.white,
-                    size: 22,
+                    size: 20,
                   ),
           ),
         ],
@@ -998,62 +1050,86 @@ class _ProfileFieldCard extends StatelessWidget {
   const _ProfileFieldCard({
     required this.label,
     required this.controller,
+    required this.height,
     required this.maxLines,
     required this.textInputAction,
+    this.minLines,
+    this.hasError = false,
   });
 
   final String label;
   final TextEditingController controller;
+  final double height;
   final int maxLines;
+  final int? minLines;
   final TextInputAction textInputAction;
+  final bool hasError;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: Container(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F0B18).withValues(alpha: 0.78),
+        color: const Color(0xFF100A18),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.075),
+          color: hasError
+              ? const Color(0xFFFF4D6A).withValues(alpha: 0.72)
+              : Colors.white.withValues(alpha: 0.07),
           width: 1,
         ),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF151020).withValues(alpha: 0.82),
-            const Color(0xFF09070F).withValues(alpha: 0.68),
-          ],
-        ),
+        boxShadow: hasError
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFFF4D6A).withValues(alpha: 0.14),
+                  blurRadius: 18,
+                  spreadRadius: -6,
+                ),
+              ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: DarkKickColors.textSecondary,
-              fontSize: 15,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.52),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              height: 16 / 12,
             ),
           ),
+          const SizedBox(height: 8),
           TextField(
             controller: controller,
+            minLines: minLines,
             maxLines: maxLines,
             textInputAction: textInputAction,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 19,
-              height: 1.3,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              height: 22 / 16,
             ),
+            textAlignVertical: TextAlignVertical.top,
             cursorColor: DarkKickColors.neonPurple,
             decoration: const InputDecoration(
               border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              filled: false,
               isDense: true,
-              contentPadding: EdgeInsets.only(top: 10),
+              contentPadding: EdgeInsets.zero,
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -1143,6 +1219,7 @@ class _ProfileAvatar extends StatelessWidget {
       user.photoURL,
       user.avatarUpdatedAt,
     );
+    final isLarge = size >= 120;
 
     return Container(
       width: size,
@@ -1150,13 +1227,18 @@ class _ProfileAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: DarkKickColors.neonPurple.withValues(alpha: 0.62),
-          width: 0.8,
+          color: const Color(0xFFA855F7).withValues(
+            alpha: isLarge ? 0.45 : 0.62,
+          ),
+          width: isLarge ? 1.2 : 0.8,
         ),
         boxShadow: [
           BoxShadow(
-            color: DarkKickColors.neonPurple.withValues(alpha: 0.18),
-            blurRadius: 18,
+            color: DarkKickColors.neonPurple.withValues(
+              alpha: isLarge ? 0.20 : 0.18,
+            ),
+            blurRadius: isLarge ? 24 : 18,
+            spreadRadius: isLarge ? -4 : 0,
           ),
         ],
       ),
@@ -1216,7 +1298,7 @@ class _SmallIconButton extends StatelessWidget {
           width: 42,
           height: 42,
           child: Center(
-            child: Icon(icon, color: DarkKickColors.neonPurple, size: 22),
+            child: Icon(icon, color: DarkKickColors.neonPurple, size: 24),
           ),
         ),
       ),
