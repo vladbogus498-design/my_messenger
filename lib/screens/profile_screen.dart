@@ -112,7 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             onTap: () => _openEditProfile(user),
                           ),
                           _SettingsItemData(
-                            icon: Icons.privacy_tip_outlined,
+                            icon: Icons.shield_outlined,
                             title: 'Приватность',
                             subtitle: 'Кто может писать, онлайн',
                             onTap: () => _openPlaceholder('Приватность'),
@@ -167,7 +167,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             onTap: () => _openPlaceholder('О приложении'),
                           ),
                           _SettingsItemData(
-                            icon: Icons.more_horiz_rounded,
+                            icon: Icons.auto_awesome_outlined,
                             title: 'Дополнительно',
                             subtitle: 'Язык, данные, экспериментальные',
                             onTap: () => _openPlaceholder('Дополнительно'),
@@ -380,7 +380,7 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
                 _ProfileFieldCard(
                   label: 'О себе',
                   controller: _bioController,
-                  height: 96,
+                  height: 110,
                   minLines: 2,
                   maxLines: 3,
                   textInputAction: TextInputAction.newline,
@@ -438,13 +438,13 @@ class _DarkkickIdCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24),
         child: Ink(
-          height: 124,
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+          height: 106,
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: const Color(0xFF0B0814).withValues(alpha: 0.86),
-            borderRadius: BorderRadius.circular(30),
+            color: const Color(0xFF160A28),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.08),
               width: 1,
@@ -453,23 +453,22 @@ class _DarkkickIdCard extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF0B0814).withValues(alpha: 0.96),
-                const Color(0xFF10091D).withValues(alpha: 0.92),
-                const Color(0xFF140B25).withValues(alpha: 0.9),
+                const Color(0xFF160A28),
+                const Color(0xFF25103F),
               ],
             ),
             boxShadow: [
               BoxShadow(
-                color: DarkKickColors.neonPurple.withValues(alpha: 0.08),
-                blurRadius: 28,
-                spreadRadius: -8,
-                offset: const Offset(0, 16),
+                color: DarkKickColors.neonPurple.withValues(alpha: 0.12),
+                blurRadius: 24,
+                spreadRadius: -6,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
           child: Row(
             children: [
-              _ProfileAvatar(user: user, size: 80),
+              _ProfileAvatar(user: user, size: 64),
               const SizedBox(width: 18),
               Expanded(
                 child: Column(
@@ -636,9 +635,9 @@ class _SettingsRow extends StatelessWidget {
           height: 70,
           child: Row(
             children: [
-              const SizedBox(width: 20),
-              _SettingsIcon(icon: data.icon),
               const SizedBox(width: 18),
+              _SettingsIcon(icon: data.icon),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -667,12 +666,12 @@ class _SettingsRow extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right,
-                color: DarkKickColors.textSecondary,
-                size: 24,
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white.withValues(alpha: 0.7),
+                size: 22,
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 18),
             ],
           ),
         ),
@@ -699,21 +698,16 @@ class _SettingsIcon extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              color: DarkKickColors.neonPurple.withValues(alpha: 0.18),
-              border: Border.all(
-                color: DarkKickColors.neonPurple.withValues(alpha: 0.2),
-                width: 1,
-              ),
+              color: const Color(0xFF6D28D9),
               boxShadow: [
                 BoxShadow(
-                  color: DarkKickColors.neonPurple.withValues(alpha: 0.1),
-                  blurRadius: 14,
-                  spreadRadius: -4,
+                  color: const Color(0xFF6D28D9).withValues(alpha: 0.35),
+                  blurRadius: 18,
                 ),
               ],
             ),
           ),
-          Icon(icon, color: DarkKickColors.electricPurple, size: 20),
+          Icon(icon, color: Colors.white, size: 22),
         ],
       ),
     );
@@ -776,23 +770,18 @@ class _LogoutIcon extends StatelessWidget {
       height: 40,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: const Color(0xFFFF3B5F).withValues(alpha: 0.13),
-        border: Border.all(
-          color: const Color(0xFFFF3B5F).withValues(alpha: 0.22),
-          width: 1,
-        ),
+        color: const Color(0xFFE11D48),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFF3B5F).withValues(alpha: 0.08),
-            blurRadius: 14,
-            spreadRadius: -4,
+            color: const Color(0xFFE11D48).withValues(alpha: 0.35),
+            blurRadius: 18,
           ),
         ],
       ),
       child: const Icon(
         Icons.logout_rounded,
-        color: Color(0xFFFF4D5D),
-        size: 20,
+        color: Colors.white,
+        size: 22,
       ),
     );
   }

@@ -320,6 +320,20 @@ class UserService {
       final effectiveNextUsername = tag != null
           ? updates['username']?.toString() ?? ''
           : nextUsername.trim().toLowerCase();
+      final usernameOwnerConflict = effectiveNextUsernameLower.isEmpty
+          ? null
+          : await _findLegacyUsernameOwnerUid(
+              effectiveNextUsernameLower,
+              currentUid: userId,
+            );
+      if (usernameOwnerConflict != null) {
+        appLogger.w(
+          'Profile save blocked by legacy username owner: '
+          'usernameLower=$effectiveNextUsernameLower '
+          'ownerUid=$usernameOwnerConflict currentUid=$userId',
+        );
+        throw const UsernameTakenException();
+      }
       final shouldUseUsernameTransaction =
           tag != null || currentUsernameLower.isNotEmpty;
       if (shouldUseUsernameTransaction) {
@@ -505,6 +519,10 @@ class UserService {
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       if (userDoc.exists) {
         await _upsertPublicProfile(user.uid, userDoc.data() ?? const {});
+        await _ensureUsernameReservationForCurrentUser(
+          user.uid,
+          userDoc.data() ?? const {},
+        );
         return;
       }
 
@@ -514,6 +532,87 @@ class UserService {
       );
     } catch (e) {
       appLogger.e('Error ensuring public profile', error: e);
+    }
+  }
+
+  static Future<String?> _findLegacyUsernameOwnerUid(
+    String usernameLower, {
+    required String currentUid,
+  }) async {
+    final normalized = usernameLower.trim().toLowerCase();
+    if (normalized.isEmpty) return null;
+
+    final seen = <String>{};
+    Future<String?> checkField(String field) async {
+      final snapshot = await _firestore
+          .collection('publicProfiles')
+          .where(field, isEqualTo: normalized)
+          .limit(4)
+          .get();
+      for (final doc in snapshot.docs) {
+        final uid = (doc.data()['uid'] ?? doc.id).toString();
+        if (!seen.add(uid)) continue;
+        if (uid != currentUid) return uid;
+      }
+      return null;
+    }
+
+    return await checkField('usernameLower') ?? await checkField('tagLower');
+  }
+
+  static Future<void> _ensureUsernameReservationForCurrentUser(
+    String uid,
+    Map<String, dynamic> userData,
+  ) async {
+    final usernameLower =
+        (userData['usernameLower'] ?? userData['tagLower'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+    if (usernameLower.isEmpty) return;
+
+    final legacyOwner = await _findLegacyUsernameOwnerUid(
+      usernameLower,
+      currentUid: uid,
+    );
+    if (legacyOwner != null) {
+      appLogger.w(
+        'Skipping username reservation because legacy owner exists: '
+        'usernameLower=$usernameLower ownerUid=$legacyOwner currentUid=$uid',
+      );
+      return;
+    }
+
+    final usernameRef = _firestore.collection('usernames').doc(usernameLower);
+    try {
+      await _firestore.runTransaction((transaction) async {
+        final usernameDoc = await transaction.get(usernameRef);
+        final ownerUid = usernameDoc.data()?['uid']?.toString();
+        if (usernameDoc.exists && ownerUid != uid) {
+          appLogger.w(
+            'Skipping username reservation because registry owner exists: '
+            'usernameLower=$usernameLower ownerUid=$ownerUid currentUid=$uid',
+          );
+          return;
+        }
+
+        transaction.set(usernameRef, {
+          'uid': uid,
+          'username': usernameLower,
+          'usernameLower': usernameLower,
+          if (!usernameDoc.exists) 'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      });
+      appLogger.d(
+        'Username reservation ensured: uid=$uid usernameLower=$usernameLower',
+      );
+    } catch (e) {
+      appLogger.e(
+        'Error ensuring username reservation: '
+        'uid=$uid usernameLower=$usernameLower',
+        error: e,
+      );
     }
   }
 

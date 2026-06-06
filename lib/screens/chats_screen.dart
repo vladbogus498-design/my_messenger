@@ -151,7 +151,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: DarkKickColors.panel.withValues(alpha: 0.92),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: DarkKickColors.stroke, width: 0.8),
         ),
         child: Row(
