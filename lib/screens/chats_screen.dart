@@ -153,7 +153,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         decoration: BoxDecoration(
           color: DarkKickColors.panel.withValues(alpha: 0.92),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: DarkKickColors.stroke),
+          border: Border.all(color: DarkKickColors.stroke, width: 0.8),
         ),
         child: Row(
           children: [
@@ -284,6 +284,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       color: isSelected
                           ? DarkKickColors.neonPurple
                           : DarkKickColors.divider,
+                      width: 0.8,
                     ),
                     boxShadow: isSelected
                         ? [
@@ -340,6 +341,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               final chat = chats[index ~/ 2];
               return _ChatTile(
                 chat: chat,
+                isDirectChat: _isDirectLikeChat(chat),
                 currentUserId: currentUserId,
                 fallbackTitle: _fallbackTitle(chat),
                 onTap: () => _openChat(chat),
@@ -384,15 +386,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final type = chat.type.toLowerCase().trim();
     return type == 'direct' ||
         type == 'private' ||
-        (!chat.isGroup && type != 'group' && type != 'channel');
+        (!chat.isGroup && type.isEmpty && chat.participants.length == 2);
   }
 
   bool _isDisplayableChat(Chat chat, String currentUserId) {
-    if (chat.id.trim().isEmpty || chat.participants.isEmpty) return false;
-    if (_isDirectLikeChat(chat)) {
-      return chat.otherParticipantId(currentUserId) != null;
+    if (chat.id.trim().isEmpty ||
+        chat.participants.isEmpty ||
+        !chat.participants.contains(currentUserId)) {
+      _logSkippedLegacyChat(chat, currentUserId, 'invalid id/participants');
+      return false;
     }
-    return _fallbackTitle(chat).trim().isNotEmpty;
+    if (_isDirectLikeChat(chat)) {
+      final hasPeer = chat.otherParticipantId(currentUserId) != null;
+      if (!hasPeer) {
+        _logSkippedLegacyChat(chat, currentUserId, 'missing direct peer');
+      }
+      return hasPeer;
+    }
+    final hasTitle = _fallbackTitle(chat).trim().isNotEmpty;
+    if (!hasTitle) {
+      _logSkippedLegacyChat(chat, currentUserId, 'empty display title');
+    }
+    return hasTitle;
+  }
+
+  void _logSkippedLegacyChat(Chat chat, String currentUserId, String reason) {
+    assert(() {
+      debugPrint(
+        'Darkkick skipped legacy chat ${chat.id}: $reason; '
+        'type=${chat.type}; participants=${chat.participants}; '
+        'currentUserId=$currentUserId',
+      );
+      return true;
+    }());
   }
 
   bool _isGroupChat(Chat chat) {
@@ -513,19 +539,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 class _ChatTile extends StatelessWidget {
   const _ChatTile({
     required this.chat,
+    required this.isDirectChat,
     required this.currentUserId,
     required this.fallbackTitle,
     required this.onTap,
   });
 
   final Chat chat;
+  final bool isDirectChat;
   final String? currentUserId;
   final String fallbackTitle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final otherUserId = chat.isDirect
+    final otherUserId = isDirectChat
         ? chat.otherParticipantId(currentUserId)
         : null;
 
@@ -533,14 +561,14 @@ class _ChatTile extends StatelessWidget {
       stream: _peerMetaStream(otherUserId),
       builder: (context, snapshot) {
         final meta = snapshot.data;
-        final title = chat.isDirect
+        final title = isDirectChat
             ? meta?.name ?? fallbackTitle
             : fallbackTitle;
-        final photoUrl = chat.isDirect ? meta?.photoUrl : null;
+        final photoUrl = isDirectChat ? meta?.photoUrl : null;
         final preview = chat.lastMessage.trim().isEmpty
             ? 'Сообщений пока нет'
             : chat.lastMessage;
-        final presence = meta == null || !chat.isDirect
+        final presence = meta == null || !isDirectChat
             ? null
             : UserFormatters.compactPresence(
                 isOnline: meta.isOnline,
@@ -563,9 +591,9 @@ class _ChatTile extends StatelessWidget {
             child: Ink(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: DarkKickColors.panel,
+                color: DarkKickColors.panel.withValues(alpha: 0.94),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: DarkKickColors.divider),
+                border: Border.all(color: DarkKickColors.divider, width: 0.8),
               ),
               child: Row(
                 children: [
@@ -760,11 +788,11 @@ class _ChatAvatar extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: DarkKickColors.stroke),
+        border: Border.all(color: DarkKickColors.stroke, width: 0.8),
         boxShadow: [
           BoxShadow(
-            color: DarkKickColors.neonPurple.withValues(alpha: 0.22),
-            blurRadius: 14,
+            color: DarkKickColors.neonPurple.withValues(alpha: 0.14),
+            blurRadius: 10,
           ),
         ],
       ),
@@ -935,11 +963,11 @@ class _IconFrame extends StatelessWidget {
         decoration: BoxDecoration(
           color: DarkKickColors.panel,
           borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: DarkKickColors.stroke),
+          border: Border.all(color: DarkKickColors.stroke, width: 0.8),
           boxShadow: [
             BoxShadow(
-              color: DarkKickColors.neonPurple.withValues(alpha: 0.18),
-              blurRadius: 16,
+              color: DarkKickColors.neonPurple.withValues(alpha: 0.12),
+              blurRadius: 12,
             ),
           ],
         ),

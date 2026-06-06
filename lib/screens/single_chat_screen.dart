@@ -936,7 +936,10 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     final isMyMessage = _isMyMessage(message.senderId);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final bubbleColor = isMyMessage
+    final isImageMessage = message.type == 'image' && message.imageUrl != null;
+    final bubbleColor = isImageMessage
+        ? DarkKickColors.panel.withValues(alpha: 0.72)
+        : isMyMessage
         ? DarkKickColors.neonPurple
         : DarkKickColors.panel;
     final textColor = isMyMessage
@@ -979,10 +982,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                 GestureDetector(
                   onLongPress: () => _showMessageMenu(message),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 13,
-                      vertical: 10,
-                    ),
+                    padding: isImageMessage
+                        ? const EdgeInsets.all(3)
+                        : const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 10,
+                          ),
                     decoration: BoxDecoration(
                       color: bubbleColor,
                       borderRadius: BorderRadius.only(
@@ -994,22 +999,34 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                       border: isHighlighted
                           ? Border.all(
                               color: DarkKickColors.neonPurple,
-                              width: 1.4,
+                              width: isImageMessage ? 0.8 : 1.2,
+                            )
+                          : isImageMessage
+                          ? Border.all(
+                              color: isMyMessage
+                                  ? DarkKickColors.neonPurple.withValues(
+                                      alpha: 0.28,
+                                    )
+                                  : DarkKickColors.divider,
+                              width: 0.7,
                             )
                           : isMyMessage
                           ? null
-                          : Border.all(color: DarkKickColors.divider),
+                          : Border.all(
+                              color: DarkKickColors.divider,
+                              width: 0.8,
+                            ),
                       boxShadow: isHighlighted
                           ? [
                               BoxShadow(
                                 color: DarkKickColors.neonPurple.withValues(
-                                  alpha: 0.55,
+                                  alpha: isImageMessage ? 0.24 : 0.55,
                                 ),
-                                blurRadius: 22,
-                                spreadRadius: 1,
+                                blurRadius: isImageMessage ? 10 : 22,
+                                spreadRadius: isImageMessage ? 0 : 1,
                               ),
                             ]
-                          : isMyMessage
+                          : isMyMessage && !isImageMessage
                           ? [
                               BoxShadow(
                                 color: DarkKickColors.neonPurple.withValues(
@@ -1066,7 +1083,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                               GestureDetector(
                                 onTap: () => _openImageViewer(message),
                                 child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(14),
                                   child: Stack(
                                     children: [
                                       Hero(
@@ -1080,11 +1097,14 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                                               Container(
                                                 width: 200,
                                                 height: 150,
-                                                color:
-                                                    colorScheme.surfaceVariant,
+                                                color: DarkKickColors.panel,
                                                 child: const Center(
                                                   child:
-                                                      CircularProgressIndicator(),
+                                                      CircularProgressIndicator(
+                                                        color: DarkKickColors
+                                                            .neonPurple,
+                                                        strokeWidth: 2,
+                                                      ),
                                                 ),
                                               ),
                                           errorWidget: (context, url, error) =>

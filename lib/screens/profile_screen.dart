@@ -152,6 +152,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             force: true,
                           );
                           await _auth.signOut();
+                          if (!mounted) return;
+                          Navigator.of(
+                            context,
+                            rootNavigator: true,
+                          ).pushNamedAndRemoveUntil('/auth', (route) => false);
                         },
                       ),
                     ],
@@ -400,7 +405,10 @@ class _DarkkickIdCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: DarkKickColors.panel.withValues(alpha: 0.82),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.035)),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.05),
+              width: 0.8,
+            ),
             gradient: LinearGradient(
               colors: [
                 DarkKickColors.cardSoft.withValues(alpha: 0.82),
@@ -410,7 +418,7 @@ class _DarkkickIdCard extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: DarkKickColors.neonPurple.withValues(alpha: 0.08),
-                blurRadius: 24,
+                blurRadius: 18,
                 offset: const Offset(0, 18),
               ),
             ],
@@ -471,7 +479,10 @@ class _SettingsList extends StatelessWidget {
       decoration: BoxDecoration(
         color: DarkKickColors.panel.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.035)),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.05),
+          width: 0.8,
+        ),
       ),
       child: Column(
         children: [
@@ -585,15 +596,19 @@ class _SettingsIcon extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: DarkKickColors.neonPurple.withValues(alpha: 0.08),
+              border: Border.all(
+                color: DarkKickColors.neonPurple.withValues(alpha: 0.22),
+                width: 0.8,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: DarkKickColors.neonPurple.withValues(alpha: 0.22),
-                  blurRadius: 18,
+                  color: DarkKickColors.neonPurple.withValues(alpha: 0.14),
+                  blurRadius: 12,
                 ),
               ],
             ),
           ),
-          Icon(icon, color: DarkKickColors.neonPurple, size: 30),
+          Icon(icon, color: DarkKickColors.neonPurple, size: 25),
         ],
       ),
     );
@@ -620,6 +635,7 @@ class _LogoutGlassButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
               color: const Color(0xFFFF405A).withValues(alpha: 0.34),
+              width: 0.8,
             ),
           ),
           child: const Row(
@@ -767,7 +783,10 @@ class _ProfileFieldCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: DarkKickColors.panel.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.035)),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.05),
+          width: 0.8,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -891,11 +910,14 @@ class _ProfileAvatar extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: DarkKickColors.neonPurple, width: 1.1),
+        border: Border.all(
+          color: DarkKickColors.neonPurple.withValues(alpha: 0.62),
+          width: 0.8,
+        ),
         boxShadow: [
           BoxShadow(
-            color: DarkKickColors.neonPurple.withValues(alpha: 0.28),
-            blurRadius: 24,
+            color: DarkKickColors.neonPurple.withValues(alpha: 0.18),
+            blurRadius: 18,
           ),
         ],
       ),

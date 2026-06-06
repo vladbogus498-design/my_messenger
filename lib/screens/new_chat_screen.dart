@@ -132,9 +132,9 @@ class _NewChatScreenState extends State<NewChatScreen> {
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
               child: Container(
                 decoration: BoxDecoration(
-                  color: DarkKickColors.panel,
+                  color: DarkKickColors.panel.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: DarkKickColors.divider),
+                  border: Border.all(color: DarkKickColors.divider, width: 0.8),
                 ),
                 child: Row(
                   children: [
@@ -255,9 +255,9 @@ class _UserResultTile extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: DarkKickColors.panel,
+            color: DarkKickColors.panel.withValues(alpha: 0.92),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: DarkKickColors.divider),
+            border: Border.all(color: DarkKickColors.divider, width: 0.8),
           ),
           child: Row(
             children: [
