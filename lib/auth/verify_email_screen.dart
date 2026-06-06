@@ -2,59 +2,108 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/auth_provider.dart';
 import '../services/email_phone_verification_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/logger.dart';
 
-class VerifyEmailScreen extends StatefulWidget {
+class VerifyEmailScreen extends ConsumerStatefulWidget {
   const VerifyEmailScreen({super.key, this.email = ''});
 
   final String email;
 
   @override
-  State<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
+  ConsumerState<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
 }
 
-class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
+class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   Timer? _cooldownTimer;
+  Timer? _pollingTimer;
   int _cooldownSeconds = 0;
   bool _isChecking = false;
   bool _isResending = false;
+  bool _completed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startVerificationPolling();
+  }
 
   @override
   void dispose() {
     _cooldownTimer?.cancel();
+    _pollingTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _checkVerification() async {
+  void _startVerificationPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (_completed || _isChecking || _isResending || !mounted) return;
+      unawaited(_checkVerification(showPendingMessage: false));
+    });
+  }
+
+  Future<void> _checkVerification({bool showPendingMessage = true}) async {
+    if (_completed || _isChecking) return;
     setState(() => _isChecking = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
-      await user?.reload();
-      final refreshedUser = FirebaseAuth.instance.currentUser;
-
-      if (!mounted) return;
-      if (refreshedUser?.emailVerified == true) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
+      final email = user?.email?.trim() ?? widget.email.trim();
+      if (email.isEmpty) {
+        await _enterApp(showSuccess: false);
         return;
       }
 
-      _showSnackBar('Почта пока не подтверждена');
+      await user?.reload();
+      final freshUser = FirebaseAuth.instance.currentUser;
+      await freshUser?.getIdToken(true);
+
+      if (!mounted) return;
+      if (freshUser?.emailVerified == true) {
+        await _enterApp();
+        return;
+      }
+
+      if (showPendingMessage) {
+        _showSnackBar('Почта ещё не подтверждена');
+      }
     } on FirebaseAuthException catch (e) {
       appLogger.e('Email verification check failed: ${e.code}', error: e);
-      if (mounted) _showSnackBar('Не удалось проверить почту');
+      if (mounted && showPendingMessage) {
+        _showSnackBar('Не удалось проверить почту');
+      }
     } catch (e) {
       appLogger.e('Email verification check failed', error: e);
-      if (mounted) _showSnackBar('Не удалось проверить почту');
+      if (mounted && showPendingMessage) {
+        _showSnackBar('Не удалось проверить почту');
+      }
     } finally {
-      if (mounted) setState(() => _isChecking = false);
+      if (mounted && !_completed) setState(() => _isChecking = false);
     }
   }
 
+  Future<void> _enterApp({bool showSuccess = true}) async {
+    if (_completed || !mounted) return;
+    _completed = true;
+    _pollingTimer?.cancel();
+    _cooldownTimer?.cancel();
+    ref.invalidate(authStateProvider);
+
+    if (showSuccess) {
+      _showSnackBar('Почта подтверждена');
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
+  }
+
   Future<void> _resendVerificationEmail() async {
-    if (_cooldownSeconds > 0 || _isResending) return;
+    if (_cooldownSeconds > 0 || _isResending || _isChecking) return;
 
     setState(() => _isResending = true);
     final sent = await EmailVerificationService.sendVerificationEmail();
@@ -106,6 +155,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     final email = widget.email.isNotEmpty
         ? widget.email
         : FirebaseAuth.instance.currentUser?.email ?? '';
+    final buttonsDisabled = _isChecking || _isResending;
     final resendLabel = _cooldownSeconds > 0
         ? 'Отправить письмо ещё раз ($_cooldownSeconds)'
         : 'Отправить письмо ещё раз';
@@ -172,13 +222,13 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 label: 'Я подтвердил',
                 isPrimary: true,
                 isLoading: _isChecking,
-                onPressed: _isChecking ? null : _checkVerification,
+                onPressed: buttonsDisabled ? null : _checkVerification,
               ),
               const SizedBox(height: 12),
               _VerificationButton(
                 label: resendLabel,
                 isLoading: _isResending,
-                onPressed: _cooldownSeconds > 0 || _isResending
+                onPressed: _cooldownSeconds > 0 || buttonsDisabled
                     ? null
                     : _resendVerificationEmail,
               ),
@@ -186,11 +236,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               _VerificationButton(
                 label: 'Выйти',
                 isDanger: true,
-                onPressed: _signOut,
+                onPressed: buttonsDisabled ? null : _signOut,
               ),
               const Spacer(),
               const Text(
-                'После подтверждения вернитесь сюда и нажмите "Я подтвердил".',
+                'После подтверждения вернитесь сюда и нажмите "Я подтвердил". DARKKICK также проверит почту автоматически.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: DarkKickColors.textTertiary,

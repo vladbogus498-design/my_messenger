@@ -222,11 +222,6 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
             onTap: () =>
                 setState(() => _showStickerPicker = !_showStickerPicker),
           ),
-          _AttachmentButton(
-            icon: Icons.bolt_outlined,
-            label: 'Скоро',
-            onTap: () => _showSnackBar('Фича появится позже.'),
-          ),
         ],
       ),
     );

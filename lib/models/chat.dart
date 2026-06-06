@@ -58,13 +58,14 @@ class Chat {
 
   factory Chat.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? const <String, dynamic>{};
-    final isGroup = data['isGroup'] ?? data['type'] == 'group';
-    final type = data['type'] ?? (isGroup ? 'group' : 'direct');
+    final rawType = data['type'];
+    final isGroup = data['isGroup'] == true || rawType == 'group';
+    final type = (rawType ?? (isGroup ? 'group' : 'direct')).toString();
     final legacyLastMessage = data['lastMessage'];
     final rawLastMessage = legacyLastMessage is Map<String, dynamic>
         ? (legacyLastMessage['text'] ?? '').toString()
         : (legacyLastMessage ?? '').toString();
-    final lastMessageType = data['lastMessageType'] ?? 'text';
+    final lastMessageType = (data['lastMessageType'] ?? 'text').toString();
     final lastMessage = _previewText(rawLastMessage, lastMessageType);
     final legacyLastMessageAt = legacyLastMessage is Map<String, dynamic>
         ? legacyLastMessage['timestamp']
@@ -76,9 +77,7 @@ class Chat {
         data['lastMessageTime'] ??
         data['createdAt'];
     final updatedAt = data['updatedAt'] ?? lastMessageAt;
-    final lastMessageReadBy = List<String>.from(
-      data['lastMessageReadBy'] ?? const [],
-    );
+    final lastMessageReadBy = _readStringList(data['lastMessageReadBy']);
     final lastMessageStatus =
         data['lastMessageStatus'] ??
         (lastMessageReadBy.length > 1 ? 'read' : 'sent');
@@ -86,8 +85,8 @@ class Chat {
     return Chat(
       id: doc.id,
       type: type,
-      name: data['name'] ?? 'Chat',
-      participants: List<String>.from(data['participants'] ?? const []),
+      name: (data['name'] ?? 'Chat').toString(),
+      participants: _readStringList(data['participants']),
       lastMessage: lastMessage,
       lastMessageStatus: lastMessageStatus,
       lastMessageTime: _readDate(lastMessageAt),
@@ -98,11 +97,11 @@ class Chat {
       lastMessageReadBy: lastMessageReadBy,
       unreadCount: _readUnreadCount(data['unreadCount']),
       typing: Map<String, dynamic>.from(data['typing'] ?? const {}),
-      pinnedMessage: data['pinnedMessage'] == null
-          ? null
-          : Map<String, dynamic>.from(data['pinnedMessage']),
+      pinnedMessage: data['pinnedMessage'] is Map
+          ? Map<String, dynamic>.from(data['pinnedMessage'] as Map)
+          : null,
       isGroup: isGroup,
-      admins: List<String>.from(data['admins'] ?? const []),
+      admins: _readStringList(data['admins']),
       groupName: data['groupName'],
     );
   }
@@ -136,11 +135,22 @@ class Chat {
   }
 
   static Map<String, int> _readUnreadCount(dynamic value) {
-    final raw = Map<String, dynamic>.from(value ?? const {});
+    if (value is! Map) return const {};
+    final raw = Map<String, dynamic>.from(value);
     return raw.map((key, value) {
       final count = value is num ? value.toInt() : int.tryParse('$value') ?? 0;
       return MapEntry(key, count);
     });
+  }
+
+  static List<String> _readStringList(dynamic value) {
+    if (value is! Iterable) return const [];
+    return value
+        .whereType<String>()
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList();
   }
 
   static DateTime _readDate(dynamic value) {

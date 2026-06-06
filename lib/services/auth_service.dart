@@ -7,7 +7,7 @@ class AppAuthService {
 
   FirebaseAuth get instance => _firebaseAuth;
 
-  Stream<User?> authStateChanges() => _firebaseAuth.authStateChanges();
+  Stream<User?> authStateChanges() => _firebaseAuth.userChanges();
 
   Future<UserCredential> signInWithEmail({
     required String email,
@@ -64,4 +64,3 @@ class AppAuthService {
     return _firebaseAuth.signInWithCredential(credential);
   }
 }
-

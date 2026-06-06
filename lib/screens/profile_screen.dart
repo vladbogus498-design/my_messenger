@@ -47,6 +47,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _confirmLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.72),
+      builder: (context) => const _LogoutConfirmDialog(),
+    );
+    if (shouldLogout != true) return;
+
+    await UserService.setPresence(isOnline: false, force: true);
+    await _auth.signOut();
+    if (!mounted) return;
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).pushNamedAndRemoveUntil('/auth', (route) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final uid = _uid;
@@ -73,19 +90,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 return SafeArea(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+                    padding: const EdgeInsets.fromLTRB(22, 26, 22, 28),
                     children: [
                       _SettingsHeader(
                         showBackButton: widget.showBackButton,
                         onBack: () => Navigator.pop(context),
                       ),
-                      const SizedBox(height: 30),
+                      const SizedBox(height: 22),
                       _DarkkickIdCard(
                         user: user,
                         onTap: () => _openEditProfile(user),
                       ),
-                      const SizedBox(height: 22),
-                      _SettingsList(
+                      const SizedBox(height: 20),
+                      _SettingsSection(
+                        title: 'АККАУНТ',
                         items: [
                           _SettingsItemData(
                             icon: Icons.person_outline,
@@ -94,17 +112,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             onTap: () => _openEditProfile(user),
                           ),
                           _SettingsItemData(
-                            icon: Icons.lock_outline,
-                            title: 'Безопасность',
-                            subtitle: 'Пароль и устройства',
-                            onTap: () => _openPlaceholder('Безопасность'),
-                          ),
-                          _SettingsItemData(
-                            icon: Icons.shield_outlined,
+                            icon: Icons.privacy_tip_outlined,
                             title: 'Приватность',
-                            subtitle: 'Кто может писать, звонить',
+                            subtitle: 'Кто может писать, онлайн',
                             onTap: () => _openPlaceholder('Приватность'),
                           ),
+                          _SettingsItemData(
+                            icon: Icons.lock_outline,
+                            title: 'Безопасность',
+                            subtitle: 'Пароль, устройства',
+                            onTap: () => _openPlaceholder('Безопасность'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      _SettingsSection(
+                        title: 'ОБЩЕНИЕ',
+                        items: [
                           _SettingsItemData(
                             icon: Icons.chat_bubble_outline,
                             title: 'Чаты',
@@ -118,17 +142,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             onTap: () => _openPlaceholder('Уведомления'),
                           ),
                           _SettingsItemData(
-                            icon: Icons.palette_outlined,
-                            title: 'Внешний вид',
-                            subtitle: 'Тема, цвета, иконки',
-                            onTap: () => _openPlaceholder('Внешний вид'),
-                          ),
-                          _SettingsItemData(
                             icon: Icons.devices_outlined,
                             title: 'Активные устройства',
                             subtitle: 'Управление входами',
                             onTap: () =>
                                 _openPlaceholder('Активные устройства'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      _SettingsSection(
+                        title: 'ПРИЛОЖЕНИЕ',
+                        items: [
+                          _SettingsItemData(
+                            icon: Icons.palette_outlined,
+                            title: 'Внешний вид',
+                            subtitle: 'Тема, цвета, иконки',
+                            onTap: () => _openPlaceholder('Внешний вид'),
                           ),
                           _SettingsItemData(
                             icon: Icons.info_outline,
@@ -145,20 +175,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                       const SizedBox(height: 22),
-                      _LogoutGlassButton(
-                        onTap: () async {
-                          await UserService.setPresence(
-                            isOnline: false,
-                            force: true,
-                          );
-                          await _auth.signOut();
-                          if (!mounted) return;
-                          Navigator.of(
-                            context,
-                            rootNavigator: true,
-                          ).pushNamedAndRemoveUntil('/auth', (route) => false);
-                        },
-                      ),
+                      _LogoutGlassButton(onTap: _confirmLogout),
                     ],
                   ),
                 );
@@ -393,6 +410,10 @@ class _DarkkickIdCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tag = (user.username ?? user.tag ?? '').trim();
+    final displayName = user.name.trim().isEmpty ? 'DARKKICK ID' : user.name;
+    final bio = (user.bio ?? '').trim().isEmpty
+        ? 'Без границ. Без слежки.\nЭто Darkkick.'
+        : user.bio!.trim();
 
     return Material(
       color: Colors.transparent,
@@ -400,56 +421,73 @@ class _DarkkickIdCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(24),
         child: Ink(
-          height: 134,
-          padding: const EdgeInsets.all(18),
+          height: 128,
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: DarkKickColors.panel.withValues(alpha: 0.82),
+            color: DarkKickColors.panel.withValues(alpha: 0.76),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: Colors.white.withValues(alpha: 0.07),
               width: 0.8,
             ),
             gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
               colors: [
                 DarkKickColors.cardSoft.withValues(alpha: 0.82),
-                DarkKickColors.panel.withValues(alpha: 0.72),
+                DarkKickColors.panel.withValues(alpha: 0.54),
+                DarkKickColors.neonPurple.withValues(alpha: 0.05),
               ],
             ),
             boxShadow: [
               BoxShadow(
-                color: DarkKickColors.neonPurple.withValues(alpha: 0.08),
-                blurRadius: 18,
-                offset: const Offset(0, 18),
+                color: DarkKickColors.neonPurple.withValues(alpha: 0.12),
+                blurRadius: 24,
+                offset: const Offset(0, 14),
               ),
             ],
           ),
           child: Row(
             children: [
-              _ProfileAvatar(user: user, size: 82),
-              const SizedBox(width: 18),
+              _ProfileAvatar(user: user, size: 78),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'DARKKICK ID',
+                      displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.spaceGrotesk(
                         color: Colors.white,
-                        fontSize: 19,
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 5),
                     Text(
-                      tag.isEmpty ? 'tag не указан' : '@$tag',
+                      tag.isEmpty ? '@darkkick' : '@$tag',
                       maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: DarkKickColors.electricPurple.withValues(
+                          alpha: 0.95,
+                        ),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      bio,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: DarkKickColors.textSecondary,
-                        fontSize: 15,
+                        fontSize: 13,
+                        height: 1.25,
                       ),
                     ),
                   ],
@@ -468,6 +506,35 @@ class _DarkkickIdCard extends StatelessWidget {
   }
 }
 
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({required this.title, required this.items});
+
+  final String title;
+  final List<_SettingsItemData> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 10, bottom: 9),
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: DarkKickColors.textTertiary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0,
+            ),
+          ),
+        ),
+        _SettingsList(items: items),
+      ],
+    );
+  }
+}
+
 class _SettingsList extends StatelessWidget {
   const _SettingsList({required this.items});
 
@@ -477,12 +544,19 @@ class _SettingsList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: DarkKickColors.panel.withValues(alpha: 0.72),
+        color: DarkKickColors.panel.withValues(alpha: 0.66),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: Colors.white.withValues(alpha: 0.055),
           width: 0.8,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: DarkKickColors.neonPurple.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -493,7 +567,7 @@ class _SettingsList extends StatelessWidget {
                 padding: const EdgeInsets.only(left: 86),
                 child: Divider(
                   height: 1,
-                  color: Colors.white.withValues(alpha: 0.055),
+                  color: Colors.white.withValues(alpha: 0.052),
                 ),
               ),
           ],
@@ -528,13 +602,14 @@ class _SettingsRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: data.onTap,
+        borderRadius: BorderRadius.circular(22),
         child: SizedBox(
-          height: 92,
+          height: 72,
           child: Row(
             children: [
-              const SizedBox(width: 22),
+              const SizedBox(width: 18),
               _SettingsIcon(icon: data.icon),
-              const SizedBox(width: 20),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -546,18 +621,18 @@ class _SettingsRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 17,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 7),
+                    const SizedBox(height: 5),
                     Text(
                       data.subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: DarkKickColors.textSecondary,
-                        fontSize: 14,
+                        fontSize: 13,
                       ),
                     ),
                   ],
@@ -566,9 +641,9 @@ class _SettingsRow extends StatelessWidget {
               const Icon(
                 Icons.chevron_right,
                 color: DarkKickColors.textSecondary,
-                size: 26,
+                size: 24,
               ),
-              const SizedBox(width: 18),
+              const SizedBox(width: 14),
             ],
           ),
         ),
@@ -585,30 +660,30 @@ class _SettingsIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 42,
-      height: 42,
+      width: 38,
+      height: 38,
       child: Stack(
         alignment: Alignment.center,
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: DarkKickColors.neonPurple.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(11),
+              color: DarkKickColors.neonPurple.withValues(alpha: 0.16),
               border: Border.all(
-                color: DarkKickColors.neonPurple.withValues(alpha: 0.22),
+                color: DarkKickColors.neonPurple.withValues(alpha: 0.24),
                 width: 0.8,
               ),
               boxShadow: [
                 BoxShadow(
                   color: DarkKickColors.neonPurple.withValues(alpha: 0.14),
-                  blurRadius: 12,
+                  blurRadius: 10,
                 ),
               ],
             ),
           ),
-          Icon(icon, color: DarkKickColors.neonPurple, size: 25),
+          Icon(icon, color: DarkKickColors.electricPurple, size: 21),
         ],
       ),
     );
@@ -618,14 +693,14 @@ class _SettingsIcon extends StatelessWidget {
 class _LogoutGlassButton extends StatelessWidget {
   const _LogoutGlassButton({required this.onTap});
 
-  final Future<void> Function() onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => onTap(),
+        onTap: onTap,
         borderRadius: BorderRadius.circular(22),
         child: Ink(
           height: 58,
@@ -654,6 +729,141 @@ class _LogoutGlassButton extends StatelessWidget {
               ),
               Icon(Icons.chevron_right, color: Color(0xFFFF7A88), size: 24),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LogoutConfirmDialog extends StatelessWidget {
+  const _LogoutConfirmDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+        decoration: BoxDecoration(
+          color: const Color(0xFF11101D).withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.08),
+            width: 0.8,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: DarkKickColors.neonPurple.withValues(alpha: 0.18),
+              blurRadius: 34,
+              offset: const Offset(0, 18),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                color: const Color(0xFFFF3358).withValues(alpha: 0.08),
+                border: Border.all(
+                  color: const Color(0xFFFF3358).withValues(alpha: 0.35),
+                  width: 0.8,
+                ),
+              ),
+              child: const Icon(
+                Icons.logout_rounded,
+                color: Color(0xFFFF4D6A),
+                size: 34,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Выйти из аккаунта?',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.spaceGrotesk(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Вы уверены, что хотите выйти?\nДля входа потребуется пароль.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: DarkKickColors.textSecondary,
+                fontSize: 15,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 24),
+            _LogoutDialogButton(
+              label: 'Выйти',
+              isDanger: true,
+              onTap: () => Navigator.pop(context, true),
+            ),
+            const SizedBox(height: 12),
+            _LogoutDialogButton(
+              label: 'Отмена',
+              onTap: () => Navigator.pop(context, false),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LogoutDialogButton extends StatelessWidget {
+  const _LogoutDialogButton({
+    required this.label,
+    required this.onTap,
+    this.isDanger = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final bool isDanger;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: isDanger
+              ? const LinearGradient(
+                  colors: [Color(0xFFFF3358), Color(0xFFC91638)],
+                )
+              : null,
+          color: isDanger ? null : Colors.white.withValues(alpha: 0.06),
+          border: Border.all(
+            color: isDanger
+                ? Colors.transparent
+                : Colors.white.withValues(alpha: 0.05),
+            width: 0.8,
+          ),
+        ),
+        child: ElevatedButton(
+          onPressed: onTap,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
         ),
       ),

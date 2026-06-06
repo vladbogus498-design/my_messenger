@@ -45,7 +45,6 @@ class _MediaStatsCardState extends State<MediaStatsCard> {
                 data['type'],
                 data['imageUrl'],
                 data['fileUrl'],
-                data['voiceUrl'],
                 data['text'],
               ].join('|');
             })
@@ -72,16 +71,14 @@ class MediaStats {
     required this.photos,
     required this.files,
     required this.links,
-    required this.voices,
   });
 
-  static const zero = MediaStats(photos: 0, files: 0, links: 0, voices: 0);
+  static const zero = MediaStats(photos: 0, files: 0, links: 0);
   static final _urlPattern = RegExp(r'https?://[^\s]+', caseSensitive: false);
 
   final int photos;
   final int files;
   final int links;
-  final int voices;
 
   static Future<MediaStats> fromMessages(
     Iterable<Map<String, dynamic>> messages,
@@ -89,14 +86,12 @@ class MediaStats {
     var photos = 0;
     var files = 0;
     var links = 0;
-    var voices = 0;
 
     for (final message in messages) {
       final type = (message['type'] ?? '').toString();
       final text = (message['text'] ?? '').toString();
       final imageUrl = (message['imageUrl'] ?? '').toString().trim();
       final fileUrl = (message['fileUrl'] ?? '').toString().trim();
-      final voiceUrl = (message['voiceUrl'] ?? '').toString().trim();
 
       if (imageUrl.isNotEmpty &&
           (type == 'image' || message.containsKey('imageUrl')) &&
@@ -109,18 +104,12 @@ class MediaStats {
         files++;
       }
       if (_urlPattern.hasMatch(text)) links++;
-      if (voiceUrl.isNotEmpty &&
-          type == 'voice' &&
-          await MediaAvailabilityService.exists(voiceUrl)) {
-        voices++;
-      }
     }
 
     return MediaStats(
       photos: photos,
       files: files,
       links: links,
-      voices: voices,
     );
   }
 }
@@ -136,7 +125,6 @@ class _StatsView extends StatelessWidget {
       ('Фотографии', stats.photos),
       ('Файлы', stats.files),
       ('Ссылки', stats.links),
-      ('Голосовые', stats.voices),
     ];
 
     return Container(

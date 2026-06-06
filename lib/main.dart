@@ -82,11 +82,14 @@ class AuthGate extends ConsumerWidget {
     final authState = ref.watch(authStateProvider);
 
     return authState.when(
-      data: (user) => user == null
-          ? const AuthScreen()
-          : _needsEmailVerification(user)
-          ? VerifyEmailScreen(email: user.email ?? '')
-          : const PresenceAwareHome(child: ChatScreen()),
+      data: (user) {
+        if (user == null) return const AuthScreen();
+        final freshUser = FirebaseAuth.instance.currentUser ?? user;
+        if (_needsEmailVerification(freshUser)) {
+          return VerifyEmailScreen(email: freshUser.email ?? '');
+        }
+        return const PresenceAwareHome(child: ChatScreen());
+      },
       loading: () => const _DarkkickLoadingScreen(),
       error: (_, __) => const AuthScreen(),
     );
@@ -103,8 +106,9 @@ class VerifiedMainGate extends ConsumerWidget {
     return authState.when(
       data: (user) {
         if (user == null) return const AuthScreen();
-        if (_needsEmailVerification(user)) {
-          return VerifyEmailScreen(email: user.email ?? '');
+        final freshUser = FirebaseAuth.instance.currentUser ?? user;
+        if (_needsEmailVerification(freshUser)) {
+          return VerifyEmailScreen(email: freshUser.email ?? '');
         }
         return const PresenceAwareHome(child: ChatScreen());
       },

@@ -136,10 +136,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
           _IconFrame(
             icon: Icons.edit_square,
-            onTap: () => Navigator.push(
-              context,
-              NavigationAnimations.slideFadeRoute(const NewChatScreen()),
-            ),
+            onTap: _openNewChat,
           ),
         ],
       ),
@@ -320,6 +317,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget _buildChatsList(List<Chat> allChats) {
     final chats = _filterChats(allChats);
     final currentUserId = _currentUserId;
+    final hasHumanChats = chats.any((chat) => !SystemBot.isSystemChat(chat));
+    final shouldShowFindFriendState =
+        _selectedFilterIndex == 0 && _searchQuery.isEmpty && !hasHumanChats;
 
     if (chats.isEmpty) {
       final empty = _emptyStateForFilter();
@@ -327,6 +327,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         title: empty.title,
         subtitle: empty.subtitle,
         icon: empty.icon,
+        actionLabel: _selectedFilterIndex <= 1 ? 'Начать чат' : null,
+        onAction: _selectedFilterIndex <= 1 ? _openNewChat : null,
       );
     }
 
@@ -352,6 +354,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             }, childCount: chats.length * 2 - 1),
           ),
         ),
+        if (shouldShowFindFriendState)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+              child: _FindFriendCard(onTap: _openNewChat),
+            ),
+          ),
       ],
     );
   }
@@ -400,14 +409,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return false;
     }
     if (SystemBot.isSystemChat(chat)) {
-      return true;
+      final validSystemChat = chat.participants.contains(SystemBot.uid);
+      if (!validSystemChat) {
+        _logSkippedLegacyChat(chat, currentUserId, 'invalid system bot chat');
+      }
+      return validSystemChat;
     }
     if (_isDirectLikeChat(chat)) {
+      final uniqueParticipants = chat.participants.toSet();
+      if (uniqueParticipants.length != 2) {
+        _logSkippedLegacyChat(chat, currentUserId, 'invalid direct participants');
+        return false;
+      }
       final hasPeer = chat.otherParticipantId(currentUserId) != null;
       if (!hasPeer) {
         _logSkippedLegacyChat(chat, currentUserId, 'missing direct peer');
       }
       return hasPeer;
+    }
+    if (!_isGroupChat(chat) && !_isChannelChat(chat)) {
+      _logSkippedLegacyChat(chat, currentUserId, 'unknown legacy chat type');
+      return false;
     }
     final hasTitle = _fallbackTitle(chat).trim().isNotEmpty;
     if (!hasTitle) {
@@ -541,6 +563,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               : chat.otherParticipantId(_currentUserId),
         ),
       ),
+    );
+  }
+
+  void _openNewChat() {
+    Navigator.push(
+      context,
+      NavigationAnimations.slideFadeRoute(const NewChatScreen()),
     );
   }
 }
@@ -1045,11 +1074,15 @@ class _EmptyState extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
+    this.actionLabel,
+    this.onAction,
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -1079,7 +1112,99 @@ class _EmptyState extends StatelessWidget {
                 height: 1.35,
               ),
             ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 18),
+              _StartChatButton(label: actionLabel!, onTap: onAction!),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FindFriendCard extends StatelessWidget {
+  const _FindFriendCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+      decoration: BoxDecoration(
+        color: DarkKickColors.panel.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: DarkKickColors.divider, width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: DarkKickColors.neonPurple.withValues(alpha: 0.08),
+            blurRadius: 16,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.person_search_outlined,
+            color: DarkKickColors.electricPurple,
+            size: 38,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Найди друга по тегу',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.spaceGrotesk(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _StartChatButton(label: 'Начать чат', onTap: onTap),
+        ],
+      ),
+    );
+  }
+}
+
+class _StartChatButton extends StatelessWidget {
+  const _StartChatButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF241050), Color(0xFF7B2CBF), Color(0xFF2E0C61)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: DarkKickColors.neonPurple.withValues(alpha: 0.24),
+              blurRadius: 16,
+            ),
+          ],
+        ),
+        child: ElevatedButton.icon(
+          onPressed: onTap,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+          ),
+          icon: const Icon(Icons.add_comment_outlined, size: 18),
+          label: Text(label),
         ),
       ),
     );

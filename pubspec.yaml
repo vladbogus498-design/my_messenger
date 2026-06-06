@@ -54,8 +54,8 @@ flutter_launcher_icons:
   android: true
   ios: true
   remove_alpha_ios: true
-  image_path: "assets/images/auth_bg.png"
-  adaptive_icon_foreground: "assets/images/auth_bg.png"
+  image_path: "assets/images/auth_angel.png"
+  adaptive_icon_foreground: "assets/images/auth_angel.png"
   adaptive_icon_background: "#07050C"
 dependency_overrides:
   http: 1.2.2

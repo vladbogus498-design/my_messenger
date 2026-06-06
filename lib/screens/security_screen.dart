@@ -143,7 +143,7 @@ class SecurityScreen extends StatelessWidget {
           ),
           const Spacer(),
           Icon(
-            Icons.workspace_premium_outlined,
+            Icons.verified_outlined,
             color: DarkKickColors.textSecondary.withValues(alpha: 0.72),
             size: 34,
           ),

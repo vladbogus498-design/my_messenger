@@ -67,7 +67,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   Timer? _highlightTimer;
   final Set<String> _invalidPinnedHandled = <String>{};
 
-  bool get _voiceMessagesTemporarilyDisabled => true;
+  bool get _showVoiceMessagesInUi => false;
 
   @override
   void initState() {
@@ -316,6 +316,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       _scrollToBottom();
     } catch (e) {
       appLogger.e('Error sending message in chat: ${widget.chatId}', error: e);
+      if (_showRateLimitSnackBarIfNeeded(e)) return;
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -355,23 +356,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       if (_actualChatId != null) {
         await ChatService.setSendingPhotoStatus(_actualChatId!, false);
       }
+      if (_showRateLimitSnackBarIfNeeded(e)) return;
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Ошибка отправки фото: $e')));
       }
-    }
-  }
-
-  Future<void> _sendVoiceMessage(
-    String base64Audio,
-    int durationSeconds,
-  ) async {
-    if (!mounted) return;
-    if (_voiceMessagesTemporarilyDisabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Голосовые сообщения временно отключены')),
-      );
     }
   }
 
@@ -388,6 +378,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       _scrollToBottom();
     } catch (e) {
       appLogger.e('Error sending sticker in chat: ${widget.chatId}', error: e);
+      if (_showRateLimitSnackBarIfNeeded(e)) return;
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -669,6 +660,17 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   void _showSnackBar(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  bool _showRateLimitSnackBarIfNeeded(Object error) {
+    final isPermissionDenied =
+        error is FirebaseException && error.code == 'permission-denied';
+    final raw = error.toString().toLowerCase();
+    final looksLikeRateLimit = raw.contains('rate') || raw.contains('limit');
+    if (!isPermissionDenied && !looksLikeRateLimit) return false;
+
+    _showSnackBar('Подожди секунду');
+    return true;
   }
 
   bool _isMyMessage(String senderId) {
@@ -1166,7 +1168,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                           ),
 
                         // Voice message
-                        if (message.type == 'voice' &&
+                        if (_showVoiceMessagesInUi &&
+                            message.type == 'voice' &&
                             message.voiceAudioBase64 != null)
                           GestureDetector(
                             onTap: () => _playVoiceMessage(message),
@@ -1201,6 +1204,14 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                                   Icon(Icons.mic, color: textColor, size: 16),
                                 ],
                               ),
+                            ),
+                          ),
+                        if (!_showVoiceMessagesInUi && message.type == 'voice')
+                          Text(
+                            'Голосовое сообщение недоступно',
+                            style: TextStyle(
+                              color: textColor.withValues(alpha: 0.74),
+                              fontSize: 14,
                             ),
                           ),
 
@@ -1481,8 +1492,6 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     }) {
       final status = isOfficial
           ? SystemBot.bio
-          : _typingStatus.recordingVoiceUsers.isNotEmpty
-          ? 'Записывает голосовое...'
           : _typingStatus.sendingPhotoUsers.isNotEmpty
           ? 'Отправляет фото...'
           : _typingStatus.typingUsers.isNotEmpty
@@ -1707,7 +1716,6 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
             currentUserId: _currentUser?.uid ?? '',
             onSendMessage: _sendTextMessage,
             onImageUpload: _sendImageMessage,
-            onVoiceMessageSent: _sendVoiceMessage,
             onStickerSent: _sendSticker,
             typingController: _typingController,
           ),

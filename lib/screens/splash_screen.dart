@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/auth_screen.dart';
-import '../auth/biometric_unlock_screen.dart';
 import '../utils/navigation_animations.dart';
 import 'main_chat_screen.dart';
 
@@ -48,21 +46,10 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final useBiometric = prefs.getBool('useBiometric') ?? false;
-    if (!mounted) return;
-
-    if (useBiometric) {
-      Navigator.pushReplacement(
-        context,
-        NavigationAnimations.slideFadeRoute(const BiometricUnlockScreen()),
-      );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        NavigationAnimations.slideFadeRoute(MainChatScreen()),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      NavigationAnimations.slideFadeRoute(MainChatScreen()),
+    );
   }
 
   @override
