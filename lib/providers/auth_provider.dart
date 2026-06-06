@@ -91,7 +91,18 @@ class AuthController extends StateNotifier<AuthFlowState> {
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      await _service.registerWithEmail(email: email, password: password);
+      final credential = await _service.registerWithEmail(
+        email: email,
+        password: password,
+      );
+      try {
+        await credential.user?.sendEmailVerification();
+      } on FirebaseAuthException catch (e) {
+        appLogger.e(
+          'Email verification send failed after registration: ${e.code}',
+          error: e,
+        );
+      }
       await _service.instance.currentUser?.reload();
       await _ensureUserProfile(
         _service.instance.currentUser,

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'config/app_config.dart';
 import 'auth/auth_screen.dart';
 import 'auth/auth_credentials_screen.dart';
+import 'auth/verify_email_screen.dart';
 import 'screens/chats_screen.dart';
 import 'widgets/otp_verification_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -52,10 +54,10 @@ class MyApp extends ConsumerWidget {
         '/auth/register': (context) => const AuthCredentialsScreen(
           initialMode: AuthCredentialsMode.register,
         ),
-        '/main': (context) => const PresenceAwareHome(child: ChatScreen()),
+        '/main': (context) => const VerifiedMainGate(),
         '/email-verification': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as String?;
-          return EmailVerificationScreen(email: args ?? '');
+          return VerifyEmailScreen(email: args ?? '');
         },
         '/phone-verification': (context) {
           final args =
@@ -82,11 +84,39 @@ class AuthGate extends ConsumerWidget {
     return authState.when(
       data: (user) => user == null
           ? const AuthScreen()
+          : _needsEmailVerification(user)
+          ? VerifyEmailScreen(email: user.email ?? '')
           : const PresenceAwareHome(child: ChatScreen()),
       loading: () => const _DarkkickLoadingScreen(),
       error: (_, __) => const AuthScreen(),
     );
   }
+}
+
+class VerifiedMainGate extends ConsumerWidget {
+  const VerifiedMainGate({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+
+    return authState.when(
+      data: (user) {
+        if (user == null) return const AuthScreen();
+        if (_needsEmailVerification(user)) {
+          return VerifyEmailScreen(email: user.email ?? '');
+        }
+        return const PresenceAwareHome(child: ChatScreen());
+      },
+      loading: () => const _DarkkickLoadingScreen(),
+      error: (_, __) => const AuthScreen(),
+    );
+  }
+}
+
+bool _needsEmailVerification(User user) {
+  final email = user.email?.trim() ?? '';
+  return email.isNotEmpty && user.emailVerified == false;
 }
 
 class PresenceAwareHome extends StatefulWidget {

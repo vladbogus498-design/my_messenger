@@ -88,7 +88,14 @@ class _AuthCredentialsScreenState extends ConsumerState<AuthCredentialsScreen> {
       ref.invalidate(chatsProvider);
       ref.invalidate(chatsNotifierProvider);
       ref.invalidate(messagesProvider);
-      Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
+      final user = FirebaseAuth.instance.currentUser;
+      final needsEmailVerification =
+          user?.email?.trim().isNotEmpty == true && user?.emailVerified == false;
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        needsEmailVerification ? '/email-verification' : '/main',
+        (route) => false,
+        arguments: user?.email ?? email,
+      );
     }
   }
 
