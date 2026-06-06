@@ -440,8 +440,8 @@ class _DarkkickIdCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(24),
         child: Ink(
-          height: 106,
-          padding: const EdgeInsets.all(18),
+          height: 120,
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: const Color(0xFF160A28),
             borderRadius: BorderRadius.circular(24),
@@ -449,13 +449,10 @@ class _DarkkickIdCard extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.08),
               width: 1,
             ),
-            gradient: LinearGradient(
+            gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF160A28),
-                const Color(0xFF25103F),
-              ],
+              colors: [Color(0xFF160A28), Color(0xFF25103F)],
             ),
             boxShadow: [
               BoxShadow(
@@ -468,54 +465,56 @@ class _DarkkickIdCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              _ProfileAvatar(user: user, size: 64),
-              const SizedBox(width: 18),
+              _ProfileAvatar(user: user, size: 72),
+              const SizedBox(width: 16),
               Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.spaceGrotesk(
-                        color: Colors.white,
-                        fontSize: 19,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      tag.isEmpty ? '@darkkick' : '@$tag',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: DarkKickColors.electricPurple.withValues(
-                          alpha: 0.95,
+                child: Transform.translate(
+                  offset: const Offset(0, 5),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.spaceGrotesk(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
                         ),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      bio,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: DarkKickColors.textSecondary,
-                        fontSize: 13,
-                        height: 1.22,
+                      const SizedBox(height: 4),
+                      Text(
+                        tag.isEmpty ? '@darkkick' : '@$tag',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFB26DFF),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        bio,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          height: 1.22,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const Icon(
-                Icons.chevron_right,
-                color: DarkKickColors.textSecondary,
-                size: 28,
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white.withValues(alpha: 0.8),
+                size: 22,
               ),
             ],
           ),
@@ -778,11 +777,7 @@ class _LogoutIcon extends StatelessWidget {
           ),
         ],
       ),
-      child: const Icon(
-        Icons.logout_rounded,
-        color: Colors.white,
-        size: 22,
-      ),
+      child: const Icon(Icons.logout_rounded, color: Colors.white, size: 22),
     );
   }
 }
@@ -1060,65 +1055,65 @@ class _ProfileFieldCard extends StatelessWidget {
       height: height,
       width: double.infinity,
       child: Container(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF100A18),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: hasError
-              ? const Color(0xFFFF4D6A).withValues(alpha: 0.72)
-              : Colors.white.withValues(alpha: 0.07),
-          width: 1,
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF100A18),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: hasError
+                ? const Color(0xFFFF4D6A).withValues(alpha: 0.72)
+                : Colors.white.withValues(alpha: 0.07),
+            width: 1,
+          ),
+          boxShadow: hasError
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFFF4D6A).withValues(alpha: 0.14),
+                    blurRadius: 18,
+                    spreadRadius: -6,
+                  ),
+                ]
+              : null,
         ),
-        boxShadow: hasError
-            ? [
-                BoxShadow(
-                  color: const Color(0xFFFF4D6A).withValues(alpha: 0.14),
-                  blurRadius: 18,
-                  spreadRadius: -6,
-                ),
-              ]
-            : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.52),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              height: 16 / 12,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.52),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                height: 16 / 12,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: controller,
-            minLines: minLines,
-            maxLines: maxLines,
-            textInputAction: textInputAction,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              height: 22 / 16,
+            const SizedBox(height: 8),
+            TextField(
+              controller: controller,
+              minLines: minLines,
+              maxLines: maxLines,
+              textInputAction: textInputAction,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                height: 22 / 16,
+              ),
+              textAlignVertical: TextAlignVertical.top,
+              cursorColor: DarkKickColors.neonPurple,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                filled: false,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
             ),
-            textAlignVertical: TextAlignVertical.top,
-            cursorColor: DarkKickColors.neonPurple,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              errorBorder: InputBorder.none,
-              focusedErrorBorder: InputBorder.none,
-              filled: false,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -1216,9 +1211,9 @@ class _ProfileAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: const Color(0xFFA855F7).withValues(
-            alpha: isLarge ? 0.45 : 0.62,
-          ),
+          color: const Color(
+            0xFFA855F7,
+          ).withValues(alpha: isLarge ? 0.45 : 0.62),
           width: isLarge ? 1.2 : 0.8,
         ),
         boxShadow: [

@@ -49,13 +49,14 @@ flutter:
   assets:
     - assets/images/auth_bg.png
     - assets/images/auth_angel.png
+    - assets/images/darkkick_app_icon.png
 
 flutter_launcher_icons:
   android: true
   ios: true
   remove_alpha_ios: true
-  image_path: "assets/images/auth_angel.png"
-  adaptive_icon_foreground: "assets/images/auth_angel.png"
+  image_path: "assets/images/darkkick_app_icon.png"
+  adaptive_icon_foreground: "assets/images/darkkick_app_icon.png"
   adaptive_icon_background: "#07050C"
 dependency_overrides:
   http: 1.2.2
