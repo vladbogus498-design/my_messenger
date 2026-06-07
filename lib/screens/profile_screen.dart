@@ -430,21 +430,19 @@ class _DarkkickIdCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tag = (user.username ?? user.tag ?? '').trim();
     final displayName = user.name.trim().isEmpty ? 'DARKKICK ID' : user.name;
-    final bio = (user.bio ?? '').trim().isEmpty
-        ? 'Без границ. Без слежки.\nЭто Darkkick.'
-        : user.bio!.trim();
+    final bio = (user.bio ?? '').trim();
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         child: Ink(
-          height: 120,
+          height: 124,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: const Color(0xFF160A28),
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.08),
               width: 1,
@@ -456,20 +454,20 @@ class _DarkkickIdCard extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: DarkKickColors.neonPurple.withValues(alpha: 0.12),
-                blurRadius: 24,
-                spreadRadius: -6,
-                offset: const Offset(0, 12),
+                color: DarkKickColors.neonPurple.withValues(alpha: 0.14),
+                blurRadius: 28,
+                spreadRadius: -8,
+                offset: const Offset(0, 14),
               ),
             ],
           ),
           child: Row(
             children: [
-              _ProfileAvatar(user: user, size: 72),
-              const SizedBox(width: 16),
+              _ProfileAvatar(user: user, size: 76),
+              const SizedBox(width: 18),
               Expanded(
                 child: Transform.translate(
-                  offset: const Offset(0, 5),
+                  offset: const Offset(0, 4),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -480,7 +478,7 @@ class _DarkkickIdCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.spaceGrotesk(
                           color: Colors.white,
-                          fontSize: 24,
+                          fontSize: 26,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -491,22 +489,24 @@ class _DarkkickIdCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xFFB26DFF),
-                          fontSize: 16,
+                          fontSize: 17,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        bio,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          height: 1.22,
+                      if (bio.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          bio,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            height: 1.22,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),

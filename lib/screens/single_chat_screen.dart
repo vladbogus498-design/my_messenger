@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/system_bot.dart';
+import '../data/darkkick_stickers.dart';
 import '../services/chat_service.dart';
 import '../services/media_availability_service.dart';
 import '../services/storage_service.dart';
@@ -714,26 +715,148 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     );
   }
 
-  Widget _buildStickerWidget(String stickerId) {
-    // Маппинг ID стикеров на эмодзи (можно расширить)
-    final stickerMap = {
-      'thumbs_up': '👍',
-      'heart': '❤️',
-      'fire': '🔥',
-      'party': '🎉',
-      'rocket': '🚀',
-      'star': '⭐',
-      'trophy': '🏆',
-      'clap': '👏',
-      'cool': '😎',
-      'wink': '😉',
-    };
-
-    final emoji = stickerMap[stickerId] ?? '😀';
+  Widget _buildStickerMessage(Message message) {
+    final isMyMessage = _isMyMessage(message.senderId);
+    final metaTextColor = isMyMessage
+        ? Colors.white.withValues(alpha: 0.74)
+        : DarkKickColors.textSecondary;
+    final isHighlighted = _highlightedMessageId == message.id;
+    final stickerId = message.stickerId ?? message.stickerUrl ?? '';
 
     return Container(
-      padding: EdgeInsets.all(8),
-      child: Text(emoji, style: TextStyle(fontSize: 64)),
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      child: Row(
+        mainAxisAlignment: isMyMessage
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
+        children: [
+          Flexible(
+            child: Column(
+              crossAxisAlignment: isMyMessage
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
+              children: [
+                if (message.isForwarded) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.forward, size: 12, color: metaTextColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Переслано',
+                          style: TextStyle(color: metaTextColor, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                GestureDetector(
+                  onLongPress: () => _showMessageMenu(message),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(28),
+                      border: isHighlighted
+                          ? Border.all(
+                              color: DarkKickColors.neonPurple.withValues(
+                                alpha: 0.72,
+                              ),
+                              width: 1,
+                            )
+                          : null,
+                      boxShadow: [
+                        BoxShadow(
+                          color: DarkKickColors.neonPurple.withValues(
+                            alpha: isHighlighted ? 0.38 : 0.16,
+                          ),
+                          blurRadius: isHighlighted ? 26 : 18,
+                          spreadRadius: isHighlighted ? 1 : -4,
+                        ),
+                      ],
+                    ),
+                    child: _buildStickerWidget(stickerId),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: DarkKickColors.panel.withValues(alpha: 0.48),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.05),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        TimeFormatter.formatMessageTime(message.timestamp),
+                        style: TextStyle(color: metaTextColor, fontSize: 12),
+                      ),
+                      if (isMyMessage) ...[
+                        const SizedBox(width: 4),
+                        MessageStatusIcon(
+                          status: _messageStatusForCurrentUser(message),
+                          isOwnMessage: true,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                _buildReactions(message),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStickerWidget(String stickerId) {
+    final assetPath =
+        DarkkickStickers.assetFor(stickerId) ??
+        (stickerId.startsWith('assets/') ? stickerId : null);
+
+    if (assetPath == null) {
+      return _buildMissingStickerPlaceholder();
+    }
+
+    return Image.asset(
+      assetPath,
+      width: 160,
+      height: 160,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+      errorBuilder: (_, __, ___) => _buildMissingStickerPlaceholder(),
+    );
+  }
+
+  Widget _buildMissingStickerPlaceholder() {
+    return Container(
+      width: 146,
+      height: 96,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: DarkKickColors.panel.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: DarkKickColors.divider),
+      ),
+      child: const Text(
+        'Стикер недоступен',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: DarkKickColors.textSecondary,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -946,6 +1069,10 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           ),
         ),
       );
+    }
+
+    if (message.type == 'sticker') {
+      return _buildStickerMessage(message);
     }
 
     final isMyMessage = _isMyMessage(message.senderId);
@@ -1651,8 +1778,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                       final docs = snapshot.data?.docs ?? [];
                       _messageDocs = docs;
                       final isSystemBotChat =
-                          (widget.otherUserId ?? _otherUserId) ==
-                          SystemBot.uid;
+                          (widget.otherUserId ?? _otherUserId) == SystemBot.uid;
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         _markMessagesAsRead();
                       });

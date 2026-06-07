@@ -77,7 +77,6 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
 
   void _sendSticker(String stickerId) {
     widget.onStickerSent?.call(stickerId);
-    setState(() => _showStickerPicker = false);
   }
 
   KeyEventResult _handleTextFieldKey(FocusNode node, KeyEvent event) {
@@ -133,10 +132,19 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
                         : Icons.add_circle_outline,
                     color: DarkKickColors.neonPurple,
                   ),
-                  onPressed: () => setState(
-                    () => _showAttachmentMenu = !_showAttachmentMenu,
-                  ),
+                  onPressed: () => setState(() {
+                    _showAttachmentMenu = !_showAttachmentMenu;
+                    if (_showAttachmentMenu) _showStickerPicker = false;
+                  }),
                 ),
+                _StickerToggleButton(
+                  active: _showStickerPicker,
+                  onTap: () => setState(() {
+                    _showStickerPicker = !_showStickerPicker;
+                    if (_showStickerPicker) _showAttachmentMenu = false;
+                  }),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
@@ -216,13 +224,50 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
             label: 'Фото',
             onTap: _uploadingImage ? null : _sendPhoto,
           ),
-          _AttachmentButton(
-            icon: Icons.emoji_emotions_outlined,
-            label: 'Стикер',
-            onTap: () =>
-                setState(() => _showStickerPicker = !_showStickerPicker),
-          ),
         ],
+      ),
+    );
+  }
+}
+
+class _StickerToggleButton extends StatelessWidget {
+  const _StickerToggleButton({required this.active, required this.onTap});
+
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: active ? const Color(0xFF1A0F2A) : DarkKickColors.panel,
+          border: Border.all(
+            color: active
+                ? DarkKickColors.neonPurple.withValues(alpha: 0.72)
+                : DarkKickColors.divider,
+          ),
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: DarkKickColors.neonPurple.withValues(alpha: 0.34),
+                    blurRadius: 16,
+                  ),
+                ]
+              : null,
+        ),
+        child: Icon(
+          Icons.sticky_note_2_outlined,
+          color: active
+              ? DarkKickColors.electricPurple
+              : DarkKickColors.neonPurple,
+          size: 21,
+        ),
       ),
     );
   }
