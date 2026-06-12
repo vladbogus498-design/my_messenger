@@ -8,10 +8,12 @@ import 'package:google_fonts/google_fonts.dart';
 import '../constants/system_bot.dart';
 import '../models/chat.dart';
 import '../providers/chats_provider.dart';
+import '../services/desktop_platform_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/navigation_animations.dart';
 import '../utils/time_formatter.dart';
 import '../utils/user_formatters.dart';
+import '../utils/logger.dart';
 import 'new_chat_screen.dart';
 import 'profile_screen.dart';
 import 'single_chat_screen.dart';
@@ -28,6 +30,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   int _selectedNavIndex = 0;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  Chat? _selectedDesktopChat;
 
   String? get _currentUserId => FirebaseAuth.instance.currentUser?.uid;
 
@@ -49,6 +52,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (DesktopPlatformService.isWindowsDesktop) {
+      return _buildWindowsDesktopMode();
+    }
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: DarkKickColors.darkBackground,
@@ -81,6 +88,80 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         bottomNavigationBar: _buildBottomNavBar(),
       ),
+    );
+  }
+
+  Widget _buildWindowsDesktopMode() {
+    final chatsState = ref.watch(chatsProvider);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: DarkKickColors.darkBackground,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: DarkKickColors.darkBackground,
+        systemNavigationBarDividerColor: DarkKickColors.darkBackground,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: DarkKickColors.darkBackground,
+        body: SafeArea(
+          child: Row(
+            children: [
+              SizedBox(
+                width: 380,
+                child: DecoratedBox(
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      right: BorderSide(color: DarkKickColors.divider),
+                    ),
+                  ),
+                  child: _buildChatsHome(),
+                ),
+              ),
+              Expanded(
+                child: chatsState.when(
+                  data: _buildDesktopChatPane,
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(
+                      color: DarkKickColors.neonPurple,
+                    ),
+                  ),
+                  error: (error, _) => _buildErrorState(error),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopChatPane(List<Chat> chats) {
+    final filtered = _filterChats(chats);
+    final selected = _selectedDesktopChat;
+    final activeChat =
+        selected != null && filtered.any((chat) => chat.id == selected.id)
+        ? selected
+        : filtered.isNotEmpty
+        ? filtered.first
+        : null;
+
+    if (activeChat == null) {
+      return const _DarkkickPlaceholder(
+        icon: Icons.chat_bubble_outline,
+        title: 'Выберите чат',
+        subtitle: 'Список чатов находится слева.',
+      );
+    }
+
+    return SingleChatScreen(
+      key: ValueKey('desktop-chat-${activeChat.id}'),
+      chatId: activeChat.id,
+      chatName: _fallbackTitle(activeChat),
+      otherUserId: SystemBot.isSystemChat(activeChat)
+          ? SystemBot.uid
+          : activeChat.otherParticipantId(_currentUserId),
+      embedded: true,
     );
   }
 
@@ -134,10 +215,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
           ),
-          _IconFrame(
-            icon: Icons.edit_square,
-            onTap: _openNewChat,
-          ),
+          _IconFrame(icon: Icons.edit_square, onTap: _openNewChat),
         ],
       ),
     );
@@ -420,7 +498,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (_isDirectLikeChat(chat)) {
       final uniqueParticipants = chat.participants.toSet();
       if (uniqueParticipants.length != 2) {
-        _logSkippedLegacyChat(chat, currentUserId, 'invalid direct participants');
+        _logSkippedLegacyChat(
+          chat,
+          currentUserId,
+          'invalid direct participants',
+        );
         return false;
       }
       final hasPeer = chat.otherParticipantId(currentUserId) != null;
@@ -580,6 +662,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _openChat(Chat chat) {
+    if (DesktopPlatformService.isWindowsDesktop) {
+      setState(() => _selectedDesktopChat = chat);
+      return;
+    }
+
     Navigator.push(
       context,
       NavigationAnimations.slideFadeRoute(
@@ -1123,6 +1210,10 @@ Stream<_PeerMeta>? _peerMetaStream(String? uid) {
           isOnline: data['isOnline'] == true,
           lastSeen: lastSeen,
         );
+      })
+      .handleError((Object error, StackTrace stackTrace) {
+        appLogger.e('Chat peer metadata stream failed: $uid', error: error);
+        throw error;
       });
 }
 

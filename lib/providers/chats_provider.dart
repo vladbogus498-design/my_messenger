@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/chat.dart';
+import '../utils/logger.dart';
 import 'auth_provider.dart';
 
 final chatsProvider = StreamProvider.autoDispose<List<Chat>>((ref) {
@@ -18,7 +19,11 @@ final chatsProvider = StreamProvider.autoDispose<List<Chat>>((ref) {
       .collection('chats')
       .where('participants', arrayContains: userId)
       .snapshots()
-      .map((snapshot) => _ownedSortedChats(snapshot.docs, userId));
+      .map((snapshot) => _ownedSortedChats(snapshot.docs, userId))
+      .handleError((Object error, StackTrace stackTrace) {
+        appLogger.e('Chats stream failed', error: error);
+        throw error;
+      });
 });
 
 class ChatsNotifier extends StateNotifier<AsyncValue<List<Chat>>> {
@@ -43,7 +48,10 @@ class ChatsNotifier extends StateNotifier<AsyncValue<List<Chat>>> {
         .map((snapshot) => _ownedSortedChats(snapshot.docs, userId))
         .listen(
           (chats) => state = AsyncValue.data(chats),
-          onError: (error, stack) => state = AsyncValue.error(error, stack),
+          onError: (error, stack) {
+            appLogger.e('Chats notifier stream failed', error: error);
+            state = AsyncValue.error(error, stack);
+          },
         );
   }
 

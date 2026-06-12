@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'desktop_platform_service.dart';
 import '../utils/logger.dart';
 
 /// Сервис для записи и воспроизведения голосовых сообщений
@@ -24,8 +25,9 @@ class VoiceMessageService {
 
   // Запрос разрешения на запись
   static Future<bool> requestPermission() async {
-    if (Platform.isWindows) {
-      return true;
+    if (DesktopPlatformService.isWindowsDesktop) {
+      appLogger.w('Voice recording is not available on Windows desktop yet');
+      return false;
     }
 
     final status = await Permission.microphone.request();
@@ -37,6 +39,11 @@ class VoiceMessageService {
     required void Function(Duration duration) onDurationUpdate,
     required void Function(List<double> waveform) onWaveformUpdate,
   }) async {
+    if (DesktopPlatformService.isWindowsDesktop) {
+      appLogger.w('Voice recording skipped on Windows desktop');
+      return null;
+    }
+
     if (_isRecording) {
       appLogger.w('Voice recording already in progress');
       return null;

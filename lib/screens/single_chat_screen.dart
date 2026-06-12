@@ -6,13 +6,16 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/system_bot.dart';
 import '../data/darkkick_stickers.dart';
 import '../services/chat_service.dart';
+import '../services/desktop_platform_service.dart';
 import '../services/media_availability_service.dart';
 import '../services/storage_service.dart';
 import '../services/voice_message_service.dart';
+import '../services/windows_messaging_adapter.dart';
 import '../models/message.dart';
 import '../models/chat.dart';
 import '../models/selected_media.dart';
 import 'chat_input_panel.dart';
+import 'desktop_chat_input_panel.dart';
 import 'image_viewer_screen.dart';
 import 'user_profile_screen.dart';
 import '../widgets/reaction_picker.dart';
@@ -28,12 +31,14 @@ class SingleChatScreen extends StatefulWidget {
   final String chatId;
   final String chatName;
   final String? otherUserId; // ID получателя для нового чата
+  final bool embedded;
 
   const SingleChatScreen({
     Key? key,
     required this.chatId,
     required this.chatName,
     this.otherUserId,
+    this.embedded = false,
   }) : super(key: key);
 
   @override
@@ -165,25 +170,28 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     if (chatId.isEmpty) return;
 
     // Используем единый поток для всех статусов
-    _typingStatusSubscription = ChatService.getTypingStatus(chatId).listen((
-      status,
-    ) {
-      if (mounted) {
-        setState(() {
-          _typingStatus = TypingStatus(
-            typingUsers: status.typingUsers
-                .where((id) => id != _currentUser?.uid)
-                .toList(),
-            sendingPhotoUsers: status.sendingPhotoUsers
-                .where((id) => id != _currentUser?.uid)
-                .toList(),
-            recordingVoiceUsers: status.recordingVoiceUsers
-                .where((id) => id != _currentUser?.uid)
-                .toList(),
-          );
-        });
-      }
-    });
+    _typingStatusSubscription = ChatService.getTypingStatus(chatId).listen(
+      (status) {
+        if (mounted) {
+          setState(() {
+            _typingStatus = TypingStatus(
+              typingUsers: status.typingUsers
+                  .where((id) => id != _currentUser?.uid)
+                  .toList(),
+              sendingPhotoUsers: status.sendingPhotoUsers
+                  .where((id) => id != _currentUser?.uid)
+                  .toList(),
+              recordingVoiceUsers: status.recordingVoiceUsers
+                  .where((id) => id != _currentUser?.uid)
+                  .toList(),
+            );
+          });
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        appLogger.e('Typing status stream failed: $chatId', error: error);
+      },
+    );
   }
 
   void _setupTypingDetection() {
@@ -223,7 +231,11 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           .collection('messages')
           .orderBy('timestamp', descending: true)
           .limit(50)
-          .snapshots();
+          .snapshots()
+          .handleError((Object error, StackTrace stackTrace) {
+            appLogger.e('Messages stream failed: $chatId', error: error);
+            throw error;
+          });
     }
     return _messagesStream!;
   }
@@ -311,13 +323,22 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     try {
       final chatId = await _ensureChatExists();
 
-      await ChatService.sendMessage(
-        chatId: chatId,
-        text: text,
-        type: type,
-        replyToId: _replyingTo?.id,
-        replyToText: _replyingTo?.text,
-      );
+      if (DesktopPlatformService.isWindowsDesktop) {
+        await WindowsMessagingAdapter.sendText(
+          chatId: chatId,
+          text: text,
+          replyToId: _replyingTo?.id,
+          replyToText: _replyingTo?.text,
+        );
+      } else {
+        await ChatService.sendMessage(
+          chatId: chatId,
+          text: text,
+          type: type,
+          replyToId: _replyingTo?.id,
+          replyToText: _replyingTo?.text,
+        );
+      }
       _cancelAction();
       _scrollToBottom();
     } catch (e) {
@@ -338,25 +359,34 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     setState(() => _sendingImageMessage = true);
     try {
       chatId = await _ensureChatExists();
-      await ChatService.setSendingPhotoStatus(chatId, true);
+      if (DesktopPlatformService.isWindowsDesktop) {
+        await WindowsMessagingAdapter.sendImage(
+          chatId: chatId,
+          image: image,
+          replyToId: _replyingTo?.id,
+          replyToText: _replyingTo?.text,
+        );
+      } else {
+        await ChatService.setSendingPhotoStatus(chatId, true);
 
-      final messageId = ChatService.createMessageId(chatId);
-      final imageUrl = await StorageService.uploadChatImage(
-        image,
-        chatId,
-        messageId: messageId,
-      );
+        final messageId = ChatService.createMessageId(chatId);
+        final imageUrl = await StorageService.uploadChatImage(
+          image,
+          chatId,
+          messageId: messageId,
+        );
 
-      await ChatService.sendMessage(
-        chatId: chatId,
-        text: '',
-        type: 'image',
-        imageUrl: imageUrl,
-        messageId: messageId,
-        replyToId: _replyingTo?.id,
-        replyToText: _replyingTo?.text,
-        encrypt: false,
-      );
+        await ChatService.sendMessage(
+          chatId: chatId,
+          text: '',
+          type: 'image',
+          imageUrl: imageUrl,
+          messageId: messageId,
+          replyToId: _replyingTo?.id,
+          replyToText: _replyingTo?.text,
+          encrypt: false,
+        );
+      }
 
       _cancelAction();
       _scrollToBottom();
@@ -391,12 +421,19 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     setState(() => _sendingStickerMessage = true);
     try {
       final chatId = await _ensureChatExists();
-      await ChatService.sendMessage(
-        chatId: chatId,
-        text: '',
-        type: 'sticker',
-        stickerId: stickerId,
-      );
+      if (DesktopPlatformService.isWindowsDesktop) {
+        await WindowsMessagingAdapter.sendSticker(
+          chatId: chatId,
+          stickerId: stickerId,
+        );
+      } else {
+        await ChatService.sendMessage(
+          chatId: chatId,
+          text: '',
+          type: 'sticker',
+          stickerId: stickerId,
+        );
+      }
 
       _scrollToBottom();
     } catch (e) {
@@ -405,6 +442,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     } finally {
       if (mounted) setState(() => _sendingStickerMessage = false);
     }
+  }
+
+  Future<void> _pickAndSendDesktopImage() async {
+    final image = await WindowsMessagingAdapter.pickImage();
+    if (image == null) return;
+    await _sendImageMessage(image);
   }
 
   Future<void> _playVoiceMessage(Message message) async {
@@ -1415,7 +1458,11 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       stream: FirebaseFirestore.instance
           .collection('chats')
           .doc(chatId)
-          .snapshots(),
+          .snapshots()
+          .handleError((Object error, StackTrace stackTrace) {
+            appLogger.e('Pinned message stream failed: $chatId', error: error);
+            throw error;
+          }),
       builder: (context, snapshot) {
         final pinned = snapshot.data?.data()?['pinnedMessage'];
         if (pinned == null) return const SizedBox.shrink();
@@ -1714,7 +1761,14 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       stream: FirebaseFirestore.instance
           .collection('publicProfiles')
           .doc(otherUserId)
-          .snapshots(),
+          .snapshots()
+          .handleError((Object error, StackTrace stackTrace) {
+            appLogger.e(
+              'Peer profile stream failed: $otherUserId',
+              error: error,
+            );
+            throw error;
+          }),
       builder: (context, snapshot) {
         final data = snapshot.data?.data() ?? const <String, dynamic>{};
         final email = (data['email'] ?? '').toString();
@@ -1749,17 +1803,19 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
     return Scaffold(
       backgroundColor: DarkKickColors.darkBackground,
-      appBar: AppBar(
-        backgroundColor: DarkKickColors.darkBackground,
-        foregroundColor: DarkKickColors.textPrimary,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-        titleSpacing: 0,
-        title: _buildChatAppBarTitle(),
-        // use theme default color
-      ),
+      appBar: widget.embedded
+          ? null
+          : AppBar(
+              backgroundColor: DarkKickColors.darkBackground,
+              foregroundColor: DarkKickColors.textPrimary,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                onPressed: () => Navigator.pop(context),
+              ),
+              titleSpacing: 0,
+              title: _buildChatAppBarTitle(),
+              // use theme default color
+            ),
       body: Column(
         children: [
           if (chatId.isNotEmpty) _buildPinnedMessageCard(chatId),
@@ -1854,14 +1910,22 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
           if (_typingStatus.typingUsers.isNotEmpty) _buildTypingIndicator(),
 
-          ChatInputPanel(
-            chatId: _actualChatId ?? widget.chatId,
-            currentUserId: _currentUser?.uid ?? '',
-            onSendMessage: _sendTextMessage,
-            onImageUpload: _sendImageMessage,
-            onStickerSent: _sendSticker,
-            typingController: _typingController,
-          ),
+          if (DesktopPlatformService.isWindowsDesktop)
+            DesktopChatInputPanel(
+              onSendMessage: _sendTextMessage,
+              onImageSelected: _pickAndSendDesktopImage,
+              onStickerSent: _sendSticker,
+              typingController: _typingController,
+            )
+          else
+            ChatInputPanel(
+              chatId: _actualChatId ?? widget.chatId,
+              currentUserId: _currentUser?.uid ?? '',
+              onSendMessage: _sendTextMessage,
+              onImageUpload: _sendImageMessage,
+              onStickerSent: _sendSticker,
+              typingController: _typingController,
+            ),
         ],
       ),
     );
