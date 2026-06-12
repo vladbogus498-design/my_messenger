@@ -14,6 +14,7 @@ import '../utils/navigation_animations.dart';
 import '../utils/time_formatter.dart';
 import '../utils/user_formatters.dart';
 import '../utils/logger.dart';
+import 'darkkick_desktop_workspace.dart';
 import 'new_chat_screen.dart';
 import 'profile_screen.dart';
 import 'single_chat_screen.dart';
@@ -30,7 +31,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   int _selectedNavIndex = 0;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  Chat? _selectedDesktopChat;
 
   String? get _currentUserId => FirebaseAuth.instance.currentUser?.uid;
 
@@ -92,59 +92,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildWindowsDesktopMode() {
-    final chatsState = ref.watch(chatsProvider);
-
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: DarkKickColors.darkBackground,
-        statusBarIconBrightness: Brightness.light,
-        systemNavigationBarColor: DarkKickColors.darkBackground,
-        systemNavigationBarDividerColor: DarkKickColors.darkBackground,
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: DarkKickColors.darkBackground,
-        body: SafeArea(
-          child: Row(
-            children: [
-              SizedBox(
-                width: 380,
-                child: DecoratedBox(
-                  decoration: const BoxDecoration(
-                    border: Border(
-                      right: BorderSide(color: DarkKickColors.divider),
-                    ),
-                  ),
-                  child: _buildChatsHome(),
-                ),
-              ),
-              Expanded(
-                child: chatsState.when(
-                  data: _buildDesktopChatPane,
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(
-                      color: DarkKickColors.neonPurple,
-                    ),
-                  ),
-                  error: (error, _) => _buildErrorState(error),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return DarkkickDesktopWorkspace(
+      currentUserId: _currentUserId,
+      onOpenNewChat: _openNewChat,
     );
   }
 
+  // ignore: unused_element
   Widget _buildDesktopChatPane(List<Chat> chats) {
-    final filtered = _filterChats(chats);
-    final selected = _selectedDesktopChat;
-    final activeChat =
-        selected != null && filtered.any((chat) => chat.id == selected.id)
-        ? selected
-        : filtered.isNotEmpty
-        ? filtered.first
-        : null;
+    final activeChat = chats.isNotEmpty ? chats.first : null;
 
     if (activeChat == null) {
       return const _DarkkickPlaceholder(
@@ -154,15 +110,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     }
 
-    return SingleChatScreen(
-      key: ValueKey('desktop-chat-${activeChat.id}'),
-      chatId: activeChat.id,
-      chatName: _fallbackTitle(activeChat),
-      otherUserId: SystemBot.isSystemChat(activeChat)
-          ? SystemBot.uid
-          : activeChat.otherParticipantId(_currentUserId),
-      embedded: true,
-    );
+    return const SizedBox.shrink();
   }
 
   Widget _buildChatsHome() {
@@ -662,11 +610,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _openChat(Chat chat) {
-    if (DesktopPlatformService.isWindowsDesktop) {
-      setState(() => _selectedDesktopChat = chat);
-      return;
-    }
-
     Navigator.push(
       context,
       NavigationAnimations.slideFadeRoute(
@@ -1184,6 +1127,7 @@ class _PeerMeta {
 
 Stream<_PeerMeta>? _peerMetaStream(String? uid) {
   if (uid == null || uid.isEmpty) return null;
+  if (DesktopPlatformService.isWindowsDesktop) return null;
 
   return FirebaseFirestore.instance
       .collection('publicProfiles')

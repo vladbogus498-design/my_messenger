@@ -71,6 +71,11 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   String? _messagesStreamChatId;
   String? _highlightedMessageId;
   Timer? _highlightTimer;
+  Timer? _windowsPollingTimer;
+  bool _windowsMessagesLoading = false;
+  Object? _windowsMessagesError;
+  Map<String, dynamic>? _windowsPinnedMessage;
+  String? _windowsPollingChatId;
   final Set<String> _invalidPinnedHandled = <String>{};
   bool _sendingTextMessage = false;
   bool _sendingImageMessage = false;
@@ -87,6 +92,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     _loadPeerInfo();
     _markMessagesAsRead();
     _setupVoicePlaybackListener();
+    if (DesktopPlatformService.isWindowsDesktop && _actualChatId != null) {
+      _startWindowsPolling(_actualChatId!);
+    }
   }
 
   Future<void> _markMessagesAsRead() async {
@@ -165,6 +173,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   void _setupTypingListener() {
+    if (DesktopPlatformService.isWindowsDesktop) return;
+
     // Слушатели работают только для существующих чатов
     final chatId = _actualChatId ?? widget.chatId;
     if (chatId.isEmpty) return;
@@ -195,6 +205,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   void _setupTypingDetection() {
+    if (DesktopPlatformService.isWindowsDesktop) return;
+
     _typingController.addListener(() {
       final isTyping = _typingController.text.isNotEmpty;
       final chatId = _actualChatId ?? widget.chatId;
@@ -238,6 +250,71 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           });
     }
     return _messagesStream!;
+  }
+
+  void _startWindowsPolling(String chatId) {
+    if (!DesktopPlatformService.isWindowsDesktop || chatId.isEmpty) return;
+    if (_windowsPollingChatId == chatId && _windowsPollingTimer != null) return;
+
+    _windowsPollingTimer?.cancel();
+    _windowsPollingChatId = chatId;
+    unawaited(_loadWindowsChatSnapshot(chatId));
+    _windowsPollingTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+      unawaited(_loadWindowsChatSnapshot(chatId, silent: true));
+    });
+  }
+
+  Future<void> _loadWindowsChatSnapshot(
+    String chatId, {
+    bool silent = false,
+  }) async {
+    if (_windowsMessagesLoading && silent) return;
+
+    if (!silent && mounted) {
+      setState(() {
+        _windowsMessagesLoading = true;
+        _windowsMessagesError = null;
+      });
+    } else {
+      _windowsMessagesLoading = true;
+    }
+
+    try {
+      final chatRef = FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatId);
+      final results = await Future.wait([
+        chatRef
+            .collection('messages')
+            .orderBy('timestamp', descending: true)
+            .limit(50)
+            .get(),
+        chatRef.get(),
+      ]);
+
+      final messagesSnapshot =
+          results[0] as QuerySnapshot<Map<String, dynamic>>;
+      final chatSnapshot = results[1] as DocumentSnapshot<Map<String, dynamic>>;
+      final messages = await _messagesFromDocs(chatId, messagesSnapshot.docs);
+      final pinned = chatSnapshot.data()?['pinnedMessage'];
+
+      if (!mounted) return;
+      setState(() {
+        _messageDocs = messagesSnapshot.docs;
+        _messages = messages;
+        _windowsPinnedMessage = pinned is Map
+            ? Map<String, dynamic>.from(pinned)
+            : null;
+        _windowsMessagesError = null;
+      });
+    } catch (error) {
+      appLogger.e('Windows chat snapshot load failed: $chatId', error: error);
+      if (!mounted) return;
+      setState(() => _windowsMessagesError = error);
+    } finally {
+      _windowsMessagesLoading = false;
+      if (mounted && !silent) setState(() {});
+    }
   }
 
   Future<List<Message>> _messagesFromDocs(
@@ -297,6 +374,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         }
         _typingStatusSubscription?.cancel();
         _setupTypingListener();
+        if (DesktopPlatformService.isWindowsDesktop) {
+          _startWindowsPolling(chatId);
+        }
         unawaited(_loadPeerInfo(chatId));
         appLogger.d('Chat ensured/created: $chatId');
         return chatId;
@@ -309,6 +389,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     // Если chatId был передан, используем его
     if (widget.chatId.isNotEmpty) {
       _actualChatId = widget.chatId;
+      if (DesktopPlatformService.isWindowsDesktop) {
+        _startWindowsPolling(_actualChatId!);
+      }
       return _actualChatId!;
     }
 
@@ -340,6 +423,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         );
       }
       _cancelAction();
+      if (DesktopPlatformService.isWindowsDesktop) {
+        await _loadWindowsChatSnapshot(chatId, silent: true);
+      }
       _scrollToBottom();
     } catch (e) {
       appLogger.e('Error sending message in chat: ${widget.chatId}', error: e);
@@ -389,6 +475,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       }
 
       _cancelAction();
+      if (DesktopPlatformService.isWindowsDesktop) {
+        await _loadWindowsChatSnapshot(chatId, silent: true);
+      }
       _scrollToBottom();
     } catch (e) {
       appLogger.e(
@@ -435,6 +524,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         );
       }
 
+      if (DesktopPlatformService.isWindowsDesktop) {
+        await _loadWindowsChatSnapshot(chatId, silent: true);
+      }
       _scrollToBottom();
     } catch (e) {
       appLogger.e('Error sending sticker in chat: ${widget.chatId}', error: e);
@@ -531,13 +623,18 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     final chatId = _actualChatId ?? widget.chatId;
     if (chatId.isEmpty) return;
     await ChatService.addReaction(chatId, message.id, emoji);
-    // StreamBuilder will automatically update
+    if (DesktopPlatformService.isWindowsDesktop) {
+      await _loadWindowsChatSnapshot(chatId, silent: true);
+    }
   }
 
   Future<void> _pinMessage(Message message) async {
     final chatId = _actualChatId ?? widget.chatId;
     if (chatId.isEmpty) return;
     await ChatService.pinMessage(chatId, message);
+    if (DesktopPlatformService.isWindowsDesktop) {
+      await _loadWindowsChatSnapshot(chatId, silent: true);
+    }
   }
 
   Future<void> _confirmDeleteMessage(Message message) async {
@@ -573,6 +670,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
     try {
       await ChatService.deleteMessageForEveryone(chatId, message);
+      if (DesktopPlatformService.isWindowsDesktop) {
+        await _loadWindowsChatSnapshot(chatId, silent: true);
+      }
     } catch (e) {
       _showSnackBar('Не удалось удалить сообщение');
     }
@@ -1102,9 +1202,283 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         final message = messages[i];
         return RepaintBoundary(
           key: _messageKey(message.id),
-          child: _buildMessageBubble(message),
+          child: DesktopPlatformService.isWindowsDesktop
+              ? _buildDesktopMessageRecord(message)
+              : _buildMessageBubble(message),
         );
       },
+    );
+  }
+
+  Widget _buildDesktopMessageRecord(Message message) {
+    if (message.type == 'system') {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: DarkKickColors.panel.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: DarkKickColors.divider),
+            ),
+            child: Text(
+              message.text,
+              style: const TextStyle(
+                color: DarkKickColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final isMyMessage = _isMyMessage(message.senderId);
+    final isHighlighted = _highlightedMessageId == message.id;
+    final senderLabel = isMyMessage ? 'You' : (_peerName ?? widget.chatName);
+    final senderInitial = senderLabel.trim().isEmpty
+        ? '?'
+        : senderLabel.trim()[0].toUpperCase();
+    final accent = isMyMessage
+        ? DarkKickColors.neonPurple
+        : const Color(0xFF7DD3FC);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 7),
+      child: GestureDetector(
+        onLongPress: () => _showMessageMenu(message),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isMyMessage
+                ? const Color(0xFF120E1A)
+                : const Color(0xFF0D0A12),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isHighlighted
+                  ? DarkKickColors.electricPurple
+                  : isMyMessage
+                  ? DarkKickColors.neonPurple.withValues(alpha: 0.34)
+                  : Colors.white.withValues(alpha: 0.07),
+            ),
+            boxShadow: isHighlighted
+                ? [
+                    BoxShadow(
+                      color: DarkKickColors.neonPurple.withValues(alpha: 0.28),
+                      blurRadius: 28,
+                      spreadRadius: -8,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: accent.withValues(alpha: 0.36)),
+                ),
+                child: Text(
+                  senderInitial,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            senderLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        _DesktopMessageKind(type: message.type),
+                        const SizedBox(width: 10),
+                        _buildDesktopMessageMeta(message),
+                      ],
+                    ),
+                    if (message.isForwarded) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: const [
+                          Icon(
+                            Icons.forward,
+                            color: DarkKickColors.textTertiary,
+                            size: 13,
+                          ),
+                          SizedBox(width: 5),
+                          Text(
+                            'Forwarded',
+                            style: TextStyle(
+                              color: DarkKickColors.textTertiary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (message.replyToText != null) ...[
+                      const SizedBox(height: 10),
+                      _DesktopReplyPreview(text: message.replyToText!),
+                    ],
+                    const SizedBox(height: 11),
+                    _buildDesktopMessagePayload(message),
+                    _buildReactions(message),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopMessagePayload(Message message) {
+    if (message.type == 'image' && message.imageUrl != null) {
+      return GestureDetector(
+        onTap: () => _openImageViewer(message),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: CachedNetworkImage(
+            imageUrl: message.imageUrl!,
+            width: 360,
+            height: 230,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Container(
+              width: 360,
+              height: 230,
+              color: DarkKickColors.panel,
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: DarkKickColors.neonPurple,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+            errorWidget: (context, url, error) => Container(
+              width: 360,
+              height: 230,
+              color: DarkKickColors.panel,
+              alignment: Alignment.center,
+              child: const Text(
+                'Image unavailable',
+                style: TextStyle(color: DarkKickColors.textSecondary),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (message.type == 'sticker') {
+      final stickerId = message.stickerId ?? message.stickerUrl ?? '';
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: _buildStickerWidget(stickerId),
+      );
+    }
+
+    if (_showVoiceMessagesInUi &&
+        message.type == 'voice' &&
+        message.voiceAudioBase64 != null) {
+      return InkWell(
+        onTap: () => _playVoiceMessage(message),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: DarkKickColors.panel.withValues(alpha: 0.78),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: DarkKickColors.divider),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _playingVoiceMessageId == message.id &&
+                        VoiceMessageService.isPlayingMessage(message.id)
+                    ? Icons.pause
+                    : Icons.play_arrow,
+                color: DarkKickColors.electricPurple,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '${(message.voiceDuration ?? 0) ~/ 60}:${((message.voiceDuration ?? 0) % 60).toString().padLeft(2, '0')}',
+                style: const TextStyle(
+                  color: DarkKickColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!_showVoiceMessagesInUi && message.type == 'voice') {
+      return const Text(
+        'Voice message is not available on desktop yet',
+        style: TextStyle(color: DarkKickColors.textSecondary, fontSize: 14),
+      );
+    }
+
+    return SelectableText(
+      message.text,
+      style: const TextStyle(
+        color: DarkKickColors.textPrimary,
+        fontSize: 15,
+        height: 1.38,
+      ),
+    );
+  }
+
+  Widget _buildDesktopMessageMeta(Message message) {
+    final isMyMessage = _isMyMessage(message.senderId);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          TimeFormatter.formatMessageTime(message.timestamp),
+          style: const TextStyle(
+            color: DarkKickColors.textTertiary,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        if (isMyMessage) ...[
+          const SizedBox(width: 5),
+          MessageStatusIcon(
+            status: _messageStatusForCurrentUser(message),
+            isOwnMessage: true,
+          ),
+        ],
+      ],
     );
   }
 
@@ -1454,6 +1828,10 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   Widget _buildPinnedMessageCard(String chatId) {
+    if (DesktopPlatformService.isWindowsDesktop) {
+      return _buildWindowsPinnedMessageCard(chatId);
+    }
+
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('chats')
@@ -1544,6 +1922,60 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildWindowsPinnedMessageCard(String chatId) {
+    final pinned = _windowsPinnedMessage;
+    if (pinned == null) return const SizedBox.shrink();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _validatePinnedMessage(chatId, pinned, notify: true);
+    });
+    final text = (pinned['text'] ?? '').toString();
+    final type = (pinned['type'] ?? 'text').toString();
+    final label = text.isNotEmpty
+        ? text
+        : type == 'image'
+        ? 'Фото'
+        : type == 'sticker'
+        ? 'Стикер'
+        : 'Сообщение';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
+      child: GestureDetector(
+        onTap: () => _scrollToPinnedMessage(pinned),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: DarkKickColors.panel.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: DarkKickColors.divider),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.push_pin_rounded,
+                color: DarkKickColors.electricPurple,
+                size: 18,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: DarkKickColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1757,6 +2189,15 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       );
     }
 
+    if (DesktopPlatformService.isWindowsDesktop) {
+      return titleContent(
+        name: fallbackName,
+        photoUrl: _peerPhotoUrl,
+        isOnline: _peerIsOnline,
+        lastSeen: _peerLastSeen,
+      );
+    }
+
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('publicProfiles')
@@ -1797,6 +2238,54 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     );
   }
 
+  Widget _buildWindowsMessagesBody(String chatId) {
+    if (_windowsMessagesLoading && _messages.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: DarkKickColors.neonPurple),
+      );
+    }
+
+    if (_windowsMessagesError != null && _messages.isEmpty) {
+      return const _ChatEmptyState(
+        icon: Icons.cloud_off_outlined,
+        title: 'Не удалось загрузить сообщения',
+        subtitle: 'Проверь подключение и открой чат еще раз.',
+      );
+    }
+
+    if (_messages.isEmpty) {
+      final isSystemBotChat =
+          (widget.otherUserId ?? _otherUserId) == SystemBot.uid;
+      if (isSystemBotChat) {
+        return const _ChatEmptyState(
+          icon: Icons.verified_rounded,
+          title: SystemBot.name,
+          subtitle: SystemBot.welcomeMessage,
+        );
+      }
+      return const _ChatEmptyState(
+        icon: Icons.chat_bubble_outline,
+        title: 'Диалог пуст',
+        subtitle: 'Отправь первое сообщение.',
+      );
+    }
+
+    return _buildMessagesList(_messages);
+  }
+
+  Widget _buildWindowsDesktopNote() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      color: DarkKickColors.panel.withValues(alpha: 0.42),
+      child: const Text(
+        'Desktop mode: messages refresh periodically.',
+        textAlign: TextAlign.center,
+        style: TextStyle(color: DarkKickColors.textTertiary, fontSize: 11),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatId = _actualChatId ?? widget.chatId;
@@ -1819,8 +2308,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       body: Column(
         children: [
           if (chatId.isNotEmpty) _buildPinnedMessageCard(chatId),
+          if (DesktopPlatformService.isWindowsDesktop)
+            _buildWindowsDesktopNote(),
           Expanded(
-            child: chatId.isNotEmpty
+            child: DesktopPlatformService.isWindowsDesktop && chatId.isNotEmpty
+                ? _buildWindowsMessagesBody(chatId)
+                : chatId.isNotEmpty
                 ? StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: _messageStreamFor(chatId),
                     builder: (context, snapshot) {
@@ -1934,6 +2427,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   @override
   void dispose() {
     _highlightTimer?.cancel();
+    _windowsPollingTimer?.cancel();
     _playbackCompleteSubscription?.cancel();
     _typingStatusSubscription?.cancel();
     VoiceMessageService.stopPlaying();
@@ -1944,6 +2438,66 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       ChatService.setTypingStatus(chatId, false);
     }
     super.dispose();
+  }
+}
+
+class _DesktopMessageKind extends StatelessWidget {
+  const _DesktopMessageKind({required this.type});
+
+  final String type;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = type.trim().isEmpty ? 'text' : type.trim();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: DarkKickColors.deepBackground.withValues(alpha: 0.68),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: DarkKickColors.divider),
+      ),
+      child: Text(
+        normalized,
+        style: const TextStyle(
+          color: DarkKickColors.textTertiary,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopReplyPreview extends StatelessWidget {
+  const _DesktopReplyPreview({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: DarkKickColors.deepBackground.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(8),
+        border: const Border(
+          left: BorderSide(color: DarkKickColors.electricPurple, width: 3),
+        ),
+      ),
+      child: Text(
+        text,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: DarkKickColors.textSecondary,
+          fontSize: 12,
+          fontStyle: FontStyle.italic,
+          height: 1.25,
+        ),
+      ),
+    );
   }
 }
 
