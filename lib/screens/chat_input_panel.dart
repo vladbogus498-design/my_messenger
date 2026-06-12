@@ -1,9 +1,11 @@
-import 'dart:io';
+import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../models/selected_media.dart';
 import '../theme/darkkick_colors.dart';
 import '../widgets/sticker_picker.dart';
 
@@ -21,10 +23,10 @@ class ChatInputPanel extends StatefulWidget {
 
   final String chatId;
   final String currentUserId;
-  final void Function(String text, String type) onSendMessage;
-  final Future<void> Function(File imageFile) onImageUpload;
+  final Future<void> Function(String text, String type) onSendMessage;
+  final Future<void> Function(SelectedMedia image) onImageUpload;
   final void Function(String base64Audio, int duration)? onVoiceMessageSent;
-  final void Function(String stickerId)? onStickerSent;
+  final Future<void> Function(String stickerId)? onStickerSent;
   final TextEditingController? typingController;
 
   @override
@@ -36,6 +38,8 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
   bool _showAttachmentMenu = false;
   bool _showStickerPicker = false;
   bool _uploadingImage = false;
+  bool _sendingText = false;
+  bool _sendingSticker = false;
 
   TextEditingController get _controller =>
       widget.typingController ?? _localController;
@@ -47,36 +51,75 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
   }
 
   Future<void> _sendPhoto() async {
-    final image = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1920,
-      maxHeight: 1080,
-      imageQuality: 85,
-    );
-    if (image == null) return;
+    if (_uploadingImage) return;
 
-    setState(() => _uploadingImage = true);
     try {
-      await widget.onImageUpload(File(image.path));
+      setState(() => _uploadingImage = true);
+
+      final image = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      if (image == null) return;
+
+      final bytes = await image.readAsBytes();
+      if (bytes.isEmpty) {
+        throw Exception('Selected image is empty');
+      }
+
+      await widget.onImageUpload(
+        SelectedMedia(bytes: bytes, name: image.name, path: image.path),
+      );
       if (mounted) setState(() => _showAttachmentMenu = false);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Photo send failed: $error\n$stackTrace');
+      }
       _showSnackBar('Не удалось отправить фото.');
     } finally {
       if (mounted) setState(() => _uploadingImage = false);
     }
   }
 
-  void _sendTextMessage() {
+  Future<void> _sendTextMessage() async {
+    if (_sendingText) return;
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
-    widget.onSendMessage(text, 'text');
-    _controller.clear();
-    setState(() {});
+    setState(() => _sendingText = true);
+    try {
+      await widget.onSendMessage(text, 'text');
+      _controller.clear();
+      if (mounted) setState(() {});
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Text send failed: $error\n$stackTrace');
+      }
+      _showSnackBar('Не удалось отправить сообщение.');
+    } finally {
+      if (mounted) setState(() => _sendingText = false);
+    }
   }
 
-  void _sendSticker(String stickerId) {
-    widget.onStickerSent?.call(stickerId);
+  Future<void> _sendSticker(String stickerId) async {
+    if (_sendingSticker) return;
+    final sendSticker = widget.onStickerSent;
+    if (sendSticker == null) return;
+
+    setState(() => _sendingSticker = true);
+    try {
+      await sendSticker(stickerId);
+      if (mounted) setState(() => _showStickerPicker = false);
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Sticker send failed: $error\n$stackTrace');
+      }
+      _showSnackBar('Не удалось отправить стикер.');
+    } finally {
+      if (mounted) setState(() => _sendingSticker = false);
+    }
   }
 
   KeyEventResult _handleTextFieldKey(FocusNode node, KeyEvent event) {
@@ -93,7 +136,7 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
       return KeyEventResult.ignored;
     }
 
-    _sendTextMessage();
+    unawaited(_sendTextMessage());
     return KeyEventResult.handled;
   }
 
@@ -171,14 +214,16 @@ class _ChatInputPanelState extends State<ChatInputPanel> {
                             vertical: 11,
                           ),
                         ),
-                        onSubmitted: (_) => _sendTextMessage(),
+                        onSubmitted: (_) => unawaited(_sendTextMessage()),
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
-                  onTap: _sendTextMessage,
+                  onTap: _sendingText
+                      ? null
+                      : () => unawaited(_sendTextMessage()),
                   child: Container(
                     width: 44,
                     height: 44,

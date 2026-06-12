@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
+import '../models/selected_media.dart';
 import '../utils/input_validator.dart';
 import '../utils/logger.dart';
 import '../utils/rate_limiter.dart';
@@ -13,7 +13,7 @@ class StorageService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
   static Future<String> uploadChatImage(
-    File imageFile,
+    SelectedMedia image,
     String chatId, {
     required String messageId,
   }) async {
@@ -25,7 +25,11 @@ class StorageService {
         throw Exception('Превышен лимит загрузки файлов. Попробуй позже.');
       }
 
-      final fileSize = await imageFile.length();
+      if (image.isEmpty) {
+        throw Exception('Selected image is empty');
+      }
+
+      final fileSize = image.sizeInBytes;
       final sizeError = InputValidator.validateFileSize(
         fileSize,
         isImage: true,
@@ -41,7 +45,7 @@ class StorageService {
       }
 
       return _uploadUnsignedImage(
-        imageFile,
+        image,
         folder: 'darkkick/chats/$chatId/images',
         publicId: messageId,
       );
@@ -54,7 +58,7 @@ class StorageService {
     }
   }
 
-  static Future<String> uploadUserAvatar(File imageFile) async {
+  static Future<String> uploadUserAvatar(SelectedMedia image) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('User not authenticated');
 
@@ -63,7 +67,11 @@ class StorageService {
         throw Exception('Превышен лимит загрузки файлов. Попробуй позже.');
       }
 
-      final fileSize = await imageFile.length();
+      if (image.isEmpty) {
+        throw Exception('Selected image is empty');
+      }
+
+      final fileSize = image.sizeInBytes;
       final sizeError = InputValidator.validateFileSize(
         fileSize,
         isImage: true,
@@ -71,7 +79,7 @@ class StorageService {
       if (sizeError != null) throw Exception(sizeError);
 
       return _uploadUnsignedImage(
-        imageFile,
+        image,
         folder: 'darkkick/avatars',
         publicId: '${userId}_${DateTime.now().millisecondsSinceEpoch}',
       );
@@ -89,7 +97,7 @@ class StorageService {
   }
 
   static Future<String> _uploadUnsignedImage(
-    File imageFile, {
+    SelectedMedia image, {
     required String folder,
     required String publicId,
   }) async {
@@ -115,7 +123,13 @@ class StorageService {
       ..fields['upload_preset'] = AppConfig.cloudinaryUploadPreset
       ..fields['folder'] = folder
       ..fields['public_id'] = publicId
-      ..files.add(await http.MultipartFile.fromPath('file', imageFile.path));
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          image.bytes,
+          filename: image.name.isEmpty ? '$publicId.jpg' : image.name,
+        ),
+      );
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);

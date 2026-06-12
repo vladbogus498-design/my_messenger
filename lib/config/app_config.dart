@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 class AppConfig {
@@ -29,17 +30,23 @@ class AppConfig {
   );
 
   static FirebaseOptions? get firebaseOptions {
-    if (!_hasFirebaseDartDefines) return null;
+    if (_hasFirebaseDartDefines) {
+      return const FirebaseOptions(
+        apiKey: firebaseApiKey,
+        authDomain: firebaseAuthDomain,
+        projectId: firebaseProjectId,
+        storageBucket: firebaseStorageBucket,
+        messagingSenderId: firebaseMessagingSenderId,
+        appId: firebaseAppId,
+        measurementId: firebaseMeasurementId,
+      );
+    }
 
-    return const FirebaseOptions(
-      apiKey: firebaseApiKey,
-      authDomain: firebaseAuthDomain,
-      projectId: firebaseProjectId,
-      storageBucket: firebaseStorageBucket,
-      messagingSenderId: firebaseMessagingSenderId,
-      appId: firebaseAppId,
-      measurementId: firebaseMeasurementId,
-    );
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      return _windowsFirebaseOptions;
+    }
+
+    return null;
   }
 
   static bool get hasCloudinaryUnsignedUploadConfig =>
@@ -52,4 +59,13 @@ class AppConfig {
         firebaseMessagingSenderId.isNotEmpty &&
         firebaseAppId.isNotEmpty;
   }
+
+  static const FirebaseOptions _windowsFirebaseOptions = FirebaseOptions(
+    apiKey: 'AIzaSyC8r4HyPtERm3vHdwzTVhhE3iv-1AYSb1g',
+    authDomain: 'darkkickchat-765e0.firebaseapp.com',
+    projectId: 'darkkickchat-765e0',
+    storageBucket: 'darkkickchat-765e0.firebasestorage.app',
+    messagingSenderId: '366138349689',
+    appId: '1:366138349689:android:19376aa5063fbb17961ca8',
+  );
 }

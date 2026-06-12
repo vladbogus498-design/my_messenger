@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'config/app_config.dart';
 import 'auth/auth_screen.dart';
 import 'auth/auth_credentials_screen.dart';
@@ -16,15 +17,12 @@ import 'services/user_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final firebaseOptions = AppConfig.firebaseOptions;
-  if (firebaseOptions != null) {
-    // Подключаем твой Firebase конфиг для браузера на ПК
-    await Firebase.initializeApp(options: firebaseOptions);
-  } else {
-    // Обычная инициализация для мобилок
-    await Firebase.initializeApp();
-  }
-
+  await Firebase.initializeApp(options: AppConfig.firebaseOptions);
+  await Future.wait([
+    initializeDateFormatting('ru'),
+    initializeDateFormatting('ru_RU'),
+    initializeDateFormatting('en'),
+  ]);
   AppRateLimiters.startCleanup();
 
   runApp(const ProviderScope(child: MyApp()));

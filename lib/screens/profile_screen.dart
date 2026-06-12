@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/user_model.dart';
+import '../models/selected_media.dart';
 import '../services/storage_service.dart';
 import '../services/user_service.dart';
 import '../theme/darkkick_colors.dart';
@@ -240,7 +239,14 @@ class _EditProfileScreenState extends State<_EditProfileScreen> {
     setState(() => _busy = true);
     try {
       appLogger.d('Avatar upload started: path=${picked.path}');
-      final url = await StorageService.uploadUserAvatar(File(picked.path));
+      final bytes = await picked.readAsBytes();
+      if (bytes.isEmpty) {
+        throw Exception('Selected avatar is empty');
+      }
+
+      final url = await StorageService.uploadUserAvatar(
+        SelectedMedia(bytes: bytes, name: picked.name, path: picked.path),
+      );
       appLogger.d('Avatar upload success: imageUrl=$url');
       appLogger.d('Profile avatar Firestore update started');
       await UserService.updateUserData(photoURL: url);

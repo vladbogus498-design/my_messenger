@@ -15,13 +15,19 @@ class VoiceMessageService {
   static bool _isPlaying = false;
   static String? _currentPlayingId;
   static StreamSubscription? _playerCompleteSubscription;
-  static final _playbackCompleteController = StreamController<String>.broadcast();
-  
+  static final _playbackCompleteController =
+      StreamController<String>.broadcast();
+
   /// Stream для отслеживания завершения воспроизведения
-  static Stream<String>? get onPlaybackComplete => _playbackCompleteController.stream;
+  static Stream<String>? get onPlaybackComplete =>
+      _playbackCompleteController.stream;
 
   // Запрос разрешения на запись
   static Future<bool> requestPermission() async {
+    if (Platform.isWindows) {
+      return true;
+    }
+
     final status = await Permission.microphone.request();
     return status.isGranted;
   }
@@ -60,8 +66,10 @@ class VoiceMessageService {
         onDurationUpdate(recordingDuration);
 
         // Симуляция waveform
-        final waveform =
-            List.generate(20, (_) => 0.3 + (0.7 * (tickCount % 10) / 10));
+        final waveform = List.generate(
+          20,
+          (_) => 0.3 + (0.7 * (tickCount % 10) / 10),
+        );
         onWaveformUpdate(waveform);
       });
 
@@ -128,7 +136,9 @@ class VoiceMessageService {
 
   // Воспроизведение голосового сообщения
   static Future<void> playVoiceMessage(
-      String base64Audio, String messageId) async {
+    String base64Audio,
+    String messageId,
+  ) async {
     if (_isPlaying && _currentPlayingId == messageId) {
       // Если уже воспроизводится этот же файл - останавливаем
       await stopPlaying();
@@ -156,22 +166,25 @@ class VoiceMessageService {
       await _audioPlayer.play(UrlSource(fileUri));
 
       // Слушаем завершение воспроизведения
-      _playerCompleteSubscription = _audioPlayer.onPlayerComplete.listen((_) {
-        final completedId = _currentPlayingId;
-        _isPlaying = false;
-        _currentPlayingId = null;
-        if (completedId != null) {
-          _playbackCompleteController.add(completedId);
-        }
-      }, onError: (error) {
-        appLogger.e('Error during voice playback', error: error);
-        final completedId = _currentPlayingId;
-        _isPlaying = false;
-        _currentPlayingId = null;
-        if (completedId != null) {
-          _playbackCompleteController.add(completedId);
-        }
-      });
+      _playerCompleteSubscription = _audioPlayer.onPlayerComplete.listen(
+        (_) {
+          final completedId = _currentPlayingId;
+          _isPlaying = false;
+          _currentPlayingId = null;
+          if (completedId != null) {
+            _playbackCompleteController.add(completedId);
+          }
+        },
+        onError: (error) {
+          appLogger.e('Error during voice playback', error: error);
+          final completedId = _currentPlayingId;
+          _isPlaying = false;
+          _currentPlayingId = null;
+          if (completedId != null) {
+            _playbackCompleteController.add(completedId);
+          }
+        },
+      );
     } catch (e) {
       appLogger.e('Error playing voice message', error: e);
       _isPlaying = false;

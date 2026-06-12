@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
-import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/system_bot.dart';
 import '../data/darkkick_stickers.dart';
@@ -12,6 +11,7 @@ import '../services/storage_service.dart';
 import '../services/voice_message_service.dart';
 import '../models/message.dart';
 import '../models/chat.dart';
+import '../models/selected_media.dart';
 import 'chat_input_panel.dart';
 import 'image_viewer_screen.dart';
 import 'user_profile_screen.dart';
@@ -67,6 +67,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   String? _highlightedMessageId;
   Timer? _highlightTimer;
   final Set<String> _invalidPinnedHandled = <String>{};
+  bool _sendingTextMessage = false;
+  bool _sendingImageMessage = false;
+  bool _sendingStickerMessage = false;
 
   bool get _showVoiceMessagesInUi => false;
 
@@ -301,9 +304,11 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   Future<void> _sendTextMessage(String text, String type) async {
+    if (_sendingTextMessage) return;
     if (text.trim().isEmpty) return;
+
+    setState(() => _sendingTextMessage = true);
     try {
-      // Создаем чат при отправке первого сообщения, если его еще нет
       final chatId = await _ensureChatExists();
 
       await ChatService.sendMessage(
@@ -313,27 +318,31 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         replyToId: _replyingTo?.id,
         replyToText: _replyingTo?.text,
       );
-      _cancelAction(); // Clear preview immediately
+      _cancelAction();
       _scrollToBottom();
     } catch (e) {
       appLogger.e('Error sending message in chat: ${widget.chatId}', error: e);
-      if (_showRateLimitSnackBarIfNeeded(e)) return;
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Ошибка отправки: $e')));
-      }
+      rethrow;
+    } finally {
+      if (mounted) setState(() => _sendingTextMessage = false);
     }
   }
 
-  Future<void> _sendImageMessage(File imageFile) async {
+  Future<void> _sendImageMessage(SelectedMedia image) async {
+    if (_sendingImageMessage) return;
+    if (image.isEmpty) {
+      throw Exception('Selected image is empty');
+    }
+
+    String? chatId;
+    setState(() => _sendingImageMessage = true);
     try {
-      final chatId = await _ensureChatExists();
+      chatId = await _ensureChatExists();
       await ChatService.setSendingPhotoStatus(chatId, true);
 
       final messageId = ChatService.createMessageId(chatId);
       final imageUrl = await StorageService.uploadChatImage(
-        imageFile,
+        image,
         chatId,
         messageId: messageId,
       );
@@ -349,24 +358,37 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         encrypt: false,
       );
 
-      await ChatService.setSendingPhotoStatus(chatId, false);
-      _cancelAction(); // Clear preview immediately
+      _cancelAction();
       _scrollToBottom();
     } catch (e) {
-      appLogger.e('Error sending image in chat: ${_actualChatId}', error: e);
-      if (_actualChatId != null) {
-        await ChatService.setSendingPhotoStatus(_actualChatId!, false);
+      appLogger.e(
+        'Error sending image in chat: ${chatId ?? _actualChatId}',
+        error: e,
+      );
+      rethrow;
+    } finally {
+      final statusChatId = chatId ?? _actualChatId;
+      if (statusChatId != null) {
+        try {
+          await ChatService.setSendingPhotoStatus(statusChatId, false);
+        } catch (e) {
+          appLogger.e(
+            'Error clearing sending photo status: $statusChatId',
+            error: e,
+          );
+        }
       }
-      if (_showRateLimitSnackBarIfNeeded(e)) return;
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Ошибка отправки фото: $e')));
-      }
+      if (mounted) setState(() => _sendingImageMessage = false);
     }
   }
 
   Future<void> _sendSticker(String stickerId) async {
+    if (_sendingStickerMessage) return;
+    if (stickerId.trim().isEmpty) {
+      throw Exception('Sticker id is empty');
+    }
+
+    setState(() => _sendingStickerMessage = true);
     try {
       final chatId = await _ensureChatExists();
       await ChatService.sendMessage(
@@ -379,12 +401,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       _scrollToBottom();
     } catch (e) {
       appLogger.e('Error sending sticker in chat: ${widget.chatId}', error: e);
-      if (_showRateLimitSnackBarIfNeeded(e)) return;
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Ошибка отправки стикера: $e')));
-      }
+      rethrow;
+    } finally {
+      if (mounted) setState(() => _sendingStickerMessage = false);
     }
   }
 
@@ -393,45 +412,54 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
     final messageId = message.id;
 
-    // Если уже воспроизводится этот же файл - останавливаем
-    if (_playingVoiceMessageId == messageId &&
-        VoiceMessageService.isPlayingMessage(messageId)) {
-      await VoiceMessageService.stopPlaying();
-      setState(() => _playingVoiceMessageId = null);
-      return;
-    }
+    try {
+      // Если уже воспроизводится этот же файл - останавливаем
+      if (_playingVoiceMessageId == messageId &&
+          VoiceMessageService.isPlayingMessage(messageId)) {
+        await VoiceMessageService.stopPlaying();
+        setState(() => _playingVoiceMessageId = null);
+        return;
+      }
 
-    // Останавливаем предыдущее воспроизведение
-    if (_playingVoiceMessageId != null) {
-      await VoiceMessageService.stopPlaying();
-    }
+      // Останавливаем предыдущее воспроизведение
+      if (_playingVoiceMessageId != null) {
+        await VoiceMessageService.stopPlaying();
+      }
 
-    // Отменяем предыдущую подписку
-    await _playbackCompleteSubscription?.cancel();
+      // Отменяем предыдущую подписку
+      await _playbackCompleteSubscription?.cancel();
 
-    setState(() => _playingVoiceMessageId = messageId);
+      setState(() => _playingVoiceMessageId = messageId);
 
-    // Play voice message and listen for completion
-    await VoiceMessageService.playVoiceMessage(
-      message.voiceAudioBase64!,
-      messageId,
-    );
+      // Play voice message and listen for completion
+      await VoiceMessageService.playVoiceMessage(
+        message.voiceAudioBase64!,
+        messageId,
+      );
 
-    // Listen for playback completion via VoiceMessageService callback
-    // The service already handles completion internally, we just need to update UI
-    final completionStream = VoiceMessageService.onPlaybackComplete;
-    if (completionStream != null) {
-      _playbackCompleteSubscription = completionStream.listen((
-        completedMessageId,
-      ) {
-        if (mounted && completedMessageId == messageId) {
-          setState(() {
-            if (_playingVoiceMessageId == messageId) {
-              _playingVoiceMessageId = null;
-            }
-          });
-        }
-      });
+      // Listen for playback completion via VoiceMessageService callback
+      // The service already handles completion internally, we just need to update UI
+      final completionStream = VoiceMessageService.onPlaybackComplete;
+      if (completionStream != null) {
+        _playbackCompleteSubscription = completionStream.listen((
+          completedMessageId,
+        ) {
+          if (mounted && completedMessageId == messageId) {
+            setState(() {
+              if (_playingVoiceMessageId == messageId) {
+                _playingVoiceMessageId = null;
+              }
+            });
+          }
+        });
+      }
+    } catch (e) {
+      appLogger.e(
+        'Error playing voice message in chat: ${widget.chatId}',
+        error: e,
+      );
+      if (mounted) setState(() => _playingVoiceMessageId = null);
+      _showSnackBar('Не удалось воспроизвести голосовое сообщение.');
     }
   }
 
@@ -661,17 +689,6 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   void _showSnackBar(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
-
-  bool _showRateLimitSnackBarIfNeeded(Object error) {
-    final isPermissionDenied =
-        error is FirebaseException && error.code == 'permission-denied';
-    final raw = error.toString().toLowerCase();
-    final looksLikeRateLimit = raw.contains('rate') || raw.contains('limit');
-    if (!isPermissionDenied && !looksLikeRateLimit) return false;
-
-    _showSnackBar('Подожди секунду');
-    return true;
   }
 
   bool _isMyMessage(String senderId) {
