@@ -15,8 +15,10 @@ import '../providers/chats_provider.dart';
 import '../services/chat_service.dart';
 import '../services/desktop_platform_service.dart';
 import '../theme/darkkick_colors.dart';
+import '../utils/logger.dart';
 import '../utils/time_formatter.dart';
 import '../utils/user_formatters.dart';
+import 'desktop_settings_screen.dart';
 import 'image_viewer_screen.dart';
 import 'single_chat_screen.dart';
 
@@ -35,7 +37,7 @@ class DarkkickDesktopWorkspace extends ConsumerStatefulWidget {
       _DarkkickDesktopWorkspaceState();
 }
 
-enum _DesktopSection { home, conversations, calls, files, settings }
+enum _DesktopSection { home, conversations, calls, contacts, files, settings }
 
 enum _ConversationTab { chat, media, files, calls, profile }
 
@@ -55,9 +57,12 @@ class _DesktopStrings {
   static const _values = {
     'en': {
       'home': 'Home',
+      'railChats': 'Chats',
       'conversations': 'Conversations',
       'calls': 'Calls',
+      'contacts': 'Contacts',
       'files': 'Files',
+      'railMedia': 'Media',
       'settings': 'Settings',
       'workspaceOffline': 'Workspace offline',
       'workspaceOfflineSubtitle':
@@ -136,9 +141,12 @@ class _DesktopStrings {
     },
     'ru': {
       'home': 'Главная',
+      'railChats': 'Чаты',
       'conversations': 'Диалоги',
       'calls': 'Звонки',
+      'contacts': 'Контакты',
       'files': 'Файлы',
+      'railMedia': 'Медиа',
       'settings': 'Настройки',
       'workspaceOffline': 'Рабочая область недоступна',
       'workspaceOfflineSubtitle':
@@ -214,9 +222,12 @@ class _DesktopStrings {
     },
     'pl': {
       'home': 'Start',
+      'railChats': 'Czaty',
       'conversations': 'Rozmowy',
       'calls': 'Połączenia',
+      'contacts': 'Kontakty',
       'files': 'Pliki',
+      'railMedia': 'Media',
       'settings': 'Ustawienia',
       'workspaceOffline': 'Obszar roboczy offline',
       'workspaceOfflineSubtitle':
@@ -297,6 +308,11 @@ class _DesktopStrings {
 String? _desktopImageUrlFor(Message message) {
   final imageUrl = message.imageUrl?.trim();
   if (imageUrl == null || imageUrl.isEmpty) return null;
+  final uri = Uri.tryParse(imageUrl);
+  if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+    appLogger.w('Desktop skipped unsupported image URL: $imageUrl');
+    return null;
+  }
   return imageUrl;
 }
 
@@ -335,6 +351,19 @@ String _desktopAttachmentTitle(Message message, _DesktopStrings strings) {
   return strings.t('attachment');
 }
 
+String _desktopFormattedTime(DateTime value) {
+  try {
+    return TimeFormatter.formatChatTime(value);
+  } catch (error, stackTrace) {
+    appLogger.e(
+      'Desktop failed to format message time',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    return '';
+  }
+}
+
 class _DarkkickDesktopWorkspaceState
     extends ConsumerState<DarkkickDesktopWorkspace> {
   static const double _minInspectorWidth = 260;
@@ -352,6 +381,7 @@ class _DarkkickDesktopWorkspaceState
   void initState() {
     super.initState();
     _searchController.addListener(() {
+      if (!mounted) return;
       setState(
         () => _searchQuery = _searchController.text.trim().toLowerCase(),
       );
@@ -369,42 +399,59 @@ class _DarkkickDesktopWorkspaceState
   Widget build(BuildContext context) {
     final chatsState = ref.watch(chatsProvider);
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: DarkKickColors.deepBackground,
-        statusBarIconBrightness: Brightness.light,
-        systemNavigationBarColor: DarkKickColors.deepBackground,
-        systemNavigationBarDividerColor: DarkKickColors.deepBackground,
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: DarkKickColors.deepBackground,
-        body: CallbackShortcuts(
-          bindings: <ShortcutActivator, VoidCallback>{
-            const SingleActivator(LogicalKeyboardKey.keyN, control: true):
-                widget.onOpenNewChat,
-            const SingleActivator(LogicalKeyboardKey.keyK, control: true):
-                _focusHomeSearch,
-            const SingleActivator(LogicalKeyboardKey.keyR, control: true): () =>
-                ref.invalidate(chatsProvider),
-            const SingleActivator(LogicalKeyboardKey.escape): _goHome,
-          },
-          child: Focus(
-            autofocus: true,
-            child: Row(
-              children: [
-                _DesktopRail(
-                  section: _section,
-                  onSectionSelected: _selectSection,
-                ),
-                Expanded(
-                  child: chatsState.when(
-                    data: _buildLoadedShell,
-                    loading: _buildLoadingShell,
-                    error: (error, _) => _buildErrorShell(error),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleDesktopBack();
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: DarkKickColors.deepBackground,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: DarkKickColors.deepBackground,
+          systemNavigationBarDividerColor: DarkKickColors.deepBackground,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
+        child: Scaffold(
+          backgroundColor: DarkKickColors.deepBackground,
+          body: CallbackShortcuts(
+            bindings: <ShortcutActivator, VoidCallback>{
+              const SingleActivator(LogicalKeyboardKey.keyN, control: true):
+                  widget.onOpenNewChat,
+              const SingleActivator(LogicalKeyboardKey.keyK, control: true):
+                  _focusHomeSearch,
+              const SingleActivator(
+                LogicalKeyboardKey.keyR,
+                control: true,
+              ): () =>
+                  ref.invalidate(chatsProvider),
+              const SingleActivator(LogicalKeyboardKey.escape):
+                  _handleDesktopBack,
+            },
+            child: Focus(
+              autofocus: true,
+              child: Row(
+                children: [
+                  _DesktopRail(
+                    section: _section,
+                    onSectionSelected: _selectSection,
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: chatsState.when(
+                      data: _buildLoadedShell,
+                      loading: _buildLoadingShell,
+                      error: (error, stackTrace) {
+                        appLogger.e(
+                          'Desktop workspace failed to load chats',
+                          error: error,
+                          stackTrace: stackTrace,
+                        );
+                        return _buildErrorShell(error);
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -435,6 +482,7 @@ class _DarkkickDesktopWorkspaceState
               ? _buildConversationGallery(chats)
               : _buildConversationWorkspace(activeChat, chats),
         _DesktopSection.calls => _buildCallsHub(chats),
+        _DesktopSection.contacts => _buildContactsHub(chats),
         _DesktopSection.files => _buildFilesHub(chats),
         _DesktopSection.settings => _buildSettingsHub(),
       },
@@ -765,8 +813,8 @@ class _DarkkickDesktopWorkspaceState
           title: _titleFor(chat),
           currentUserId: widget.currentUserId,
           tab: _conversationTab,
-          onBackHome: _goHome,
-          onTabSelected: (tab) => setState(() => _conversationTab = tab),
+          onBackHome: _closeConversation,
+          onTabSelected: _selectWorkspaceTab,
           onRefresh: () => ref.invalidate(chatsProvider),
           onOpenNewChat: widget.onOpenNewChat,
         ),
@@ -775,7 +823,7 @@ class _DarkkickDesktopWorkspaceState
             padding: const EdgeInsets.fromLTRB(26, 0, 26, 26),
             child: Row(
               children: [
-                Expanded(child: _buildWorkspaceBody(chat, chats)),
+                Expanded(child: _buildSafeWorkspaceBody(chat, chats)),
                 _InspectorResizeHandle(
                   onDelta: (delta) {
                     setState(() {
@@ -803,6 +851,16 @@ class _DarkkickDesktopWorkspaceState
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSafeWorkspaceBody(Chat chat, List<Chat> chats) {
+    final strings = _DesktopStrings.of(context);
+
+    return _DesktopTabGuard(
+      tabLabel: _tabLabel(_conversationTab, strings),
+      onRetry: () => setState(() {}),
+      builder: (_) => _buildWorkspaceBody(chat, chats),
     );
   }
 
@@ -919,6 +977,51 @@ class _DarkkickDesktopWorkspaceState
     );
   }
 
+  Widget _buildContactsHub(List<Chat> chats) {
+    final strings = _DesktopStrings.of(context);
+    final contacts = chats.where(_isDirectLikeChat).toList();
+
+    return _DesktopPageScaffold(
+      title: strings.t('contacts'),
+      subtitle: strings.t('favoriteContacts'),
+      trailing: _TopBarButton(
+        icon: Icons.person_add_alt_1_outlined,
+        label: strings.t('new'),
+        onTap: widget.onOpenNewChat,
+      ),
+      child: contacts.isEmpty
+          ? Center(
+              child: _DesktopEmptyCard(
+                icon: Icons.people_outline,
+                title: strings.t('nothingMatched'),
+                subtitle: strings.t('startPrivateWorkspace'),
+                actionLabel: strings.t('start'),
+                onAction: widget.onOpenNewChat,
+              ),
+            )
+          : GridView.builder(
+              padding: const EdgeInsets.fromLTRB(34, 0, 34, 34),
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 270,
+                mainAxisExtent: 190,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
+              ),
+              itemCount: contacts.length,
+              itemBuilder: (context, index) {
+                final chat = contacts[index];
+                return _ConversationCard(
+                  chat: chat,
+                  title: _titleFor(chat),
+                  currentUserId: widget.currentUserId,
+                  selected: _activeChat?.id == chat.id,
+                  onTap: () => _openConversation(chat),
+                );
+              },
+            ),
+    );
+  }
+
   Widget _buildFilesHub(List<Chat> chats) {
     final strings = _DesktopStrings.of(context);
     final fileChats = chats
@@ -968,42 +1071,7 @@ class _DarkkickDesktopWorkspaceState
   }
 
   Widget _buildSettingsHub() {
-    final strings = _DesktopStrings.of(context);
-
-    return _DesktopPageScaffold(
-      title: strings.t('settings'),
-      subtitle: strings.t('desktopBehavior'),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(34, 0, 34, 34),
-        children: [
-          SizedBox(
-            height: 430,
-            child: _WorkspaceDeck(
-              title: strings.t('desktopModeTitle'),
-              subtitle: strings.t('desktopModeSubtitle'),
-              children: [
-                _FilePreviewTile(
-                  icon: Icons.stream_outlined,
-                  title: strings.t('snapshotsAvoided'),
-                  subtitle: strings.t('snapshotsAvoidedSubtitle'),
-                ),
-                _FilePreviewTile(
-                  icon: Icons.image_outlined,
-                  title: strings.t('bytesMedia'),
-                  subtitle: strings.t('bytesMediaSubtitle'),
-                ),
-                _FilePreviewTile(
-                  icon: Icons.mic_off_outlined,
-                  title: strings.t('voicePaused'),
-                  subtitle: strings.t('notAvailableDesktop'),
-                  onTap: _showDesktopUnavailable,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return DesktopSettingsScreen(currentUserId: widget.currentUserId);
   }
 
   List<Chat> _visibleChats(List<Chat> chats) {
@@ -1027,10 +1095,12 @@ class _DarkkickDesktopWorkspaceState
   }
 
   void _selectSection(_DesktopSection section) {
+    if (!mounted) return;
     setState(() => _section = section);
   }
 
   void _selectWorkspaceTab(_ConversationTab tab) {
+    if (!mounted) return;
     final active = _activeChat;
     if (active == null) {
       setState(() => _section = _DesktopSection.conversations);
@@ -1043,6 +1113,11 @@ class _DarkkickDesktopWorkspaceState
   }
 
   void _openConversation(Chat chat) {
+    if (!mounted) return;
+    if (chat.id.trim().isEmpty) {
+      appLogger.w('Desktop ignored attempt to open an empty chat id');
+      return;
+    }
     setState(() {
       _activeChat = chat;
       _section = _DesktopSection.conversations;
@@ -1051,12 +1126,34 @@ class _DarkkickDesktopWorkspaceState
   }
 
   void _focusHomeSearch() {
+    if (!mounted) return;
     setState(() => _section = _DesktopSection.home);
     _searchFocusNode.requestFocus();
   }
 
   void _goHome() {
+    if (!mounted) return;
     setState(() => _section = _DesktopSection.home);
+  }
+
+  void _closeConversation() {
+    if (!mounted) return;
+    setState(() {
+      _activeChat = null;
+      _section = _DesktopSection.conversations;
+      _conversationTab = _ConversationTab.chat;
+    });
+  }
+
+  void _handleDesktopBack() {
+    if (!mounted) return;
+    if (_section == _DesktopSection.conversations && _activeChat != null) {
+      _closeConversation();
+      return;
+    }
+    if (_section != _DesktopSection.home) {
+      _goHome();
+    }
   }
 
   void _openFirstSearchResult(String value) {
@@ -1073,11 +1170,22 @@ class _DarkkickDesktopWorkspaceState
   }
 
   void _showDesktopUnavailable() {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(_DesktopStrings.of(context).t('notAvailableDesktop')),
       ),
     );
+  }
+
+  String _tabLabel(_ConversationTab tab, _DesktopStrings strings) {
+    return switch (tab) {
+      _ConversationTab.chat => strings.t('chat'),
+      _ConversationTab.media => strings.t('media'),
+      _ConversationTab.files => strings.t('files'),
+      _ConversationTab.calls => strings.t('calls'),
+      _ConversationTab.profile => strings.t('profile'),
+    };
   }
 
   bool _isDisplayableChat(Chat chat, String currentUserId) {
@@ -1167,14 +1275,9 @@ class _DesktopRail extends StatelessWidget {
     final strings = _DesktopStrings.of(context);
     final items = [
       _RailItemData(
-        _DesktopSection.home,
-        Icons.grid_view_rounded,
-        strings.t('home'),
-      ),
-      _RailItemData(
         _DesktopSection.conversations,
-        Icons.forum_outlined,
-        strings.t('conversations'),
+        Icons.chat_bubble_outline,
+        strings.t('railChats'),
       ),
       _RailItemData(
         _DesktopSection.calls,
@@ -1182,9 +1285,14 @@ class _DesktopRail extends StatelessWidget {
         strings.t('calls'),
       ),
       _RailItemData(
+        _DesktopSection.contacts,
+        Icons.people_outline,
+        strings.t('contacts'),
+      ),
+      _RailItemData(
         _DesktopSection.files,
-        Icons.folder_outlined,
-        strings.t('files'),
+        Icons.photo_library_outlined,
+        strings.t('railMedia'),
       ),
     ];
 
@@ -1207,7 +1315,7 @@ class _DesktopRail extends StatelessWidget {
                 onTap: () => onSectionSelected(item.section),
               ),
             ),
-            const Spacer(),
+            const SizedBox(height: 28),
             _RailItem(
               item: _RailItemData(
                 _DesktopSection.settings,
@@ -1630,7 +1738,7 @@ class _ConversationCard extends StatelessWidget {
                   _TypeChip(type: chat.lastMessageType),
                   const Spacer(),
                   Text(
-                    TimeFormatter.formatChatTime(chat.lastMessageTime),
+                    _desktopFormattedTime(chat.lastMessageTime),
                     style: const TextStyle(
                       color: DarkKickColors.textTertiary,
                       fontSize: 11,
@@ -1791,11 +1899,27 @@ class _DesktopChatAvatar extends StatelessWidget {
           .doc(peerId)
           .get(),
       builder: (context, snapshot) {
-        final data = snapshot.data?.data() ?? const <String, dynamic>{};
-        final photoUrl = UserFormatters.readPhotoUrl(data);
-        final avatarUpdatedAt = UserFormatters.readDate(
-          data['avatarUpdatedAt'],
-        );
+        if (snapshot.hasError) {
+          appLogger.e(
+            'Desktop avatar failed to load public profile $peerId',
+            error: snapshot.error,
+            stackTrace: snapshot.stackTrace,
+          );
+        }
+
+        String? photoUrl;
+        DateTime? avatarUpdatedAt;
+        try {
+          final data = snapshot.data?.data() ?? const <String, dynamic>{};
+          photoUrl = UserFormatters.readPhotoUrl(data);
+          avatarUpdatedAt = UserFormatters.readDate(data['avatarUpdatedAt']);
+        } catch (error, stackTrace) {
+          appLogger.e(
+            'Desktop avatar failed to parse public profile $peerId',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }
 
         return _DesktopAvatar(
           title: title,
@@ -1973,7 +2097,7 @@ class _MediaPreviewGrid extends StatelessWidget {
           return _LargePreviewTile(
             icon: Icons.image_outlined,
             title: titleFor(chat),
-            subtitle: TimeFormatter.formatChatTime(chat.lastMessageTime),
+            subtitle: _desktopFormattedTime(chat.lastMessageTime),
             accent: index.isEven
                 ? DarkKickColors.neonPurple
                 : const Color(0xFF7DD3FC),
@@ -2148,7 +2272,7 @@ class _WorkspaceHeader extends StatelessWidget {
           Row(
             children: [
               Tooltip(
-                message: strings.t('home'),
+                message: strings.t('conversations'),
                 child: IconButton(
                   onPressed: onBackHome,
                   icon: const Icon(Icons.arrow_back_rounded, size: 20),
@@ -2402,6 +2526,47 @@ class _ChatWorkspaceCard extends StatelessWidget {
   }
 }
 
+class _DesktopTabGuard extends StatelessWidget {
+  const _DesktopTabGuard({
+    required this.tabLabel,
+    required this.builder,
+    required this.onRetry,
+  });
+
+  final String tabLabel;
+  final WidgetBuilder builder;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
+    try {
+      return builder(context);
+    } catch (error, stackTrace) {
+      appLogger.e(
+        'Desktop tab "$tabLabel" failed to build',
+        error: error,
+        stackTrace: stackTrace,
+      );
+
+      return _WorkspaceDataDeck(
+        title: tabLabel,
+        subtitle: strings.t('workspaceOfflineSubtitle'),
+        child: Center(
+          child: _DesktopEmptyCard(
+            icon: Icons.warning_amber_rounded,
+            title: strings.t('workspaceOffline'),
+            subtitle: strings.t('workspaceOfflineSubtitle'),
+            actionLabel: strings.t('retry'),
+            onAction: onRetry,
+          ),
+        ),
+      );
+    }
+  }
+}
+
 class _ConversationMediaBoard extends StatefulWidget {
   const _ConversationMediaBoard({
     super.key,
@@ -2423,14 +2588,30 @@ class _ConversationMediaBoardState extends State<_ConversationMediaBoard> {
   @override
   void initState() {
     super.initState();
-    _messagesFuture = ChatService.getChatMessages(widget.chat.id);
+    _messagesFuture = _loadMessages();
   }
 
   @override
   void didUpdateWidget(covariant _ConversationMediaBoard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.chat.id != widget.chat.id) {
-      _messagesFuture = ChatService.getChatMessages(widget.chat.id);
+      _messagesFuture = _loadMessages();
+    }
+  }
+
+  Future<List<Message>> _loadMessages() async {
+    final chatId = widget.chat.id.trim();
+    if (chatId.isEmpty) return const <Message>[];
+
+    try {
+      return await ChatService.getChatMessages(chatId);
+    } catch (error, stackTrace) {
+      appLogger.e(
+        'Desktop media tab failed to load messages for chat $chatId',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return const <Message>[];
     }
   }
 
@@ -2452,16 +2633,40 @@ class _ConversationMediaBoardState extends State<_ConversationMediaBoard> {
             );
           }
 
-          final messages = snapshot.data ?? const <Message>[];
-          final media =
-              messages
-                  .where(
-                    (message) =>
-                        _desktopImageUrlFor(message) != null ||
-                        _desktopStickerValueFor(message) != null,
-                  )
-                  .toList()
-                ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+          if (snapshot.hasError) {
+            appLogger.e(
+              'Desktop media tab FutureBuilder error for chat ${widget.chat.id}',
+              error: snapshot.error,
+              stackTrace: snapshot.stackTrace,
+            );
+          }
+
+          final List<Message> media;
+          try {
+            final messages = snapshot.data ?? const <Message>[];
+            media =
+                messages
+                    .where(
+                      (message) =>
+                          _desktopImageUrlFor(message) != null ||
+                          _desktopStickerValueFor(message) != null,
+                    )
+                    .toList()
+                  ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+          } catch (error, stackTrace) {
+            appLogger.e(
+              'Desktop media tab failed to prepare items for chat ${widget.chat.id}',
+              error: error,
+              stackTrace: stackTrace,
+            );
+            return Center(
+              child: _DesktopEmptyCard(
+                icon: Icons.photo_library_outlined,
+                title: strings.t('noMedia'),
+                subtitle: strings.t('noMediaSubtitle'),
+              ),
+            );
+          }
 
           if (media.isEmpty) {
             return Center(
@@ -2498,6 +2703,7 @@ class _ConversationMediaBoardState extends State<_ConversationMediaBoard> {
                   message: message,
                   imageUrl: imageUrl,
                   onTap: () {
+                    if (!mounted || imageItems.isEmpty) return;
                     final initialIndex = imageItems.indexWhere(
                       (item) => item.messageId == message.id,
                     );
@@ -2543,14 +2749,30 @@ class _ConversationFilesBoardState extends State<_ConversationFilesBoard> {
   @override
   void initState() {
     super.initState();
-    _messagesFuture = ChatService.getChatMessages(widget.chat.id);
+    _messagesFuture = _loadMessages();
   }
 
   @override
   void didUpdateWidget(covariant _ConversationFilesBoard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.chat.id != widget.chat.id) {
-      _messagesFuture = ChatService.getChatMessages(widget.chat.id);
+      _messagesFuture = _loadMessages();
+    }
+  }
+
+  Future<List<Message>> _loadMessages() async {
+    final chatId = widget.chat.id.trim();
+    if (chatId.isEmpty) return const <Message>[];
+
+    try {
+      return await ChatService.getChatMessages(chatId);
+    } catch (error, stackTrace) {
+      appLogger.e(
+        'Desktop files tab failed to load messages for chat $chatId',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return const <Message>[];
     }
   }
 
@@ -2572,11 +2794,35 @@ class _ConversationFilesBoardState extends State<_ConversationFilesBoard> {
             );
           }
 
-          final attachments =
-              (snapshot.data ?? const <Message>[])
-                  .where(_desktopIsAttachment)
-                  .toList()
-                ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+          if (snapshot.hasError) {
+            appLogger.e(
+              'Desktop files tab FutureBuilder error for chat ${widget.chat.id}',
+              error: snapshot.error,
+              stackTrace: snapshot.stackTrace,
+            );
+          }
+
+          final List<Message> attachments;
+          try {
+            attachments =
+                (snapshot.data ?? const <Message>[])
+                    .where(_desktopIsAttachment)
+                    .toList()
+                  ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+          } catch (error, stackTrace) {
+            appLogger.e(
+              'Desktop files tab failed to prepare items for chat ${widget.chat.id}',
+              error: error,
+              stackTrace: stackTrace,
+            );
+            return Center(
+              child: _DesktopEmptyCard(
+                icon: Icons.folder_open_outlined,
+                title: strings.t('noFiles'),
+                subtitle: strings.t('noFilesSubtitle'),
+              ),
+            );
+          }
 
           if (attachments.isEmpty) {
             return Center(
@@ -2596,7 +2842,7 @@ class _ConversationFilesBoardState extends State<_ConversationFilesBoard> {
               return _FilePreviewTile(
                 icon: _desktopAttachmentIcon(message),
                 title: _desktopAttachmentTitle(message, strings),
-                subtitle: TimeFormatter.formatChatTime(message.timestamp),
+                subtitle: _desktopFormattedTime(message.timestamp),
               );
             },
           );
@@ -2711,7 +2957,7 @@ class _DesktopMediaImageTile extends StatelessWidget {
               bottom: 10,
               child: _MediaLabel(
                 icon: Icons.image_outlined,
-                label: TimeFormatter.formatChatTime(message.timestamp),
+                label: _desktopFormattedTime(message.timestamp),
               ),
             ),
           ],
@@ -2751,7 +2997,7 @@ class _DesktopStickerMediaTile extends StatelessWidget {
           const SizedBox(height: 10),
           _MediaLabel(
             icon: Icons.sticky_note_2_outlined,
-            label: TimeFormatter.formatChatTime(message.timestamp),
+            label: _desktopFormattedTime(message.timestamp),
           ),
         ],
       ),
@@ -2915,7 +3161,7 @@ class _WorkspaceInspector extends StatelessWidget {
               _InspectorMetric(
                 icon: Icons.schedule_outlined,
                 label: strings.t('updated'),
-                value: TimeFormatter.formatChatTime(chat.updatedAt),
+                value: _desktopFormattedTime(chat.updatedAt),
               ),
               _InspectorMetric(
                 icon: Icons.people_outline,
@@ -3324,7 +3570,7 @@ class _ProfileIdentityTile extends StatelessWidget {
             currentUserId: currentUserId,
             size: 54,
           ),
-          const Spacer(),
+          const SizedBox(height: 28),
           Text(
             title,
             maxLines: 1,

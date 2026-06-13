@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'config/app_config.dart';
 import 'auth/auth_screen.dart';
@@ -10,6 +11,7 @@ import 'screens/chats_screen.dart';
 import 'widgets/otp_verification_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/auth_provider.dart';
+import 'providers/language_provider.dart';
 import 'providers/theme_provider.dart';
 import 'utils/rate_limiter.dart';
 import 'services/user_service.dart';
@@ -21,6 +23,7 @@ void main() async {
   await Future.wait([
     initializeDateFormatting('ru'),
     initializeDateFormatting('ru_RU'),
+    initializeDateFormatting('pl'),
     initializeDateFormatting('en'),
   ]);
   AppRateLimiters.startCleanup();
@@ -36,12 +39,20 @@ class MyApp extends ConsumerWidget {
     final lightTheme = ref.watch(lightThemeProvider);
     final darkTheme = ref.watch(darkThemeProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final language = ref.watch(languageNotifierProvider).currentLanguage;
 
     return MaterialApp(
       title: 'DarkKick Messenger',
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: themeMode,
+      locale: Locale(language),
+      supportedLocales: const [Locale('ru'), Locale('pl'), Locale('en')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       // На ПК сразу открываем форму входа, на телефоне — сплеш
       home: const AuthGate(),
       routes: {
