@@ -980,9 +980,32 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   Widget _buildStickerWidget(String stickerId) {
+    final trimmed = stickerId.trim();
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+      return CachedNetworkImage(
+        imageUrl: trimmed,
+        width: 160,
+        height: 160,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        placeholder: (context, url) => const SizedBox(
+          width: 160,
+          height: 160,
+          child: Center(
+            child: CircularProgressIndicator(
+              color: DarkKickColors.neonPurple,
+              strokeWidth: 2,
+            ),
+          ),
+        ),
+        errorWidget: (_, __, ___) => _buildMissingStickerPlaceholder(),
+      );
+    }
+
     final assetPath =
-        DarkkickStickers.assetFor(stickerId) ??
-        (stickerId.startsWith('assets/') ? stickerId : null);
+        DarkkickStickers.assetFor(trimmed) ??
+        (trimmed.startsWith('assets/') ? trimmed : null);
 
     if (assetPath == null) {
       return _buildMissingStickerPlaceholder();
@@ -1158,12 +1181,22 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   List<ChatImageItem> _chatImageItems() {
+    final resolvedItems = _messages
+        .map((message) {
+          final imageUrl = _imageUrlFor(message);
+          if (imageUrl == null) return null;
+          return ChatImageItem(messageId: message.id, imageUrl: imageUrl);
+        })
+        .whereType<ChatImageItem>()
+        .toList();
+    if (resolvedItems.isNotEmpty) return resolvedItems;
+
     return _messageDocs
         .map((doc) {
           final data = doc.data();
           final type = (data['type'] ?? '').toString();
-          final imageUrl = (data['imageUrl'] ?? '').toString().trim();
-          if (type != 'image' || imageUrl.isEmpty) return null;
+          final imageUrl = _imageUrlFromData(data, type);
+          if (imageUrl == null) return null;
           return ChatImageItem(messageId: doc.id, imageUrl: imageUrl);
         })
         .whereType<ChatImageItem>()
@@ -1171,7 +1204,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   void _openImageViewer(Message message) {
-    final imageUrl = message.imageUrl?.trim();
+    final imageUrl = _imageUrlFor(message);
     if (imageUrl == null || imageUrl.isEmpty) return;
 
     final items = _chatImageItems();
@@ -1190,6 +1223,36 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
         ),
       ),
     );
+  }
+
+  String? _imageUrlFor(Message message) {
+    final imageUrl = message.imageUrl?.trim();
+    if (imageUrl == null || imageUrl.isEmpty) return null;
+    return imageUrl;
+  }
+
+  String? _imageUrlFromData(Map<String, dynamic> data, String rawType) {
+    for (final key in const [
+      'imageUrl',
+      'imageURL',
+      'photoUrl',
+      'photoURL',
+      'mediaUrl',
+      'downloadUrl',
+      'secureUrl',
+    ]) {
+      final value = data[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+
+    final type = rawType.toLowerCase().trim();
+    if (type == 'image' || type == 'photo') {
+      for (final key in const ['fileUrl', 'url']) {
+        final value = data[key]?.toString().trim();
+        if (value != null && value.isNotEmpty) return value;
+      }
+    }
+    return null;
   }
 
   Widget _buildMessagesList(List<Message> messages) {
@@ -1236,7 +1299,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
 
     final isMyMessage = _isMyMessage(message.senderId);
     final isHighlighted = _highlightedMessageId == message.id;
-    final senderLabel = isMyMessage ? 'You' : (_peerName ?? widget.chatName);
+    final senderLabel = isMyMessage
+        ? _desktopChatText(context, 'you')
+        : (_peerName ?? widget.chatName);
     final senderInitial = senderLabel.trim().isEmpty
         ? '?'
         : senderLabel.trim()[0].toUpperCase();
@@ -1321,16 +1386,16 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                     if (message.isForwarded) ...[
                       const SizedBox(height: 8),
                       Row(
-                        children: const [
-                          Icon(
+                        children: [
+                          const Icon(
                             Icons.forward,
                             color: DarkKickColors.textTertiary,
                             size: 13,
                           ),
-                          SizedBox(width: 5),
+                          const SizedBox(width: 5),
                           Text(
-                            'Forwarded',
-                            style: TextStyle(
+                            _desktopChatText(context, 'forwarded'),
+                            style: const TextStyle(
                               color: DarkKickColors.textTertiary,
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -1357,13 +1422,14 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 
   Widget _buildDesktopMessagePayload(Message message) {
-    if (message.type == 'image' && message.imageUrl != null) {
+    final imageUrl = _imageUrlFor(message);
+    if (imageUrl != null) {
       return GestureDetector(
         onTap: () => _openImageViewer(message),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: CachedNetworkImage(
-            imageUrl: message.imageUrl!,
+            imageUrl: imageUrl,
             width: 360,
             height: 230,
             fit: BoxFit.cover,
@@ -1383,9 +1449,9 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
               height: 230,
               color: DarkKickColors.panel,
               alignment: Alignment.center,
-              child: const Text(
-                'Image unavailable',
-                style: TextStyle(color: DarkKickColors.textSecondary),
+              child: Text(
+                _desktopChatText(context, 'imageUnavailable'),
+                style: const TextStyle(color: DarkKickColors.textSecondary),
               ),
             ),
           ),
@@ -1441,9 +1507,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     }
 
     if (!_showVoiceMessagesInUi && message.type == 'voice') {
-      return const Text(
-        'Voice message is not available on desktop yet',
-        style: TextStyle(color: DarkKickColors.textSecondary, fontSize: 14),
+      return Text(
+        _desktopChatText(context, 'voiceUnavailable'),
+        style: const TextStyle(
+          color: DarkKickColors.textSecondary,
+          fontSize: 14,
+        ),
       );
     }
 
@@ -1512,7 +1581,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     final isMyMessage = _isMyMessage(message.senderId);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isImageMessage = message.type == 'image' && message.imageUrl != null;
+    final imageUrl = _imageUrlFor(message);
+    final isImageMessage = imageUrl != null;
     final bubbleColor = isImageMessage
         ? DarkKickColors.panel.withValues(alpha: 0.72)
         : isMyMessage
@@ -1653,7 +1723,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                         ],
 
                         // Image message
-                        if (message.type == 'image' && message.imageUrl != null)
+                        if (isImageMessage)
                           Column(
                             children: [
                               GestureDetector(
@@ -1665,7 +1735,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                                       Hero(
                                         tag: 'chat-image-${message.id}',
                                         child: CachedNetworkImage(
-                                          imageUrl: message.imageUrl!,
+                                          imageUrl: imageUrl,
                                           width: 200,
                                           height: 150,
                                           fit: BoxFit.cover,
@@ -2278,10 +2348,13 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       color: DarkKickColors.panel.withValues(alpha: 0.42),
-      child: const Text(
-        'Desktop mode: messages refresh periodically.',
+      child: Text(
+        _desktopChatText(context, 'desktopNote'),
         textAlign: TextAlign.center,
-        style: TextStyle(color: DarkKickColors.textTertiary, fontSize: 11),
+        style: const TextStyle(
+          color: DarkKickColors.textTertiary,
+          fontSize: 11,
+        ),
       ),
     );
   }
@@ -2441,6 +2514,52 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   }
 }
 
+String _desktopChatText(BuildContext context, String key) {
+  final code = Localizations.localeOf(context).languageCode.toLowerCase();
+  final values = _desktopChatStrings[code] ?? _desktopChatStrings['en']!;
+  return values[key] ?? _desktopChatStrings['en']![key] ?? key;
+}
+
+const _desktopChatStrings = {
+  'en': {
+    'you': 'You',
+    'forwarded': 'Forwarded',
+    'imageUnavailable': 'Image unavailable',
+    'voiceUnavailable': 'Voice message is not available on desktop yet',
+    'desktopNote': 'Desktop mode: messages refresh periodically.',
+    'text': 'text',
+    'photo': 'photo',
+    'sticker': 'sticker',
+    'voice': 'voice',
+    'file': 'file',
+  },
+  'ru': {
+    'you': 'Вы',
+    'forwarded': 'Переслано',
+    'imageUnavailable': 'Изображение недоступно',
+    'voiceUnavailable': 'Голосовое сообщение пока недоступно на desktop',
+    'desktopNote': 'Desktop mode: сообщения обновляются периодически.',
+    'text': 'текст',
+    'photo': 'фото',
+    'sticker': 'стикер',
+    'voice': 'голос',
+    'file': 'файл',
+  },
+  'pl': {
+    'you': 'Ty',
+    'forwarded': 'Przekazano',
+    'imageUnavailable': 'Obraz niedostępny',
+    'voiceUnavailable':
+        'Wiadomość głosowa nie jest jeszcze dostępna na desktopie',
+    'desktopNote': 'Tryb desktop: wiadomości odświeżają się okresowo.',
+    'text': 'tekst',
+    'photo': 'zdjęcie',
+    'sticker': 'naklejka',
+    'voice': 'głos',
+    'file': 'plik',
+  },
+};
+
 class _DesktopMessageKind extends StatelessWidget {
   const _DesktopMessageKind({required this.type});
 
@@ -2449,6 +2568,13 @@ class _DesktopMessageKind extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = type.trim().isEmpty ? 'text' : type.trim();
+    final label = switch (normalized.toLowerCase()) {
+      'image' || 'photo' => _desktopChatText(context, 'photo'),
+      'sticker' => _desktopChatText(context, 'sticker'),
+      'voice' || 'audio' => _desktopChatText(context, 'voice'),
+      'file' || 'document' => _desktopChatText(context, 'file'),
+      _ => _desktopChatText(context, 'text'),
+    };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
@@ -2458,7 +2584,7 @@ class _DesktopMessageKind extends StatelessWidget {
         border: Border.all(color: DarkKickColors.divider),
       ),
       child: Text(
-        normalized,
+        label,
         style: const TextStyle(
           color: DarkKickColors.textTertiary,
           fontSize: 10,

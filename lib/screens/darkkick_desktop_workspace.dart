@@ -1,16 +1,23 @@
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/system_bot.dart';
+import '../data/darkkick_stickers.dart';
 import '../models/chat.dart';
+import '../models/message.dart';
 import '../providers/chats_provider.dart';
+import '../services/chat_service.dart';
 import '../services/desktop_platform_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../utils/time_formatter.dart';
+import '../utils/user_formatters.dart';
+import 'image_viewer_screen.dart';
 import 'single_chat_screen.dart';
 
 class DarkkickDesktopWorkspace extends ConsumerStatefulWidget {
@@ -31,6 +38,302 @@ class DarkkickDesktopWorkspace extends ConsumerStatefulWidget {
 enum _DesktopSection { home, conversations, calls, files, settings }
 
 enum _ConversationTab { chat, media, files, calls, profile }
+
+class _DesktopStrings {
+  const _DesktopStrings(this.code);
+
+  final String code;
+
+  static _DesktopStrings of(BuildContext context) {
+    final code = Localizations.localeOf(context).languageCode.toLowerCase();
+    if (_values.containsKey(code)) return _DesktopStrings(code);
+    return const _DesktopStrings('en');
+  }
+
+  String t(String key) => _values[code]?[key] ?? _values['en']![key] ?? key;
+
+  static const _values = {
+    'en': {
+      'home': 'Home',
+      'conversations': 'Conversations',
+      'calls': 'Calls',
+      'files': 'Files',
+      'settings': 'Settings',
+      'workspaceOffline': 'Workspace offline',
+      'workspaceOfflineSubtitle':
+          'DARKKICK could not load your desktop workspace.',
+      'retry': 'Retry',
+      'homeSubtitle': 'A people-centered communication workspace.',
+      'new': 'New',
+      'continueConversations': 'Continue Conversations',
+      'noActiveConversations': 'No active conversations',
+      'startPrivateWorkspace': 'Start a private workspace from DARKKICK.',
+      'start': 'Start',
+      'recentMedia': 'Recent Media',
+      'activeCalls': 'Active Calls',
+      'favoriteContacts': 'Favorite Contacts',
+      'recentFiles': 'Recent Files',
+      'desktopTitle': 'DARKKICK Desktop',
+      'desktopSubtitle':
+          'Open conversations as workspaces, not message queues.',
+      'spaces': 'spaces',
+      'unread': 'unread',
+      'windowsMode': 'Windows mode',
+      'searchWorkspace': 'Search workspace',
+      'pickConversation': 'Pick a person or group to open a workspace.',
+      'nothingMatched': 'Nothing matched',
+      'nothingMatchedSubtitle': 'Try another name or start a new conversation.',
+      'newConversation': 'New conversation',
+      'chat': 'Chat',
+      'media': 'Media',
+      'profile': 'Profile',
+      'mediaBoard': 'Media',
+      'mediaBoardSubtitle':
+          'Shared photos and stickers from this conversation.',
+      'noMedia': 'No media yet',
+      'noMediaSubtitle': 'Photos and stickers from this chat will appear here.',
+      'filesSubtitle': 'Shared documents, archives and attachments.',
+      'noFiles': 'No files yet',
+      'noFilesSubtitle': 'Attachments from this conversation will appear here.',
+      'callsSubtitle':
+          'Desktop calling controls stay isolated from mobile plugins.',
+      'notAvailableDesktop': 'Not available on desktop yet',
+      'callHistory': 'Call history',
+      'callHistorySubtitle': 'Desktop call records will live here.',
+      'profileSubtitle': 'Workspace identity and participant details.',
+      'officialSpace': 'Official space',
+      'privateSpace': 'Private space',
+      'participants': 'participants',
+      'desktopBehavior': 'Desktop behavior and workspace safety.',
+      'desktopModeTitle': 'Windows Desktop Mode',
+      'desktopModeSubtitle':
+          'DARKKICK is running the safe desktop platform path.',
+      'snapshotsAvoided': 'Realtime snapshots avoided',
+      'snapshotsAvoidedSubtitle':
+          'Open chats use polling to protect Windows stability.',
+      'bytesMedia': 'Bytes-based media picking',
+      'bytesMediaSubtitle':
+          'Photos are selected through a desktop-safe picker.',
+      'voicePaused': 'Voice recording paused',
+      'workspace': 'Workspace',
+      'updated': 'Updated',
+      'people': 'People',
+      'desktopIntake': 'Desktop Intake',
+      'attachmentFlow': 'Attachment flow',
+      'attachmentFlowSubtitle': 'Use the Chat input for safe Windows picking.',
+      'voiceRecording': 'Voice recording',
+      'detachedWindow': 'Detached window',
+      'detachedWindowSubtitle': 'Multi-window shell hook.',
+      'attachment': 'Attachment',
+      'imageUnavailable': 'Image unavailable',
+      'stickerUnavailable': 'Sticker unavailable',
+      'photo': 'Photo',
+      'sticker': 'Sticker',
+      'voice': 'Voice',
+      'file': 'File',
+      'text': 'Text',
+      'noMessagesYet': 'No messages yet',
+    },
+    'ru': {
+      'home': 'Главная',
+      'conversations': 'Диалоги',
+      'calls': 'Звонки',
+      'files': 'Файлы',
+      'settings': 'Настройки',
+      'workspaceOffline': 'Рабочая область недоступна',
+      'workspaceOfflineSubtitle':
+          'DARKKICK не смог загрузить desktop-рабочую область.',
+      'retry': 'Повторить',
+      'homeSubtitle': 'Коммуникационная рабочая область вокруг людей.',
+      'new': 'Новый',
+      'continueConversations': 'Продолжить диалоги',
+      'noActiveConversations': 'Активных диалогов нет',
+      'startPrivateWorkspace': 'Начни приватную рабочую область в DARKKICK.',
+      'start': 'Начать',
+      'recentMedia': 'Недавние медиа',
+      'activeCalls': 'Активные звонки',
+      'favoriteContacts': 'Избранные контакты',
+      'recentFiles': 'Недавние файлы',
+      'desktopTitle': 'DARKKICK Desktop',
+      'desktopSubtitle':
+          'Открывай диалоги как рабочие области, а не очередь сообщений.',
+      'spaces': 'пространств',
+      'unread': 'непрочитано',
+      'windowsMode': 'Режим Windows',
+      'searchWorkspace': 'Поиск',
+      'pickConversation':
+          'Выбери человека или группу, чтобы открыть workspace.',
+      'nothingMatched': 'Ничего не найдено',
+      'nothingMatchedSubtitle': 'Попробуй другое имя или начни новый диалог.',
+      'newConversation': 'Новый диалог',
+      'chat': 'Чат',
+      'media': 'Медиа',
+      'profile': 'Профиль',
+      'mediaBoard': 'Медиа',
+      'mediaBoardSubtitle': 'Фото и стикеры из этого диалога.',
+      'noMedia': 'Медиа пока нет',
+      'noMediaSubtitle': 'Фото и стикеры из чата появятся здесь.',
+      'filesSubtitle': 'Общие документы, архивы и вложения.',
+      'noFiles': 'Файлов пока нет',
+      'noFilesSubtitle': 'Вложения из этого диалога появятся здесь.',
+      'callsSubtitle': 'Desktop-звонки отделены от мобильных плагинов.',
+      'notAvailableDesktop': 'Пока недоступно на desktop',
+      'callHistory': 'История звонков',
+      'callHistorySubtitle': 'Desktop-звонки будут отображаться здесь.',
+      'profileSubtitle': 'Профиль и участники рабочей области.',
+      'officialSpace': 'Официальное пространство',
+      'privateSpace': 'Приватное пространство',
+      'participants': 'участников',
+      'desktopBehavior': 'Поведение и стабильность desktop-версии.',
+      'desktopModeTitle': 'Режим Windows Desktop',
+      'desktopModeSubtitle': 'DARKKICK использует безопасный desktop-путь.',
+      'snapshotsAvoided': 'Realtime snapshots отключены',
+      'snapshotsAvoidedSubtitle':
+          'Открытые чаты обновляются polling-ом для стабильности Windows.',
+      'bytesMedia': 'Выбор медиа через bytes',
+      'bytesMediaSubtitle': 'Фото выбираются через desktop-safe picker.',
+      'voicePaused': 'Запись голоса отключена',
+      'workspace': 'Workspace',
+      'updated': 'Обновлено',
+      'people': 'Люди',
+      'desktopIntake': 'Desktop-ввод',
+      'attachmentFlow': 'Вложения',
+      'attachmentFlowSubtitle': 'Используй кнопку вложений в Chat для Windows.',
+      'voiceRecording': 'Запись голоса',
+      'detachedWindow': 'Отдельное окно',
+      'detachedWindowSubtitle': 'Заготовка для multi-window режима.',
+      'attachment': 'Вложение',
+      'imageUnavailable': 'Изображение недоступно',
+      'stickerUnavailable': 'Стикер недоступен',
+      'photo': 'Фото',
+      'sticker': 'Стикер',
+      'voice': 'Голос',
+      'file': 'Файл',
+      'text': 'Текст',
+      'noMessagesYet': 'Сообщений пока нет',
+    },
+    'pl': {
+      'home': 'Start',
+      'conversations': 'Rozmowy',
+      'calls': 'Połączenia',
+      'files': 'Pliki',
+      'settings': 'Ustawienia',
+      'workspaceOffline': 'Obszar roboczy offline',
+      'workspaceOfflineSubtitle':
+          'DARKKICK nie mógł wczytać obszaru roboczego desktop.',
+      'retry': 'Ponów',
+      'homeSubtitle': 'Przestrzeń komunikacji skupiona na ludziach.',
+      'new': 'Nowa',
+      'continueConversations': 'Kontynuuj rozmowy',
+      'noActiveConversations': 'Brak aktywnych rozmów',
+      'startPrivateWorkspace': 'Rozpocznij prywatną przestrzeń w DARKKICK.',
+      'start': 'Start',
+      'recentMedia': 'Ostatnie media',
+      'activeCalls': 'Aktywne połączenia',
+      'favoriteContacts': 'Ulubione kontakty',
+      'recentFiles': 'Ostatnie pliki',
+      'desktopTitle': 'DARKKICK Desktop',
+      'desktopSubtitle':
+          'Otwieraj rozmowy jako obszary robocze, nie kolejki wiadomości.',
+      'spaces': 'przestrzeni',
+      'unread': 'nieprzeczytane',
+      'windowsMode': 'Tryb Windows',
+      'searchWorkspace': 'Szukaj',
+      'pickConversation': 'Wybierz osobę lub grupę, aby otworzyć workspace.',
+      'nothingMatched': 'Nic nie znaleziono',
+      'nothingMatchedSubtitle':
+          'Spróbuj innej nazwy albo zacznij nową rozmowę.',
+      'newConversation': 'Nowa rozmowa',
+      'chat': 'Czat',
+      'media': 'Media',
+      'profile': 'Profil',
+      'mediaBoard': 'Media',
+      'mediaBoardSubtitle': 'Zdjęcia i naklejki z tej rozmowy.',
+      'noMedia': 'Brak mediów',
+      'noMediaSubtitle': 'Zdjęcia i naklejki z czatu pojawią się tutaj.',
+      'filesSubtitle': 'Wspólne dokumenty, archiwa i załączniki.',
+      'noFiles': 'Brak plików',
+      'noFilesSubtitle': 'Załączniki z tej rozmowy pojawią się tutaj.',
+      'callsSubtitle':
+          'Sterowanie połączeniami desktop jest oddzielone od pluginów mobilnych.',
+      'notAvailableDesktop': 'Jeszcze niedostępne na desktopie',
+      'callHistory': 'Historia połączeń',
+      'callHistorySubtitle': 'Połączenia desktop pojawią się tutaj.',
+      'profileSubtitle': 'Tożsamość workspace i uczestnicy.',
+      'officialSpace': 'Oficjalna przestrzeń',
+      'privateSpace': 'Prywatna przestrzeń',
+      'participants': 'uczestników',
+      'desktopBehavior': 'Zachowanie i stabilność wersji desktop.',
+      'desktopModeTitle': 'Tryb Windows Desktop',
+      'desktopModeSubtitle': 'DARKKICK używa bezpiecznej ścieżki desktop.',
+      'snapshotsAvoided': 'Realtime snapshots wyłączone',
+      'snapshotsAvoidedSubtitle':
+          'Otwarte czaty używają polling dla stabilności Windows.',
+      'bytesMedia': 'Wybór mediów przez bytes',
+      'bytesMediaSubtitle': 'Zdjęcia są wybierane desktop-safe pickerem.',
+      'voicePaused': 'Nagrywanie głosu wyłączone',
+      'workspace': 'Workspace',
+      'updated': 'Aktualizacja',
+      'people': 'Osoby',
+      'desktopIntake': 'Wejście desktop',
+      'attachmentFlow': 'Załączniki',
+      'attachmentFlowSubtitle': 'Użyj przycisku załącznika w Chat dla Windows.',
+      'voiceRecording': 'Nagrywanie głosu',
+      'detachedWindow': 'Osobne okno',
+      'detachedWindowSubtitle': 'Punkt integracji dla multi-window.',
+      'attachment': 'Załącznik',
+      'imageUnavailable': 'Obraz niedostępny',
+      'stickerUnavailable': 'Naklejka niedostępna',
+      'photo': 'Zdjęcie',
+      'sticker': 'Naklejka',
+      'voice': 'Głos',
+      'file': 'Plik',
+      'text': 'Tekst',
+      'noMessagesYet': 'Brak wiadomości',
+    },
+  };
+}
+
+String? _desktopImageUrlFor(Message message) {
+  final imageUrl = message.imageUrl?.trim();
+  if (imageUrl == null || imageUrl.isEmpty) return null;
+  return imageUrl;
+}
+
+String? _desktopStickerValueFor(Message message) {
+  if (message.type.toLowerCase().trim() != 'sticker') return null;
+  final sticker = message.stickerId?.trim().isNotEmpty == true
+      ? message.stickerId!.trim()
+      : message.stickerUrl?.trim();
+  if (sticker == null || sticker.isEmpty) return null;
+  return sticker;
+}
+
+bool _desktopIsAttachment(Message message) {
+  return _desktopImageUrlFor(message) != null ||
+      _desktopStickerValueFor(message) != null ||
+      (message.voiceUrl?.trim().isNotEmpty ?? false);
+}
+
+IconData _desktopAttachmentIcon(Message message) {
+  if (_desktopImageUrlFor(message) != null) return Icons.image_outlined;
+  if (_desktopStickerValueFor(message) != null) {
+    return Icons.sticky_note_2_outlined;
+  }
+  if (message.voiceUrl?.trim().isNotEmpty ?? false) {
+    return Icons.graphic_eq_outlined;
+  }
+  return Icons.insert_drive_file_outlined;
+}
+
+String _desktopAttachmentTitle(Message message, _DesktopStrings strings) {
+  if (_desktopImageUrlFor(message) != null) return strings.t('photo');
+  if (_desktopStickerValueFor(message) != null) return strings.t('sticker');
+  if (message.voiceUrl?.trim().isNotEmpty ?? false) return strings.t('voice');
+  final text = message.text.trim();
+  if (text.isNotEmpty) return text;
+  return strings.t('attachment');
+}
 
 class _DarkkickDesktopWorkspaceState
     extends ConsumerState<DarkkickDesktopWorkspace> {
@@ -148,14 +451,16 @@ class _DarkkickDesktopWorkspaceState
   }
 
   Widget _buildErrorShell(Object error) {
+    final strings = _DesktopStrings.of(context);
+
     return ColoredBox(
       color: DarkKickColors.deepBackground,
       child: Center(
         child: _DesktopEmptyCard(
           icon: Icons.cloud_off_outlined,
-          title: 'Workspace offline',
-          subtitle: 'DARKKICK could not load your desktop workspace.',
-          actionLabel: 'Retry',
+          title: strings.t('workspaceOffline'),
+          subtitle: strings.t('workspaceOfflineSubtitle'),
+          actionLabel: strings.t('retry'),
           onAction: () => ref.invalidate(chatsProvider),
         ),
       ),
@@ -163,6 +468,7 @@ class _DarkkickDesktopWorkspaceState
   }
 
   Widget _buildHome(List<Chat> chats) {
+    final strings = _DesktopStrings.of(context);
     final continued = chats.take(8).toList();
     final mediaChats = chats
         .where((chat) => chat.lastMessageType.toLowerCase() == 'image')
@@ -175,11 +481,11 @@ class _DarkkickDesktopWorkspaceState
     final favorites = chats.where(_isDirectLikeChat).take(6).toList();
 
     return _DesktopPageScaffold(
-      title: 'Home',
-      subtitle: 'A people-centered communication workspace.',
+      title: strings.t('home'),
+      subtitle: strings.t('homeSubtitle'),
       trailing: _TopBarButton(
         icon: Icons.add_comment_outlined,
-        label: 'New',
+        label: strings.t('new'),
         onTap: widget.onOpenNewChat,
       ),
       child: LayoutBuilder(
@@ -189,15 +495,15 @@ class _DarkkickDesktopWorkspaceState
             _buildWelcomeSurface(chats),
             const SizedBox(height: 28),
             _DashboardSection(
-              title: 'Continue Conversations',
+              title: strings.t('continueConversations'),
               actionIcon: Icons.arrow_forward_rounded,
               onAction: () => _selectSection(_DesktopSection.conversations),
               child: continued.isEmpty
                   ? _DesktopEmptyCard(
                       icon: Icons.mode_comment_outlined,
-                      title: 'No active conversations',
-                      subtitle: 'Start a private workspace from DARKKICK.',
-                      actionLabel: 'Start',
+                      title: strings.t('noActiveConversations'),
+                      subtitle: strings.t('startPrivateWorkspace'),
+                      actionLabel: strings.t('start'),
                       onAction: widget.onOpenNewChat,
                     )
                   : SizedBox(
@@ -221,7 +527,7 @@ class _DarkkickDesktopWorkspaceState
             ),
             const SizedBox(height: 28),
             _DashboardSection(
-              title: 'Recent Media',
+              title: strings.t('recentMedia'),
               actionIcon: Icons.photo_library_outlined,
               onAction: () => _selectWorkspaceTab(_ConversationTab.media),
               child: _MediaPreviewGrid(
@@ -234,21 +540,22 @@ class _DarkkickDesktopWorkspaceState
 
           final side = [
             _DashboardSection(
-              title: 'Active Calls',
+              title: strings.t('activeCalls'),
               child: _CallStatusCard(onTap: _showDesktopUnavailable),
             ),
             const SizedBox(height: 22),
             _DashboardSection(
-              title: 'Favorite Contacts',
+              title: strings.t('favoriteContacts'),
               child: _FavoriteContactsGrid(
                 chats: favorites,
                 titleFor: _titleFor,
+                currentUserId: widget.currentUserId,
                 onOpen: _openConversation,
               ),
             ),
             const SizedBox(height: 22),
             _DashboardSection(
-              title: 'Recent Files',
+              title: strings.t('recentFiles'),
               actionIcon: Icons.folder_open_outlined,
               onAction: () => _selectSection(_DesktopSection.files),
               child: _RecentFilesStrip(
@@ -297,6 +604,7 @@ class _DarkkickDesktopWorkspaceState
   }
 
   Widget _buildWelcomeSurface(List<Chat> chats) {
+    final strings = _DesktopStrings.of(context);
     final unread = chats.fold<int>(
       0,
       (total, chat) => total + chat.unreadFor(widget.currentUserId),
@@ -332,7 +640,7 @@ class _DarkkickDesktopWorkspaceState
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'DARKKICK Desktop',
+                  strings.t('desktopTitle'),
                   style: GoogleFonts.spaceGrotesk(
                     color: Colors.white,
                     fontSize: 32,
@@ -341,8 +649,8 @@ class _DarkkickDesktopWorkspaceState
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  'Open conversations as workspaces, not message queues.',
+                Text(
+                  strings.t('desktopSubtitle'),
                   style: TextStyle(
                     color: DarkKickColors.textSecondary,
                     fontSize: 15,
@@ -355,15 +663,15 @@ class _DarkkickDesktopWorkspaceState
                   children: [
                     _MetricPill(
                       icon: Icons.forum_outlined,
-                      label: '${chats.length} spaces',
+                      label: '${chats.length} ${strings.t('spaces')}',
                     ),
                     _MetricPill(
                       icon: Icons.mark_chat_unread_outlined,
-                      label: '$unread unread',
+                      label: '$unread ${strings.t('unread')}',
                     ),
-                    const _MetricPill(
+                    _MetricPill(
                       icon: Icons.desktop_windows_outlined,
-                      label: 'Windows mode',
+                      label: strings.t('windowsMode'),
                     ),
                   ],
                 ),
@@ -385,6 +693,7 @@ class _DarkkickDesktopWorkspaceState
   }
 
   Widget _buildConversationGallery(List<Chat> chats) {
+    final strings = _DesktopStrings.of(context);
     final filtered = _searchQuery.isEmpty
         ? chats
         : chats
@@ -394,8 +703,8 @@ class _DarkkickDesktopWorkspaceState
               .toList();
 
     return _DesktopPageScaffold(
-      title: 'Conversations',
-      subtitle: 'Pick a person or group to open a workspace.',
+      title: strings.t('conversations'),
+      subtitle: strings.t('pickConversation'),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -410,7 +719,7 @@ class _DarkkickDesktopWorkspaceState
           const SizedBox(width: 12),
           _TopBarButton(
             icon: Icons.add_comment_outlined,
-            label: 'New',
+            label: strings.t('new'),
             onTap: widget.onOpenNewChat,
           ),
         ],
@@ -419,9 +728,9 @@ class _DarkkickDesktopWorkspaceState
           ? Center(
               child: _DesktopEmptyCard(
                 icon: Icons.search_off_outlined,
-                title: 'Nothing matched',
-                subtitle: 'Try another name or start a new conversation.',
-                actionLabel: 'New conversation',
+                title: strings.t('nothingMatched'),
+                subtitle: strings.t('nothingMatchedSubtitle'),
+                actionLabel: strings.t('newConversation'),
                 onAction: widget.onOpenNewChat,
               ),
             )
@@ -498,6 +807,8 @@ class _DarkkickDesktopWorkspaceState
   }
 
   Widget _buildWorkspaceBody(Chat chat, List<Chat> chats) {
+    final strings = _DesktopStrings.of(context);
+
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 160),
       child: switch (_conversationTab) {
@@ -513,80 +824,40 @@ class _DarkkickDesktopWorkspaceState
             embedded: true,
           ),
         ),
-        _ConversationTab.media => _WorkspaceDeck(
+        _ConversationTab.media => _ConversationMediaBoard(
           key: ValueKey('media-${chat.id}'),
-          title: 'Media Board',
-          subtitle: 'Large previews for shared photos and visual context.',
-          children: [
-            _LargePreviewTile(
-              icon: Icons.photo_library_outlined,
-              title: chat.lastMessageType == 'image'
-                  ? 'Latest shared image'
-                  : 'No recent media',
-              subtitle: _titleFor(chat),
-              accent: const Color(0xFF7DD3FC),
-            ),
-            _LargePreviewTile(
-              icon: Icons.grid_view_rounded,
-              title: 'Gallery slots',
-              subtitle: 'Media history stays in this workspace tab.',
-              accent: DarkKickColors.neonPurple,
-            ),
-            _LargePreviewTile(
-              icon: Icons.fullscreen_rounded,
-              title: 'Large preview mode',
-              subtitle: 'Desktop review surface for images and files.',
-              accent: const Color(0xFF47FF93),
-            ),
-          ],
+          chat: chat,
+          title: _titleFor(chat),
         ),
-        _ConversationTab.files => _WorkspaceDeck(
+        _ConversationTab.files => _ConversationFilesBoard(
           key: ValueKey('files-${chat.id}'),
-          title: 'Files',
-          subtitle: 'Shared documents, archives and attachments.',
-          children: [
-            _FilePreviewTile(
-              icon: Icons.archive_outlined,
-              title: 'Conversation archive',
-              subtitle: 'Files uploaded here appear as desktop cards.',
-            ),
-            _FilePreviewTile(
-              icon: Icons.upload_file_outlined,
-              title: 'Desktop upload path',
-              subtitle:
-                  'Use the attachment button in Chat for safe Windows send.',
-            ),
-            _FilePreviewTile(
-              icon: Icons.folder_special_outlined,
-              title: 'Rich previews',
-              subtitle: 'Preview state is separated from the message timeline.',
-            ),
-          ],
+          chat: chat,
+          title: _titleFor(chat),
         ),
         _ConversationTab.calls => _WorkspaceDeck(
           key: ValueKey('calls-${chat.id}'),
-          title: 'Calls',
-          subtitle: 'Voice recording is disabled on Windows until stable.',
+          title: strings.t('calls'),
+          subtitle: strings.t('callsSubtitle'),
           children: [
             _LargePreviewTile(
               icon: Icons.phone_disabled_outlined,
-              title: 'Not available on desktop yet',
-              subtitle: DesktopPlatformService.unsupportedDesktopMessage,
+              title: strings.t('notAvailableDesktop'),
+              subtitle: strings.t('notAvailableDesktop'),
               accent: DarkKickColors.pending,
               onTap: _showDesktopUnavailable,
             ),
             _LargePreviewTile(
               icon: Icons.history_toggle_off_outlined,
-              title: 'Call history',
-              subtitle: 'Desktop call records will live here.',
+              title: strings.t('callHistory'),
+              subtitle: strings.t('callHistorySubtitle'),
               accent: const Color(0xFF7DD3FC),
             ),
           ],
         ),
         _ConversationTab.profile => _WorkspaceDeck(
           key: ValueKey('profile-${chat.id}'),
-          title: 'Profile',
-          subtitle: 'Workspace identity and participant details.',
+          title: strings.t('profile'),
+          subtitle: strings.t('profileSubtitle'),
           children: [
             _ProfileIdentityTile(
               title: _titleFor(chat),
@@ -596,10 +867,10 @@ class _DarkkickDesktopWorkspaceState
             _FilePreviewTile(
               icon: Icons.verified_user_outlined,
               title: SystemBot.isSystemChat(chat)
-                  ? 'Official space'
-                  : 'Private space',
+                  ? strings.t('officialSpace')
+                  : strings.t('privateSpace'),
               subtitle:
-                  '${chat.participants.length} participant${chat.participants.length == 1 ? '' : 's'}',
+                  '${chat.participants.length} ${strings.t('participants')}',
             ),
           ],
         ),
@@ -608,12 +879,14 @@ class _DarkkickDesktopWorkspaceState
   }
 
   Widget _buildCallsHub(List<Chat> chats) {
+    final strings = _DesktopStrings.of(context);
+
     return _DesktopPageScaffold(
-      title: 'Calls',
-      subtitle: 'Desktop calling controls stay isolated from mobile plugins.',
+      title: strings.t('calls'),
+      subtitle: strings.t('callsSubtitle'),
       trailing: _TopBarButton(
         icon: Icons.phone_disabled_outlined,
-        label: 'Unavailable',
+        label: strings.t('notAvailableDesktop'),
         onTap: _showDesktopUnavailable,
       ),
       child: ListView(
@@ -622,20 +895,20 @@ class _DarkkickDesktopWorkspaceState
           SizedBox(
             height: 430,
             child: _WorkspaceDeck(
-              title: 'Active Calls',
-              subtitle: 'No active desktop calls.',
+              title: strings.t('activeCalls'),
+              subtitle: strings.t('notAvailableDesktop'),
               children: [
                 _LargePreviewTile(
                   icon: Icons.phone_disabled_outlined,
-                  title: 'Not available on desktop yet',
-                  subtitle: DesktopPlatformService.unsupportedDesktopMessage,
+                  title: strings.t('notAvailableDesktop'),
+                  subtitle: strings.t('notAvailableDesktop'),
                   accent: DarkKickColors.pending,
                   onTap: _showDesktopUnavailable,
                 ),
                 _LargePreviewTile(
                   icon: Icons.groups_2_outlined,
-                  title: '${math.min(chats.length, 12)} ready spaces',
-                  subtitle: 'Conversations can become call workspaces later.',
+                  title: '${math.min(chats.length, 12)} ${strings.t('spaces')}',
+                  subtitle: strings.t('callHistorySubtitle'),
                   accent: const Color(0xFF7DD3FC),
                 ),
               ],
@@ -647,26 +920,26 @@ class _DarkkickDesktopWorkspaceState
   }
 
   Widget _buildFilesHub(List<Chat> chats) {
+    final strings = _DesktopStrings.of(context);
     final fileChats = chats
         .where((chat) => _looksLikeFileActivity(chat.lastMessageType))
         .take(12)
         .toList();
 
     return _DesktopPageScaffold(
-      title: 'Files',
-      subtitle: 'A desktop-first library for shared attachments.',
+      title: strings.t('files'),
+      subtitle: strings.t('filesSubtitle'),
       trailing: _TopBarButton(
         icon: Icons.refresh_rounded,
-        label: 'Refresh',
+        label: strings.t('retry'),
         onTap: () => ref.invalidate(chatsProvider),
       ),
       child: fileChats.isEmpty
           ? Center(
               child: _DesktopEmptyCard(
                 icon: Icons.folder_open_outlined,
-                title: 'No desktop files yet',
-                subtitle:
-                    'Attachments sent from conversations will appear here.',
+                title: strings.t('noFiles'),
+                subtitle: strings.t('noFilesSubtitle'),
               ),
             )
           : GridView.builder(
@@ -682,7 +955,7 @@ class _DarkkickDesktopWorkspaceState
                 final chat = fileChats[index];
                 return _FilePreviewTile(
                   icon: _fileIconFor(chat.lastMessageType),
-                  title: _messagePreview(chat),
+                  title: _messagePreview(chat, strings),
                   subtitle: _titleFor(chat),
                   onTap: () {
                     _openConversation(chat);
@@ -695,34 +968,34 @@ class _DarkkickDesktopWorkspaceState
   }
 
   Widget _buildSettingsHub() {
+    final strings = _DesktopStrings.of(context);
+
     return _DesktopPageScaffold(
-      title: 'Settings',
-      subtitle: 'Desktop behavior and workspace safety.',
+      title: strings.t('settings'),
+      subtitle: strings.t('desktopBehavior'),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(34, 0, 34, 34),
         children: [
           SizedBox(
             height: 430,
             child: _WorkspaceDeck(
-              title: 'Windows Desktop Mode',
-              subtitle: 'DARKKICK is running the safe desktop platform path.',
+              title: strings.t('desktopModeTitle'),
+              subtitle: strings.t('desktopModeSubtitle'),
               children: [
-                const _FilePreviewTile(
+                _FilePreviewTile(
                   icon: Icons.stream_outlined,
-                  title: 'Realtime snapshots avoided',
-                  subtitle:
-                      'Open chats use polling to protect Windows stability.',
+                  title: strings.t('snapshotsAvoided'),
+                  subtitle: strings.t('snapshotsAvoidedSubtitle'),
                 ),
-                const _FilePreviewTile(
+                _FilePreviewTile(
                   icon: Icons.image_outlined,
-                  title: 'Bytes-based media picking',
-                  subtitle:
-                      'Photos are selected through a desktop-safe picker.',
+                  title: strings.t('bytesMedia'),
+                  subtitle: strings.t('bytesMediaSubtitle'),
                 ),
                 _FilePreviewTile(
                   icon: Icons.mic_off_outlined,
-                  title: 'Voice recording paused',
-                  subtitle: DesktopPlatformService.unsupportedDesktopMessage,
+                  title: strings.t('voicePaused'),
+                  subtitle: strings.t('notAvailableDesktop'),
                   onTap: _showDesktopUnavailable,
                 ),
               ],
@@ -801,7 +1074,9 @@ class _DarkkickDesktopWorkspaceState
 
   void _showDesktopUnavailable() {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(DesktopPlatformService.unsupportedDesktopMessage)),
+      SnackBar(
+        content: Text(_DesktopStrings.of(context).t('notAvailableDesktop')),
+      ),
     );
   }
 
@@ -858,16 +1133,16 @@ class _DarkkickDesktopWorkspaceState
     return 'Conversation';
   }
 
-  String _messagePreview(Chat chat) {
+  String _messagePreview(Chat chat, _DesktopStrings strings) {
     final text = chat.lastMessage.trim();
     if (text.isNotEmpty) return text;
 
     return switch (chat.lastMessageType.toLowerCase()) {
-      'image' => 'Image',
-      'sticker' => 'Sticker',
-      'voice' || 'audio' => 'Audio message',
-      'file' || 'document' => 'File',
-      _ => 'No messages yet',
+      'image' || 'photo' => strings.t('photo'),
+      'sticker' => strings.t('sticker'),
+      'voice' || 'audio' => strings.t('voice'),
+      'file' || 'document' => strings.t('file'),
+      _ => strings.t('noMessagesYet'),
     };
   }
 
@@ -889,15 +1164,28 @@ class _DesktopRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
     final items = [
-      _RailItemData(_DesktopSection.home, Icons.grid_view_rounded, 'Home'),
+      _RailItemData(
+        _DesktopSection.home,
+        Icons.grid_view_rounded,
+        strings.t('home'),
+      ),
       _RailItemData(
         _DesktopSection.conversations,
         Icons.forum_outlined,
-        'Conversations',
+        strings.t('conversations'),
       ),
-      _RailItemData(_DesktopSection.calls, Icons.call_outlined, 'Calls'),
-      _RailItemData(_DesktopSection.files, Icons.folder_outlined, 'Files'),
+      _RailItemData(
+        _DesktopSection.calls,
+        Icons.call_outlined,
+        strings.t('calls'),
+      ),
+      _RailItemData(
+        _DesktopSection.files,
+        Icons.folder_outlined,
+        strings.t('files'),
+      ),
     ];
 
     return Container(
@@ -924,7 +1212,7 @@ class _DesktopRail extends StatelessWidget {
               item: _RailItemData(
                 _DesktopSection.settings,
                 Icons.settings_outlined,
-                'Settings',
+                strings.t('settings'),
               ),
               selected: section == _DesktopSection.settings,
               onTap: () => onSectionSelected(_DesktopSection.settings),
@@ -1113,6 +1401,8 @@ class _DesktopSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
     return TextField(
       controller: controller,
       focusNode: focusNode,
@@ -1120,7 +1410,7 @@ class _DesktopSearchField extends StatelessWidget {
       style: const TextStyle(color: DarkKickColors.textPrimary, fontSize: 14),
       cursorColor: DarkKickColors.neonPurple,
       decoration: InputDecoration(
-        hintText: 'Search workspace',
+        hintText: strings.t('searchWorkspace'),
         hintStyle: const TextStyle(color: DarkKickColors.textTertiary),
         prefixIcon: const Icon(
           Icons.search,
@@ -1258,11 +1548,11 @@ class _ConversationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
     final unread = chat.unreadFor(currentUserId);
-    final color = _avatarColor(title);
 
     return Tooltip(
-      message: 'Open $title',
+      message: title,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
@@ -1295,11 +1585,10 @@ class _ConversationCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _DesktopAvatar(
+                  _DesktopChatAvatar(
+                    chat: chat,
                     title: title,
-                    color: color,
-                    isGroup: chat.isGroup,
-                    isOfficial: SystemBot.isSystemChat(chat),
+                    currentUserId: currentUserId,
                     size: 46,
                   ),
                   const Spacer(),
@@ -1326,7 +1615,7 @@ class _ConversationCard extends StatelessWidget {
               ),
               const SizedBox(height: 7),
               Text(
-                _previewText(chat),
+                _previewText(chat, strings),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -1356,21 +1645,9 @@ class _ConversationCard extends StatelessWidget {
     );
   }
 
-  String _previewText(Chat chat) {
+  String _previewText(Chat chat, _DesktopStrings strings) {
     final text = chat.lastMessage.trim();
-    return text.isEmpty ? 'No messages yet' : text;
-  }
-
-  Color _avatarColor(String value) {
-    final hash = value.codeUnits.fold<int>(0, (sum, unit) => sum + unit);
-    const colors = [
-      Color(0xFF2E2A7F),
-      Color(0xFF7C3AED),
-      Color(0xFF0F766E),
-      Color(0xFF9A3412),
-      Color(0xFF334155),
-    ];
-    return colors[hash % colors.length];
+    return text.isEmpty ? strings.t('noMessagesYet') : text;
   }
 }
 
@@ -1381,6 +1658,7 @@ class _DesktopAvatar extends StatelessWidget {
     required this.isGroup,
     required this.isOfficial,
     required this.size,
+    this.photoUrl,
   });
 
   final String title;
@@ -1388,6 +1666,7 @@ class _DesktopAvatar extends StatelessWidget {
   final bool isGroup;
   final bool isOfficial;
   final double size;
+  final String? photoUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -1416,21 +1695,117 @@ class _DesktopAvatar extends StatelessWidget {
                 errorBuilder: (_, __, ___) =>
                     const Icon(Icons.verified_rounded, color: Colors.white),
               )
-            : isGroup
-            ? Icon(
-                Icons.groups_2_outlined,
-                color: Colors.white.withValues(alpha: 0.92),
-                size: size * 0.42,
-              )
-            : Text(
-                initial,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: size * 0.36,
-                  fontWeight: FontWeight.w800,
+            : photoUrl != null && photoUrl!.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: photoUrl!,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => _DesktopAvatarFallback(
+                  initial: initial,
+                  isGroup: isGroup,
+                  size: size,
                 ),
+              )
+            : _DesktopAvatarFallback(
+                initial: initial,
+                isGroup: isGroup,
+                size: size,
               ),
       ),
+    );
+  }
+}
+
+class _DesktopAvatarFallback extends StatelessWidget {
+  const _DesktopAvatarFallback({
+    required this.initial,
+    required this.isGroup,
+    required this.size,
+  });
+
+  final String initial;
+  final bool isGroup;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isGroup) {
+      return Icon(
+        Icons.groups_2_outlined,
+        color: Colors.white.withValues(alpha: 0.92),
+        size: size * 0.42,
+      );
+    }
+
+    return Text(
+      initial,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: size * 0.36,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+}
+
+class _DesktopChatAvatar extends StatelessWidget {
+  const _DesktopChatAvatar({
+    required this.chat,
+    required this.title,
+    required this.currentUserId,
+    required this.size,
+  });
+
+  final Chat chat;
+  final String title;
+  final String? currentUserId;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    if (SystemBot.isSystemChat(chat) || chat.isGroup) {
+      return _DesktopAvatar(
+        title: title,
+        color: DarkKickColors.cardSoft,
+        isGroup: chat.isGroup,
+        isOfficial: SystemBot.isSystemChat(chat),
+        size: size,
+      );
+    }
+
+    final peerId = chat.otherParticipantId(currentUserId);
+    if (peerId == null || peerId.isEmpty) {
+      return _DesktopAvatar(
+        title: title,
+        color: DarkKickColors.cardSoft,
+        isGroup: chat.isGroup,
+        isOfficial: false,
+        size: size,
+      );
+    }
+
+    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      future: FirebaseFirestore.instance
+          .collection('publicProfiles')
+          .doc(peerId)
+          .get(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() ?? const <String, dynamic>{};
+        final photoUrl = UserFormatters.readPhotoUrl(data);
+        final avatarUpdatedAt = UserFormatters.readDate(
+          data['avatarUpdatedAt'],
+        );
+
+        return _DesktopAvatar(
+          title: title,
+          color: DarkKickColors.cardSoft,
+          isGroup: false,
+          isOfficial: false,
+          size: size,
+          photoUrl: UserFormatters.versionedImageUrl(photoUrl, avatarUpdatedAt),
+        );
+      },
     );
   }
 }
@@ -1443,6 +1818,8 @@ class _TypeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = type.trim().isEmpty ? 'text' : type.trim();
+    final strings = _DesktopStrings.of(context);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
@@ -1451,7 +1828,7 @@ class _TypeChip extends StatelessWidget {
         border: Border.all(color: DarkKickColors.divider),
       ),
       child: Text(
-        normalized,
+        _typeLabel(normalized, strings),
         style: const TextStyle(
           color: DarkKickColors.textSecondary,
           fontSize: 10,
@@ -1459,6 +1836,16 @@ class _TypeChip extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _typeLabel(String type, _DesktopStrings strings) {
+    return switch (type.toLowerCase()) {
+      'image' || 'photo' => strings.t('photo'),
+      'sticker' => strings.t('sticker'),
+      'voice' || 'audio' => strings.t('voice'),
+      'file' || 'document' => strings.t('file'),
+      _ => strings.t('text'),
+    };
   }
 }
 
@@ -1565,11 +1952,13 @@ class _MediaPreviewGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
     if (chats.isEmpty) {
-      return const _DesktopEmptyCard(
+      return _DesktopEmptyCard(
         icon: Icons.photo_library_outlined,
-        title: 'No media yet',
-        subtitle: 'Image messages will become large desktop previews here.',
+        title: strings.t('noMedia'),
+        subtitle: strings.t('noMediaSubtitle'),
       );
     }
 
@@ -1600,20 +1989,24 @@ class _FavoriteContactsGrid extends StatelessWidget {
   const _FavoriteContactsGrid({
     required this.chats,
     required this.titleFor,
+    required this.currentUserId,
     required this.onOpen,
   });
 
   final List<Chat> chats;
   final String Function(Chat chat) titleFor;
+  final String? currentUserId;
   final ValueChanged<Chat> onOpen;
 
   @override
   Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
     if (chats.isEmpty) {
-      return const _DesktopEmptyCard(
+      return _DesktopEmptyCard(
         icon: Icons.star_border_rounded,
-        title: 'No favorites yet',
-        subtitle: 'People you talk to most will stay close.',
+        title: strings.t('favoriteContacts'),
+        subtitle: strings.t('noActiveConversations'),
       );
     }
 
@@ -1636,11 +2029,10 @@ class _FavoriteContactsGrid extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _DesktopAvatar(
+                _DesktopChatAvatar(
+                  chat: chat,
                   title: title,
-                  color: DarkKickColors.cardSoft,
-                  isGroup: chat.isGroup,
-                  isOfficial: SystemBot.isSystemChat(chat),
+                  currentUserId: currentUserId,
                   size: 42,
                 ),
                 const SizedBox(height: 10),
@@ -1677,11 +2069,13 @@ class _RecentFilesStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
     if (chats.isEmpty) {
-      return const _DesktopEmptyCard(
+      return _DesktopEmptyCard(
         icon: Icons.folder_outlined,
-        title: 'No files yet',
-        subtitle: 'Desktop-safe attachments will be collected here.',
+        title: strings.t('noFiles'),
+        subtitle: strings.t('noFilesSubtitle'),
       );
     }
 
@@ -1710,10 +2104,12 @@ class _CallStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
     return _LargePreviewTile(
       icon: Icons.phone_disabled_outlined,
-      title: 'No active calls',
-      subtitle: DesktopPlatformService.unsupportedDesktopMessage,
+      title: strings.t('activeCalls'),
+      subtitle: strings.t('notAvailableDesktop'),
       accent: DarkKickColors.pending,
       onTap: onTap,
     );
@@ -1743,6 +2139,8 @@ class _WorkspaceHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(26, 22, 26, 18),
       child: Column(
@@ -1750,7 +2148,7 @@ class _WorkspaceHeader extends StatelessWidget {
           Row(
             children: [
               Tooltip(
-                message: 'Home',
+                message: strings.t('home'),
                 child: IconButton(
                   onPressed: onBackHome,
                   icon: const Icon(Icons.arrow_back_rounded, size: 20),
@@ -1767,11 +2165,10 @@ class _WorkspaceHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 14),
-              _DesktopAvatar(
+              _DesktopChatAvatar(
+                chat: chat,
                 title: title,
-                color: DarkKickColors.cardSoft,
-                isGroup: chat.isGroup,
-                isOfficial: SystemBot.isSystemChat(chat),
+                currentUserId: currentUserId,
                 size: 48,
               ),
               const SizedBox(width: 14),
@@ -1808,7 +2205,7 @@ class _WorkspaceHeader extends StatelessWidget {
               const SizedBox(width: 8),
               _HeaderIconButton(
                 icon: Icons.add_comment_outlined,
-                tooltip: 'New conversation',
+                tooltip: strings.t('newConversation'),
                 onPressed: onOpenNewChat,
               ),
             ],
@@ -1829,12 +2226,29 @@ class _WorkspaceTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
     final tabs = [
-      _TabData(_ConversationTab.chat, Icons.chat_bubble_outline, 'Chat'),
-      _TabData(_ConversationTab.media, Icons.photo_library_outlined, 'Media'),
-      _TabData(_ConversationTab.files, Icons.folder_outlined, 'Files'),
-      _TabData(_ConversationTab.calls, Icons.call_outlined, 'Calls'),
-      _TabData(_ConversationTab.profile, Icons.person_outline, 'Profile'),
+      _TabData(
+        _ConversationTab.chat,
+        Icons.chat_bubble_outline,
+        strings.t('chat'),
+      ),
+      _TabData(
+        _ConversationTab.media,
+        Icons.photo_library_outlined,
+        strings.t('media'),
+      ),
+      _TabData(
+        _ConversationTab.files,
+        Icons.folder_outlined,
+        strings.t('files'),
+      ),
+      _TabData(_ConversationTab.calls, Icons.call_outlined, strings.t('calls')),
+      _TabData(
+        _ConversationTab.profile,
+        Icons.person_outline,
+        strings.t('profile'),
+      ),
     ];
 
     return Container(
@@ -1988,6 +2402,461 @@ class _ChatWorkspaceCard extends StatelessWidget {
   }
 }
 
+class _ConversationMediaBoard extends StatefulWidget {
+  const _ConversationMediaBoard({
+    super.key,
+    required this.chat,
+    required this.title,
+  });
+
+  final Chat chat;
+  final String title;
+
+  @override
+  State<_ConversationMediaBoard> createState() =>
+      _ConversationMediaBoardState();
+}
+
+class _ConversationMediaBoardState extends State<_ConversationMediaBoard> {
+  late Future<List<Message>> _messagesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _messagesFuture = ChatService.getChatMessages(widget.chat.id);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ConversationMediaBoard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.chat.id != widget.chat.id) {
+      _messagesFuture = ChatService.getChatMessages(widget.chat.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
+    return _WorkspaceDataDeck(
+      title: strings.t('mediaBoard'),
+      subtitle: strings.t('mediaBoardSubtitle'),
+      child: FutureBuilder<List<Message>>(
+        future: _messagesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(
+                color: DarkKickColors.neonPurple,
+              ),
+            );
+          }
+
+          final messages = snapshot.data ?? const <Message>[];
+          final media =
+              messages
+                  .where(
+                    (message) =>
+                        _desktopImageUrlFor(message) != null ||
+                        _desktopStickerValueFor(message) != null,
+                  )
+                  .toList()
+                ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+          if (media.isEmpty) {
+            return Center(
+              child: _DesktopEmptyCard(
+                icon: Icons.photo_library_outlined,
+                title: strings.t('noMedia'),
+                subtitle: strings.t('noMediaSubtitle'),
+              ),
+            );
+          }
+
+          final imageItems = media
+              .map((message) {
+                final imageUrl = _desktopImageUrlFor(message);
+                if (imageUrl == null) return null;
+                return ChatImageItem(messageId: message.id, imageUrl: imageUrl);
+              })
+              .whereType<ChatImageItem>()
+              .toList();
+
+          return GridView.builder(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 260,
+              mainAxisExtent: 210,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
+            ),
+            itemCount: media.length,
+            itemBuilder: (context, index) {
+              final message = media[index];
+              final imageUrl = _desktopImageUrlFor(message);
+              if (imageUrl != null) {
+                return _DesktopMediaImageTile(
+                  message: message,
+                  imageUrl: imageUrl,
+                  onTap: () {
+                    final initialIndex = imageItems.indexWhere(
+                      (item) => item.messageId == message.id,
+                    );
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ImageViewerScreen(
+                          images: imageItems,
+                          initialIndex: initialIndex < 0 ? 0 : initialIndex,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              }
+
+              return _DesktopStickerMediaTile(message: message);
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ConversationFilesBoard extends StatefulWidget {
+  const _ConversationFilesBoard({
+    super.key,
+    required this.chat,
+    required this.title,
+  });
+
+  final Chat chat;
+  final String title;
+
+  @override
+  State<_ConversationFilesBoard> createState() =>
+      _ConversationFilesBoardState();
+}
+
+class _ConversationFilesBoardState extends State<_ConversationFilesBoard> {
+  late Future<List<Message>> _messagesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _messagesFuture = ChatService.getChatMessages(widget.chat.id);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ConversationFilesBoard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.chat.id != widget.chat.id) {
+      _messagesFuture = ChatService.getChatMessages(widget.chat.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
+    return _WorkspaceDataDeck(
+      title: strings.t('files'),
+      subtitle: strings.t('filesSubtitle'),
+      child: FutureBuilder<List<Message>>(
+        future: _messagesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(
+                color: DarkKickColors.neonPurple,
+              ),
+            );
+          }
+
+          final attachments =
+              (snapshot.data ?? const <Message>[])
+                  .where(_desktopIsAttachment)
+                  .toList()
+                ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+          if (attachments.isEmpty) {
+            return Center(
+              child: _DesktopEmptyCard(
+                icon: Icons.folder_open_outlined,
+                title: strings.t('noFiles'),
+                subtitle: strings.t('noFilesSubtitle'),
+              ),
+            );
+          }
+
+          return ListView.separated(
+            itemCount: attachments.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              final message = attachments[index];
+              return _FilePreviewTile(
+                icon: _desktopAttachmentIcon(message),
+                title: _desktopAttachmentTitle(message, strings),
+                subtitle: TimeFormatter.formatChatTime(message.timestamp),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WorkspaceDataDeck extends StatelessWidget {
+  const _WorkspaceDataDeck({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: DarkKickColors.panel.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.spaceGrotesk(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: DarkKickColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+class _DesktopMediaImageTile extends StatelessWidget {
+  const _DesktopMediaImageTile({
+    required this.message,
+    required this.imageUrl,
+    required this.onTap,
+  });
+
+  final Message message;
+  final String imageUrl;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Hero(
+              tag: 'chat-image-${message.id}',
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => const ColoredBox(
+                  color: DarkKickColors.panel,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: DarkKickColors.neonPurple,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) => ColoredBox(
+                  color: DarkKickColors.card,
+                  child: Center(
+                    child: Text(
+                      strings.t('imageUnavailable'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: DarkKickColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 10,
+              bottom: 10,
+              child: _MediaLabel(
+                icon: Icons.image_outlined,
+                label: TimeFormatter.formatChatTime(message.timestamp),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopStickerMediaTile extends StatelessWidget {
+  const _DesktopStickerMediaTile({required this.message});
+
+  final Message message;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+    final sticker = _desktopStickerValueFor(message) ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: DarkKickColors.card.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: _DesktopStickerImage(
+                sticker: sticker,
+                missingLabel: strings.t('stickerUnavailable'),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _MediaLabel(
+            icon: Icons.sticky_note_2_outlined,
+            label: TimeFormatter.formatChatTime(message.timestamp),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DesktopStickerImage extends StatelessWidget {
+  const _DesktopStickerImage({
+    required this.sticker,
+    required this.missingLabel,
+  });
+
+  final String sticker;
+  final String missingLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmed = sticker.trim();
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+      return CachedNetworkImage(
+        imageUrl: trimmed,
+        width: 148,
+        height: 148,
+        fit: BoxFit.contain,
+        placeholder: (context, url) => const SizedBox(
+          width: 148,
+          height: 148,
+          child: Center(
+            child: CircularProgressIndicator(
+              color: DarkKickColors.neonPurple,
+              strokeWidth: 2,
+            ),
+          ),
+        ),
+        errorWidget: (_, __, ___) => _MissingMediaLabel(label: missingLabel),
+      );
+    }
+
+    final assetPath =
+        DarkkickStickers.assetFor(trimmed) ??
+        (trimmed.startsWith('assets/') ? trimmed : null);
+    if (assetPath == null) return _MissingMediaLabel(label: missingLabel);
+
+    return Image.asset(
+      assetPath,
+      width: 148,
+      height: 148,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+      errorBuilder: (_, __, ___) => _MissingMediaLabel(label: missingLabel),
+    );
+  }
+}
+
+class _MissingMediaLabel extends StatelessWidget {
+  const _MissingMediaLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      textAlign: TextAlign.center,
+      style: const TextStyle(color: DarkKickColors.textSecondary, fontSize: 12),
+    );
+  }
+}
+
+class _MediaLabel extends StatelessWidget {
+  const _MediaLabel({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.54),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 13),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WorkspaceInspector extends StatelessWidget {
   const _WorkspaceInspector({
     required this.chat,
@@ -2005,20 +2874,21 @@ class _WorkspaceInspector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
     return ListView(
       children: [
         _InspectorPanel(
-          title: 'Workspace',
+          title: strings.t('workspace'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  _DesktopAvatar(
+                  _DesktopChatAvatar(
+                    chat: chat,
                     title: title,
-                    color: DarkKickColors.cardSoft,
-                    isGroup: chat.isGroup,
-                    isOfficial: SystemBot.isSystemChat(chat),
+                    currentUserId: currentUserId,
                     size: 44,
                   ),
                   const SizedBox(width: 12),
@@ -2039,17 +2909,17 @@ class _WorkspaceInspector extends StatelessWidget {
               const SizedBox(height: 18),
               _InspectorMetric(
                 icon: Icons.mark_chat_unread_outlined,
-                label: 'Unread',
+                label: strings.t('unread'),
                 value: '${chat.unreadFor(currentUserId)}',
               ),
               _InspectorMetric(
                 icon: Icons.schedule_outlined,
-                label: 'Updated',
+                label: strings.t('updated'),
                 value: TimeFormatter.formatChatTime(chat.updatedAt),
               ),
               _InspectorMetric(
                 icon: Icons.people_outline,
-                label: 'People',
+                label: strings.t('people'),
                 value: '${chat.participants.length}',
               ),
             ],
@@ -2057,25 +2927,25 @@ class _WorkspaceInspector extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         _InspectorPanel(
-          title: 'Desktop Intake',
+          title: strings.t('desktopIntake'),
           child: Column(
             children: [
               _InspectorAction(
                 icon: Icons.upload_file_outlined,
-                title: 'Attachment flow',
-                subtitle: 'Use the Chat input for safe Windows picking.',
+                title: strings.t('attachmentFlow'),
+                subtitle: strings.t('attachmentFlowSubtitle'),
                 onTap: onOpenFiles,
               ),
               _InspectorAction(
                 icon: Icons.mic_off_outlined,
-                title: 'Voice recording',
-                subtitle: DesktopPlatformService.unsupportedDesktopMessage,
+                title: strings.t('voiceRecording'),
+                subtitle: strings.t('notAvailableDesktop'),
                 onTap: onUnsupported,
               ),
               _InspectorAction(
                 icon: Icons.open_in_new_rounded,
-                title: 'Detached window',
-                subtitle: 'Multi-window shell hook.',
+                title: strings.t('detachedWindow'),
+                subtitle: strings.t('detachedWindowSubtitle'),
                 onTap: onUnsupported,
               ),
             ],
@@ -2362,6 +3232,8 @@ class _FilePreviewTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -2391,7 +3263,7 @@ class _FilePreviewTile extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    title.trim().isEmpty ? 'Attachment' : title,
+                    title.trim().isEmpty ? strings.t('attachment') : title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -2434,6 +3306,8 @@ class _ProfileIdentityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = _DesktopStrings.of(context);
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -2444,11 +3318,10 @@ class _ProfileIdentityTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _DesktopAvatar(
+          _DesktopChatAvatar(
+            chat: chat,
             title: title,
-            color: DarkKickColors.cardSoft,
-            isGroup: chat.isGroup,
-            isOfficial: SystemBot.isSystemChat(chat),
+            currentUserId: currentUserId,
             size: 54,
           ),
           const Spacer(),
@@ -2464,7 +3337,7 @@ class _ProfileIdentityTile extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Unread: ${chat.unreadFor(currentUserId)}',
+            '${strings.t('unread')}: ${chat.unreadFor(currentUserId)}',
             style: const TextStyle(
               color: DarkKickColors.textSecondary,
               fontSize: 12,

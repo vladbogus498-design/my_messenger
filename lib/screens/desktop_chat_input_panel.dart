@@ -4,9 +4,47 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../services/desktop_platform_service.dart';
 import '../theme/darkkick_colors.dart';
 import '../widgets/sticker_picker.dart';
+
+String _desktopInputText(BuildContext context, String key) {
+  final code = Localizations.localeOf(context).languageCode.toLowerCase();
+  final values = _desktopInputStrings[code] ?? _desktopInputStrings['en']!;
+  return values[key] ?? _desktopInputStrings['en']![key] ?? key;
+}
+
+const _desktopInputStrings = {
+  'en': {
+    'sendTextFailed': 'Could not send the message.',
+    'sendStickerFailed': 'Could not send the sticker.',
+    'sendPhotoFailed': 'Could not send the photo.',
+    'unsupported': 'Not available on desktop yet',
+    'photo': 'Photo',
+    'stickers': 'Stickers',
+    'message': 'Message...',
+    'send': 'Send',
+  },
+  'ru': {
+    'sendTextFailed': 'Не удалось отправить сообщение.',
+    'sendStickerFailed': 'Не удалось отправить стикер.',
+    'sendPhotoFailed': 'Не удалось отправить фото.',
+    'unsupported': 'Пока недоступно на desktop',
+    'photo': 'Фото',
+    'stickers': 'Стикеры',
+    'message': 'Сообщение...',
+    'send': 'Отправить',
+  },
+  'pl': {
+    'sendTextFailed': 'Nie udało się wysłać wiadomości.',
+    'sendStickerFailed': 'Nie udało się wysłać naklejki.',
+    'sendPhotoFailed': 'Nie udało się wysłać zdjęcia.',
+    'unsupported': 'Jeszcze niedostępne na desktopie',
+    'photo': 'Zdjęcie',
+    'stickers': 'Naklejki',
+    'message': 'Wiadomość...',
+    'send': 'Wyślij',
+  },
+};
 
 class DesktopChatInputPanel extends StatefulWidget {
   const DesktopChatInputPanel({
@@ -55,7 +93,7 @@ class _DesktopChatInputPanelState extends State<DesktopChatInputPanel> {
       if (kDebugMode) {
         debugPrint('Desktop text send failed: $error\n$stackTrace');
       }
-      _showSnackBar('Не удалось отправить сообщение.');
+      _showSnackBar(_desktopInputText(context, 'sendTextFailed'));
     } finally {
       if (mounted) setState(() => _sendingText = false);
     }
@@ -72,7 +110,7 @@ class _DesktopChatInputPanelState extends State<DesktopChatInputPanel> {
       if (kDebugMode) {
         debugPrint('Desktop sticker send failed: $error\n$stackTrace');
       }
-      _showSnackBar('Не удалось отправить стикер.');
+      _showSnackBar(_desktopInputText(context, 'sendStickerFailed'));
     } finally {
       if (mounted) setState(() => _sendingSticker = false);
     }
@@ -88,14 +126,14 @@ class _DesktopChatInputPanelState extends State<DesktopChatInputPanel> {
       if (kDebugMode) {
         debugPrint('Desktop photo send failed: $error\n$stackTrace');
       }
-      _showSnackBar('Не удалось отправить фото.');
+      _showSnackBar(_desktopInputText(context, 'sendPhotoFailed'));
     } finally {
       if (mounted) setState(() => _pickingImage = false);
     }
   }
 
   void _showUnsupported() {
-    _showSnackBar(DesktopPlatformService.unsupportedDesktopMessage);
+    _showSnackBar(_desktopInputText(context, 'unsupported'));
   }
 
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
@@ -145,7 +183,7 @@ class _DesktopChatInputPanelState extends State<DesktopChatInputPanel> {
                   icon: _pickingImage
                       ? Icons.hourglass_top
                       : Icons.photo_outlined,
-                  tooltip: 'Фото',
+                  tooltip: _desktopInputText(context, 'photo'),
                   onPressed: _pickingImage
                       ? null
                       : () => unawaited(_pickPhoto()),
@@ -153,7 +191,7 @@ class _DesktopChatInputPanelState extends State<DesktopChatInputPanel> {
                 const SizedBox(width: 8),
                 _DesktopIconButton(
                   icon: Icons.sticky_note_2_outlined,
-                  tooltip: 'Стикеры',
+                  tooltip: _desktopInputText(context, 'stickers'),
                   active: _showStickers,
                   onPressed: () =>
                       setState(() => _showStickers = !_showStickers),
@@ -161,7 +199,7 @@ class _DesktopChatInputPanelState extends State<DesktopChatInputPanel> {
                 const SizedBox(width: 8),
                 _DesktopIconButton(
                   icon: Icons.mic_none_outlined,
-                  tooltip: DesktopPlatformService.unsupportedDesktopMessage,
+                  tooltip: _desktopInputText(context, 'unsupported'),
                   onPressed: _showUnsupported,
                 ),
                 const SizedBox(width: 10),
@@ -176,7 +214,7 @@ class _DesktopChatInputPanelState extends State<DesktopChatInputPanel> {
                       style: const TextStyle(color: DarkKickColors.textPrimary),
                       cursorColor: DarkKickColors.neonPurple,
                       decoration: InputDecoration(
-                        hintText: 'Сообщение...',
+                        hintText: _desktopInputText(context, 'message'),
                         hintStyle: const TextStyle(
                           color: DarkKickColors.textTertiary,
                         ),
@@ -211,7 +249,7 @@ class _DesktopChatInputPanelState extends State<DesktopChatInputPanel> {
                 const SizedBox(width: 10),
                 _DesktopIconButton(
                   icon: _sendingText ? Icons.hourglass_top : Icons.send,
-                  tooltip: 'Отправить',
+                  tooltip: _desktopInputText(context, 'send'),
                   filled: true,
                   onPressed: _sendingText ? null : () => unawaited(_sendText()),
                 ),

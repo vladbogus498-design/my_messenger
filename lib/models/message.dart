@@ -58,16 +58,34 @@ class Message {
     final replyTo = data['replyTo'] == null
         ? null
         : Map<String, dynamic>.from(data['replyTo']);
+    final type = (data['type'] ?? 'text').toString();
+    final imageUrl =
+        _readString(data, const [
+          'imageUrl',
+          'imageURL',
+          'photoUrl',
+          'photoURL',
+          'mediaUrl',
+          'downloadUrl',
+          'secureUrl',
+        ]) ??
+        (_isImageType(type)
+            ? _readString(data, const ['fileUrl', 'url'])
+            : null);
 
     return Message(
       id: id,
       chatId: data['chatId'] ?? '',
       senderId: data['senderId'] ?? '',
       text: data['text'] ?? '',
-      type: data['type'] ?? 'text',
-      imageUrl: data['imageUrl'],
-      stickerUrl: data['stickerUrl'] ?? data['stickerId'],
-      voiceUrl: data['voiceUrl'],
+      type: type,
+      imageUrl: imageUrl,
+      stickerUrl: _readString(data, const [
+        'stickerUrl',
+        'stickerURL',
+        'stickerId',
+      ]),
+      voiceUrl: _readString(data, const ['voiceUrl', 'audioUrl']),
       voiceAudioBase64: data['voiceAudioBase64'],
       voiceDuration: data['voiceDuration'],
       stickerId: data['stickerId'],
@@ -149,5 +167,18 @@ class Message {
     if (value is Timestamp) return value.toDate();
     if (value is DateTime) return value;
     return DateTime.now();
+  }
+
+  static String? _readString(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      final value = data[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  static bool _isImageType(String type) {
+    final normalized = type.toLowerCase().trim();
+    return normalized == 'image' || normalized == 'photo';
   }
 }
